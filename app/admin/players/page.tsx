@@ -353,22 +353,58 @@ export default function AdminPlayers() {
 
   const handleImportCSV = () => {
     try {
-      const lines = importCSV.trim().split("\n");
-      const header = lines[0].split(",").map(h => h.trim());
-      const newPlayers = lines.slice(1).map(line => {
+      const lines = importCSV.trim().split("\n").filter(l => l.trim());
+      if (lines.length < 2) {
+        setToast({ msg: "Import failed: need a header row + at least one player row", type: "error" });
+        return;
+      }
+
+      const header = lines[0].split(",").map(h => h.trim().toLowerCase());
+      const nameIdx   = header.indexOf("name");
+      const brandIdx  = header.findIndex(h => h === "brandname" || h === "brand");
+      const cohortIdx = header.indexOf("cohort");
+      const emailIdx  = header.indexOf("email");
+
+      if (nameIdx === -1 || brandIdx === -1 || cohortIdx === -1 || emailIdx === -1) {
+        setToast({ msg: "CSV must include columns: name, brandName, cohort, email", type: "error" });
+        return;
+      }
+
+      const newPlayers: User[] = lines.slice(1).map((line, i) => {
         const values = line.split(",").map(v => v.trim());
-        const obj: any = {};
-        header.forEach((key, i) => {
-          obj[key] = isNaN(Number(values[i])) ? values[i] : Number(values[i]);
-        });
-        return obj as User;
+        const name      = values[nameIdx]   || `Player ${i + 1}`;
+        const brandName = values[brandIdx]  || name;
+        const cohort    = values[cohortIdx] || "Cohort 1";
+        const email     = values[emailIdx]  || "";
+        const id        = `player-import-${Date.now()}-${i}`;
+        return {
+          id,
+          name,
+          brandName,
+          email,
+          cohort,
+          role: "player" as const,
+          avatar: name.substring(0, 2).toUpperCase(),
+          digitalBadges: 0,
+          xcoin: 0,
+          totalXcoin: 0,
+          level: 1,
+          rank: 1,
+          pathway: "",
+          joinedAt: new Date().toISOString().split("T")[0],
+          pin: generatePin(),
+          claimed: false,
+        };
       });
+
+      // Push into live mockUsers so the rest of the app sees them immediately
+      mockUsers.push(...newPlayers);
       setPlayers([...players, ...newPlayers]);
       setShowImportModal(false);
       setImportCSV("");
-      setToast({ msg: `${newPlayers.length} players imported`, type: "success" });
-    } catch (err) {
-      setToast({ msg: "Import failed: invalid CSV format", type: "error" });
+      setToast({ msg: `${newPlayers.length} player${newPlayers.length !== 1 ? "s" : ""} imported successfully`, type: "success" });
+    } catch {
+      setToast({ msg: "Import failed: check your CSV format", type: "error" });
     }
   };
 
@@ -560,7 +596,7 @@ export default function AdminPlayers() {
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                   <thead>
                     <tr style={{ background: "linear-gradient(90deg, rgba(245,200,66,0.06) 0%, rgba(245,200,66,0.02) 100%)" }}>
-                      {(["Name","Brand","Cohort","Joined","Actions"] as const).map(label => (
+                      {(["Name","Brand","Email","Cohort","Joined","Actions"] as const).map(label => (
                         <th key={label} style={{
                           padding: "10px 16px", textAlign: "left",
                           borderBottom: "1px solid rgba(245,200,66,0.2)",
@@ -596,6 +632,7 @@ export default function AdminPlayers() {
                           </div>
                         </td>
                         <td style={{ padding: "10px 16px", color: "rgba(224,232,255,0.8)" }}>{host.brandName}</td>
+                        <td style={{ padding: "10px 16px", color: "rgba(224,232,255,0.5)", fontSize: "12px" }}>{host.email || <span style={{ color: "rgba(255,255,255,0.15)" }}>—</span>}</td>
                         <td style={{ padding: "10px 16px", color: "rgba(224,232,255,0.6)", fontSize: "12px" }}>{host.cohort}</td>
                         <td style={{ padding: "10px 16px", color: "rgba(224,232,255,0.5)", fontSize: "12px" }}>
                           {new Date(host.joinedAt).toLocaleDateString()}
@@ -637,6 +674,7 @@ export default function AdminPlayers() {
                 <tr style={{ background: "linear-gradient(90deg, rgba(0,212,255,0.08) 0%, rgba(0,212,255,0.03) 100%)" }}>
                   <ColHeader label="Name" sortKey="name" currentSort={sort} onSort={handleSort} />
                   <ColHeader label="Brand" sortKey="brandName" currentSort={sort} onSort={handleSort} />
+                  <th style={{ padding: "12px 16px", textAlign: "left", background: "linear-gradient(90deg, rgba(0,212,255,0.05) 0%, rgba(0,212,255,0.02) 100%)", borderBottom: "2px solid #00d4ff", color: "rgba(0,212,255,0.7)", fontSize: "12px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" }}>Email</th>
                   <ColHeader label="Level" sortKey="level" currentSort={sort} onSort={handleSort} />
                   <ColHeader label="XC" sortKey="xcoin" currentSort={sort} onSort={handleSort} />
                   <ColHeader label="Badges" sortKey="digitalBadges" currentSort={sort} onSort={handleSort} />
@@ -684,6 +722,14 @@ export default function AdminPlayers() {
                         </div>
                       </td>
                       <td style={{ padding: "12px 16px", color: "rgba(224,232,255,0.9)" }}>{player.brandName}</td>
+                      <td style={{ padding: "12px 16px" }}>
+                        {player.email
+                          ? <span style={{ fontSize: "12px", color: "rgba(0,212,255,0.6)", fontFamily: "monospace" }}>{player.email}</span>
+                          : <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.15)" }}>—</span>}
+                        {player.claimed === false && player.email && (
+                          <span style={{ marginLeft: "6px", fontSize: "9px", fontWeight: 800, color: "#f5c842", background: "rgba(245,200,66,0.1)", border: "1px solid rgba(245,200,66,0.3)", borderRadius: "4px", padding: "1px 5px", letterSpacing: "0.05em" }}>UNCLAIMED</span>
+                        )}
+                      </td>
                       <td style={{ padding: "12px 16px", color: "#00d4ff", fontWeight: 600 }}>{level}</td>
                       <td style={{ padding: "12px 16px", color: "rgba(224,232,255,0.8)" }}>
                         {player.xcoin.toLocaleString()}
@@ -802,19 +848,42 @@ export default function AdminPlayers() {
               <h2 style={{
                 fontSize: "22px",
                 fontWeight: "700",
-                margin: "0 0 20px 0",
+                margin: "0 0 12px 0",
                 color: "#00d4ff",
                 textShadow: "0 0 15px rgba(0,212,255,0.4)",
               }}>
                 Import Players from CSV
               </h2>
+
+              {/* Format instructions */}
+              <div style={{
+                background: "rgba(0,212,255,0.05)", border: "1px solid rgba(0,212,255,0.15)",
+                borderRadius: "8px", padding: "12px 14px", marginBottom: "14px",
+              }}>
+                <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 800, color: "rgba(0,212,255,0.7)", letterSpacing: "0.08em" }}>
+                  REQUIRED COLUMNS
+                </p>
+                <p style={{ margin: "0 0 8px", fontSize: "12px", color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
+                  Only four columns are needed. Everything else (PIN, XC, level, etc.) is generated automatically.
+                </p>
+                <code style={{ fontSize: "11px", color: "#00d4ff", background: "rgba(0,212,255,0.08)", padding: "4px 8px", borderRadius: "5px", display: "block", letterSpacing: "0.03em" }}>
+                  name, brandName, cohort, email
+                </code>
+                <p style={{ margin: "8px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>
+                  Example: <span style={{ color: "rgba(0,212,255,0.6)" }}>Jordan Smith, DesignDriven, Cohort 1, jordan@school.edu</span>
+                </p>
+                <p style={{ margin: "6px 0 0", fontSize: "11px", color: "rgba(167,139,250,0.7)" }}>
+                  ✦ Players use their email to claim their account and complete the diagnostic.
+                </p>
+              </div>
+
               <textarea
                 value={importCSV}
                 onChange={(e) => setImportCSV(e.target.value)}
-                placeholder="id,name,brandName,cohort,pathway,joinedAt,xp,xc,pin&#10;..."
+                placeholder={"name,brandName,cohort,email\nJordan Smith,DesignDriven,Cohort 1,jordan@school.edu\nAlex Torres,PixelForge,Cohort 1,alex@school.edu"}
                 style={{
                   width: "100%",
-                  height: "200px",
+                  height: "180px",
                   padding: "12px",
                   background: "rgba(6,9,13,0.8)",
                   border: "1px solid rgba(0,212,255,0.2)",
@@ -827,6 +896,7 @@ export default function AdminPlayers() {
                   marginBottom: "16px",
                   resize: "vertical",
                   transition: "all .2s ease-out",
+                  boxSizing: "border-box",
                 }}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = "#00d4ff";

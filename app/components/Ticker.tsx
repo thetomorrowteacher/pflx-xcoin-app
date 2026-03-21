@@ -5,6 +5,22 @@ import {
   mockStudioInvestments, getStatusScore,
 } from "../lib/data";
 
+const TICKER_DATE_KEY = "pflx_ticker_date";
+
+/** Returns "YYYY-MM-DD" for today in local time. */
+function todayString(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Milliseconds until the next local midnight. */
+function msUntilMidnight(): number {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  return midnight.getTime() - now.getTime();
+}
+
 interface TickerEvent {
   text: string;
   color: string;
@@ -13,6 +29,11 @@ interface TickerEvent {
 }
 
 function buildTickerEvents(): TickerEvent[] {
+  // Only include events from the current calendar day (resets at midnight)
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const cutoff = startOfToday.getTime();
+
   const players = mockUsers.filter(u => u.role === "player");
   const events: TickerEvent[] = [];
 
@@ -124,9 +145,10 @@ function buildTickerEvents(): TickerEvent[] {
     });
   }
 
-  // Sort by date descending, deduplicate, cap at 40
+  // Filter to today only (events without a valid date are excluded except #1 which always has now())
+  // Sort newest first, cap at 40
   return events
-    .filter(e => e.text.trim())
+    .filter(e => e.text.trim() && new Date(e.date).getTime() >= cutoff)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 40);
 }
@@ -135,10 +157,55 @@ export default function Ticker() {
   const [events, setEvents] = useState<TickerEvent[]>([]);
 
   useEffect(() => {
+    // ── Initial load ──────────────────────────────────────────────
+    const today = todayString();
+    const stored = localStorage.getItem(TICKER_DATE_KEY);
+    if (stored !== today) {
+      // New day — record today's date and start fresh
+      localStorage.setItem(TICKER_DATE_KEY, today);
+    }
     setEvents(buildTickerEvents());
+
+    // ── Refresh every 60 s to pick up new activity ────────────────
+    const refreshInterval = setInterval(() => {
+      setEvents(buildTickerEvents());
+    }, 60_000);
+
+    // ── Schedule a reset exactly at midnight ──────────────────────
+    const midnightTimeout = setTimeout(() => {
+      localStorage.setItem(TICKER_DATE_KEY, todayString());
+      setEvents(buildTickerEvents());
+    }, msUntilMidnight());
+
+    return () => {
+      clearInterval(refreshInterval);
+      clearTimeout(midnightTimeout);
+    };
   }, []);
 
-  if (events.length === 0) return null;
+  if (events.length === 0) {
+    // No activity yet today — show a placeholder so the ticker bar still renders
+    return (
+      <div style={{
+        position: "fixed", bottom: 0, left: 0, width: "100%",
+        background: "rgba(8,8,14,0.97)",
+        borderTop: "1px solid rgba(0,212,255,0.15)",
+        zIndex: 99999, height: "28px", display: "flex", alignItems: "center",
+        backdropFilter: "blur(12px)",
+      }}>
+        <div style={{
+          flexShrink: 0, padding: "0 10px", height: "100%",
+          display: "flex", alignItems: "center",
+          background: "rgba(0,212,255,0.08)",
+          borderRight: "1px solid rgba(0,212,255,0.15)",
+          fontSize: "8px", fontWeight: 900, letterSpacing: "0.14em", color: "#00d4ff",
+        }}>⚡ LIVE</div>
+        <span style={{ fontSize: "11px", color: "rgba(0,212,255,0.3)", marginLeft: "16px", letterSpacing: "0.06em" }}>
+          No activity yet today · Resets daily at midnight
+        </span>
+      </div>
+    );
+  }
 
   // Build the ticker string with colored segments via spans — we render the text once and duplicate it
   const separator = "      ◆      ";
