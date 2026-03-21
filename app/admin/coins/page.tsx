@@ -1,0 +1,362 @@
+"use client";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import SideNav from "../../components/SideNav";
+import {
+  User,
+  COIN_CATEGORIES,
+  Coin,
+  CoinCategory,
+  mockUsers,
+  mockSubmissions,
+  CoinSubmission
+} from "../../lib/data";
+import { applyPlayerImages } from "../../lib/playerImages";
+import { playReward, playSuccess, playClick } from "../../lib/sounds";
+import { updatePlayerStats } from "../../lib/playerStats";
+
+export default function ManageCoinsPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [categories, setCategories] = useState<CoinCategory[]>(COIN_CATEGORIES);
+  const [editingCoin, setEditingCoin] = useState<{catIndex: number, coinIndex: number, coin: Coin} | null>(null);
+  const [isAdding, setIsAdding] = useState<number | null>(null); // Category index
+  const [grantTarget, setGrantTarget] = useState<{playerId: string, coin: Coin, amount: number} | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("pflx_user");
+    if (!stored) { router.push("/"); return; }
+    const u = JSON.parse(stored) as User;
+    if (u.role !== "admin") { router.push("/player"); return; }
+    setUser(u);
+  }, [router]);
+
+  if (!user) return null;
+
+  const handleDelete = (catIdx: number, coinIdx: number) => {
+    if (!confirm("Are you sure you want to delete this coin?")) return;
+    const newCats = [...categories];
+    newCats[catIdx].coins.splice(coinIdx, 1);
+    setCategories(newCats);
+  };
+
+  const handleSaveCoin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCoin) return;
+    const { catIndex, coinIndex, coin } = editingCoin;
+    const newCats = [...categories];
+    newCats[catIndex].coins[coinIndex] = coin;
+    setCategories(newCats);
+    setEditingCoin(null);
+  };
+
+  const handleImageUpload = (file: File, isEditing: boolean) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      if (isEditing && editingCoin) {
+        setEditingCoin({ ...editingCoin, coin: { ...editingCoin.coin, image: base64String } });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCreateCoin = (e: React.FormEvent, catIdx: number) => {
+    e.preventDefault();
+    const formData = new FormData(e.target as HTMLFormElement);
+    const newCoin: Coin = {
+      name: formData.get("name") as string,
+      description: formData.get("description") as string,
+      xc: parseInt(formData.get("xc") as string) || 0,
+      image: (e.target as any).querySelector('#new-coin-image-preview')?.src || undefined,
+    };
+    const newCats = [...categories];
+    newCats[catIdx].coins.push(newCoin);
+    setCategories(newCats);
+    setIsAdding(null);
+  };
+
+  const handleGrantCoin = () => {
+    if (!grantTarget) return;
+    const { playerId, coin, amount } = grantTarget;
+    const targetPlayer = mockUsers.find(u => u.id === playerId);
+    if (targetPlayer) {
+      const totalXcReward = coin.xc * amount;
+      targetPlayer.digitalBadges += amount; // +X badges
+      targetPlayer.xcoin += totalXcReward;
+      targetPlayer.totalXcoin += totalXcReward;
+
+      // Add to submissions history as pre-approved
+      mockSubmissions.push({
+        id: `grant-${Date.now()}`,
+        playerId,
+        coinType: coin.name,
+        amount: amount,
+        reason: "Administrator Grant",
+        status: "approved",
+        submittedAt: new Date().toISOString(),
+        reviewedAt: new Date().toISOString()
+      });
+
+      // Persist updated stats so player dashboard reflects this immediately
+      updatePlayerStats(playerId, {
+        xcoin: targetPlayer.xcoin,
+        totalXcoin: targetPlayer.totalXcoin,
+        digitalBadges: targetPlayer.digitalBadges,
+        level: targetPlayer.level,
+        rank: targetPlayer.rank,
+      });
+
+      playReward();
+      alert(`Successfully granted ${amount}x ${coin.name} to ${targetPlayer.name} (+${totalXcReward} XC)`);
+    }
+    setGrantTarget(null);
+  };
+
+  return (
+    <div style={{ display: "flex", minHeight: "100vh", background: "#0a0a0f" }}>
+      <SideNav user={user} />
+
+      <main style={{ flex: 1, padding: "32px", overflow: "auto" }}>
+        {/* Header */}
+        <div style={{ marginBottom: "28px" }}>
+          <h1 style={{ fontSize: "28px", fontWeight: 900, margin: "0 0 4px", letterSpacing: "0.08em",
+            background: "linear-gradient(90deg, #00d4ff, #a78bfa, #00d4ff)",
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            filter: "drop-shadow(0 0 10px rgba(0,212,255,0.4))"
+          }}>💎 X-COIN MANAGEMENT</h1>
+          <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.1em" }}>[ ADD, MANAGE & CONFIGURE PFLX CURRENCY ]</p>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "40px" }}>
+          {categories.map((cat, catIdx) => (
+            <section key={cat.name}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.05)", paddingBottom: "8px" }}>
+                <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#f5c842", margin: 0 }}>{cat.name}</h2>
+                <button 
+                  onClick={() => setIsAdding(catIdx)}
+                  style={{ background: "rgba(245,200,66,0.1)", border: "1px solid rgba(245,200,66,0.2)", color: "#f5c842", padding: "6px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
+                >+ Add New Coin</button>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
+                {cat.coins.map((coin, coinIdx) => (
+                  <div key={coin.name} style={{ background: "rgba(22,22,31,0.6)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "16px", padding: "20px", display: "flex", alignItems: "flex-start", gap: "20px" }}>
+                    <div style={{ width: "86px", height: "86px", borderRadius: "14px", background: "rgba(255,255,255,0.03)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)", flexShrink: 0, padding: "8px" }}>
+                      {coin.image ? <img src={coin.image} style={{ width: "100%", height: "100%", objectFit: "contain" }} alt={coin.name} /> : <span style={{ fontSize: "36px" }}>🪙</span>}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: "0 0 4px", fontSize: "14px", fontWeight: 700, color: "#f0f0ff" }}>{coin.name}</p>
+                      <p style={{ margin: "0 0 12px", fontSize: "12px", color: "rgba(255,255,255,0.4)", lineHeight: 1.4 }}>{coin.description}</p>
+                      <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#4f8ef7", padding: "2px 8px", background: "rgba(79,142,247,0.1)", borderRadius: "6px" }}>{coin.xc} XC REWARD</span>
+                      </div>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button 
+                          onClick={() => setEditingCoin({ catIndex: catIdx, coinIndex: coinIdx, coin: {...coin} })}
+                          style={{ flex: 1, padding: "6px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "white", fontSize: "11px", cursor: "pointer" }}
+                        >Edit</button>
+                        <button 
+                          onClick={() => setGrantTarget({ playerId: "", coin, amount: 1 })}
+                          style={{ flex: 1, padding: "6px", borderRadius: "8px", border: "none", background: "rgba(79,142,247,0.2)", color: "#4f8ef7", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
+                        >Grant</button>
+                        <button 
+                          onClick={() => handleDelete(catIdx, coinIdx)}
+                          style={{ padding: "6px 10px", borderRadius: "8px", border: "none", background: "rgba(239,68,68,0.1)", color: "#ef4444", fontSize: "11px", cursor: "pointer" }}
+                        >Delete</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+
+        {/* Edit Modal */}
+        {editingCoin && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
+            <div style={{ background: "#16161f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "24px", padding: "32px", width: "100%", maxWidth: "450px" }}>
+              <h2 style={{ margin: "0 0 24px", color: "#f0f0ff" }}>Edit Coin</h2>
+              <form onSubmit={handleSaveCoin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Name</label>
+                  <input 
+                    value={editingCoin.coin.name}
+                    onChange={e => setEditingCoin({...editingCoin, coin: {...editingCoin.coin, name: e.target.value}})}
+                    style={{ width: "100%", padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Description</label>
+                  <textarea 
+                    value={editingCoin.coin.description}
+                    onChange={e => setEditingCoin({...editingCoin, coin: {...editingCoin.coin, description: e.target.value}})}
+                    style={{ width: "100%", padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white", minHeight: "80px" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>XC Reward</label>
+                  <input
+                    type="number"
+                    value={editingCoin.coin.xc}
+                    onChange={e => setEditingCoin({...editingCoin, coin: {...editingCoin.coin, xc: parseInt(e.target.value)}})}
+                    style={{ width: "100%", padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white" }}
+                  />
+                </div>
+                
+                {/* Image Upload */}
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Coin Image</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                    <div style={{ width: "64px", height: "64px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {editingCoin.coin.image ? <img src={editingCoin.coin.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "24px" }}>🪙</span>}
+                    </div>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      id="edit-coin-file" 
+                      hidden 
+                      onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], true)}
+                    />
+                    <label htmlFor="edit-coin-file" style={{ 
+                      flex: 1, padding: "12px", background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.2)", 
+                      borderRadius: "12px", color: "rgba(255,255,255,0.6)", fontSize: "13px", textAlign: "center", cursor: "pointer"
+                    }}>
+                      {editingCoin.coin.image ? "Change Image" : "Upload Custom Image"}
+                    </label>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
+                  <button type="button" onClick={() => setEditingCoin(null)} style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", cursor: "pointer" }}>Cancel</button>
+                  <button type="submit" style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "#f5c842", border: "none", color: "#000", fontWeight: 700, cursor: "pointer" }}>Save Changes</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Add Modal */}
+        {isAdding !== null && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
+            <div style={{ background: "#16161f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "24px", padding: "32px", width: "100%", maxWidth: "450px" }}>
+              <h2 style={{ margin: "0 0 24px", color: "#f0f0ff" }}>Add to {categories[isAdding].name}</h2>
+              <form onSubmit={(e) => handleCreateCoin(e, isAdding)} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <input name="name" placeholder="Coin Name" required style={{ width: "100%", padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white" }} />
+                <textarea name="description" placeholder="Description" required style={{ width: "100%", padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white", minHeight: "80px" }} />
+                <input name="xc" type="number" placeholder="XC Reward" required style={{ width: "100%", padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white" }} />
+                
+                {/* Image Upload for New Coin */}
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Coin Image</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                    <div style={{ width: "64px", height: "64px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <img id="new-coin-image-preview" src="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "none" }} />
+                      <span id="new-coin-placeholder" style={{ fontSize: "24px" }}>🪙</span>
+                    </div>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      id="add-coin-file" 
+                      hidden 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            const preview = document.getElementById('new-coin-image-preview') as HTMLImageElement;
+                            const placeholder = document.getElementById('new-coin-placeholder');
+                            if (preview && placeholder) {
+                              preview.src = reader.result as string;
+                              preview.style.display = 'block';
+                              placeholder.style.display = 'none';
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                    <label htmlFor="add-coin-file" style={{ 
+                      flex: 1, padding: "12px", background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.2)", 
+                      borderRadius: "12px", color: "rgba(255,255,255,0.6)", fontSize: "13px", textAlign: "center", cursor: "pointer"
+                    }}>
+                      Upload Badge Image
+                    </label>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
+                  <button type="button" onClick={() => setIsAdding(null)} style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", cursor: "pointer" }}>Cancel</button>
+                  <button type="submit" style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "#f5c842", border: "none", color: "#000", fontWeight: 700, cursor: "pointer" }}>Create Coin</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Grant Modal */}
+        {grantTarget && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
+            <div style={{ background: "#16161f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "24px", padding: "32px", width: "100%", maxWidth: "400px" }}>
+              <h2 style={{ margin: "0 0 8px", color: "#f0f0ff" }}>Grant {grantTarget.coin.name}</h2>
+              <p style={{ margin: "0 0 24px", fontSize: "14px", color: "rgba(255,255,255,0.4)" }}>Select a player to award this coin</p>
+              
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "24px", maxHeight: "200px", overflowY: "auto" }}>
+                {applyPlayerImages(mockUsers).filter(u => u.role === "player").map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => setGrantTarget({...grantTarget, playerId: s.id})}
+                    style={{
+                      padding: "12px", borderRadius: "12px", border: grantTarget.playerId === s.id ? "1px solid #4f8ef7" : "1px solid rgba(255,255,255,0.05)",
+                      background: grantTarget.playerId === s.id ? "rgba(79,142,247,0.1)" : "rgba(255,255,255,0.02)",
+                      display: "flex", alignItems: "center", gap: "12px", color: "#f0f0ff", cursor: "pointer", textAlign: "left"
+                    }}
+                  >
+                    <div style={{ width: "24px", height: "24px", overflow: "hidden",
+                      borderRadius: s.image ? "50%" : "6px",
+                      background: s.image ? "transparent" : "linear-gradient(135deg, #4f8ef7, #8b5cf6)",
+                      fontSize: "10px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      {s.image ? <img src={s.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : s.avatar}
+                    </div>
+                    <span style={{ fontSize: "14px", flex: 1 }}>{s.name}</span>
+                    <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>Lv.{s.level}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ marginBottom: "24px" }}>
+                <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Amount to Grant</label>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="100" 
+                    value={grantTarget.amount} 
+                    onChange={e => setGrantTarget({...grantTarget, amount: parseInt(e.target.value) || 1})}
+                    style={{ flex: 1, padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white" }}
+                  />
+                  <div style={{ textAlign: "right", minWidth: "100px" }}>
+                    <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#4f8ef7" }}>+{grantTarget.coin.xc * grantTarget.amount} XP</p>
+                    <p style={{ margin: 0, fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>{grantTarget.amount} Badges</p>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button onClick={() => setGrantTarget(null)} style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", cursor: "pointer" }}>Cancel</button>
+                <button 
+                  onClick={handleGrantCoin}
+                  disabled={!grantTarget.playerId}
+                  style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "#4f8ef7", border: "none", color: "white", fontWeight: 700, cursor: grantTarget.playerId ? "pointer" : "not-allowed", opacity: grantTarget.playerId ? 1 : 0.5 }}
+                >Confirm Grant</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}

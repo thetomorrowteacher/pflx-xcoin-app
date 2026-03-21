@@ -1,0 +1,27 @@
+
+> pflx-xcoin-app@0.1.0 dev
+> next dev
+
+ ⚠ Port 3000 is in use, trying 3001 instead.
+ ⚠ Port 3001 is in use, trying 3002 instead.
+ ⚠ Port 3002 is in use, trying 3003 instead.
+ ⚠ Port 3003 is in use, trying 3004 instead.
+   ▲ Next.js 14.1.0
+   - Local:        http://localhost:3004
+
+Error: ECANCELED: operation canceled, read
+    at Object.readFileSync (node:fs:448:20)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1378:18)
+    at Module.load (node:internal/modules/cjs/loader:1208:32)
+    at Module._load (node:internal/modules/cjs/loader:1024:12)
+    at Module.require (node:internal/modules/cjs/loader:1233:19)
+    at mod.require (/Users/ejohnson/Desktop/pflx-xcoin-app/node_modules/next/dist/server/require-hook.js:65:28)
+    at require (node:internal/modules/helpers:179:18)
+    at Object.<anonymous> (/Users/ejohnson/Desktop/pflx-xcoin-app/node_modules/caniuse-lite/dist/unpacker/browsers.js:1:27)
+    at Module._compile (node:internal/modules/cjs/loader:1358:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1416:10) {
+  errno: -89,
+  code: 'ECANCELED',
+  syscall: 'read'
+}
+[?25h

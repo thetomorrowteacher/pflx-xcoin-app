@@ -1,0 +1,807 @@
+
+> pflx-xcoin-app@0.1.0 dev
+> next dev
+
+   ▲ Next.js 14.1.0
+   - Local:        http://localhost:3000
+
+ ✓ Ready in 297.2s
+ ○ Compiling / ...
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-win32-arm64-msvc isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-win32-ia32-msvc isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-linux-x64-musl isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-win32-x64-msvc isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-linux-x64-gnu isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-darwin-x64 isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+ ✓ Compiled / in 513s (506 modules)
+ ✓ Compiled in 362ms (248 modules)
+ ✓ Compiled /favicon.ico in 155ms (286 modules)
+ ✓ Compiled in 293ms (248 modules)
+ ✓ Compiled in 304ms (248 modules)
+ ✓ Compiled in 91ms (248 modules)
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 63.9s (524 modules)
+ ✓ Compiled /favicon.ico in 97ms (297 modules)
+ ○ Compiling /player ...
+ ✓ Compiled /admin/coins in 52.6s (568 modules)
+ ○ Compiling /player/leaderboard ...
+ ✓ Compiled /player/leaderboard in 730ms (562 modules)
+ ○ Compiling /player/submit ...
+ ✓ Compiled /player/marketplace in 35.2s (580 modules)
+ ○ Compiling /player/wallet ...
+ ✓ Compiled /player/wallet in 1129ms (582 modules)
+ ✓ Compiled in 4.5s (560 modules)
+ ✓ Compiled in 3.4s (560 modules)
+ ✓ Compiled in 896ms (560 modules)
+ ✓ Compiled in 2.4s (560 modules)
+ ✓ Compiled in 803ms (560 modules)
+ ✓ Compiled in 1701ms (560 modules)
+ ✓ Compiled in 5s (560 modules)
+ ✓ Compiled in 1556ms (275 modules)
+ ✓ Compiled in 700ms (560 modules)
+ ✓ Compiled in 2.5s (560 modules)
+ ✓ Compiled in 448ms (560 modules)
+ ✓ Compiled in 701ms (560 modules)
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 2.1s (313 modules)
+ ✓ Compiled in 75.5s (560 modules)
+ ✓ Compiled in 3.8s (560 modules)
+ ✓ Compiled in 2s (560 modules)
+ ⨯ SyntaxError: Unexpected end of JSON input
+    at JSON.parse (<anonymous>)
+    at loadManifest (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/load-manifest.js:35:27)
+    at DevServer.getNextFontManifest (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/next-server.js:710:47)
+    at DevServer.findPageComponents (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/dev/next-dev-server.js:559:43)
+    at async DevServer.renderPageComponent (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/base-server.js:1844:24)
+    at async DevServer.renderToResponseImpl (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/base-server.js:1894:32)
+    at async DevServer.pipeImpl (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/base-server.js:911:25)
+    at async NextNodeServer.handleCatchallRenderRequest (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/next-server.js:271:17)
+    at async DevServer.handleRequestImpl (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/base-server.js:807:17)
+    at async /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/dev/next-dev-server.js:331:20
+    at async Span.traceAsyncFn (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/trace/trace.js:151:20)
+    at async DevServer.handleRequest (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/dev/next-dev-server.js:328:24)
+    at async invokeRender (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/lib/router-server.js:163:21)
+    at async handleRequest (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/lib/router-server.js:342:24)
+    at async requestHandlerImpl (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/lib/router-server.js:366:13)
+    at async Server.requestListener (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/lib/start-server.js:140:13) {
+  page: '/player/submit'
+}
+ ✓ Compiled in 531ms (275 modules)
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 96.4s (722 modules)
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 620ms (351 modules)
+ ✓ Compiled in 6.8s (748 modules)
+ ✓ Compiled in 10s (397 modules)
+ ✓ Compiled in 19.5s (397 modules)
+ ✓ Compiled in 51.4s (720 modules)
+ ✓ Compiled in 738ms (397 modules)
+ ✓ Compiled in 2s (720 modules)
+ ✓ Compiled in 1186ms (720 modules)
+ ✓ Compiled in 1055ms (720 modules)
+ ✓ Compiled in 749ms (720 modules)
+ ✓ Compiled in 1298ms (720 modules)
+ ✓ Compiled in 1332ms (720 modules)
+ ○ Compiling /player ...
+ ✓ Compiled /favicon.ico in 18.7s (752 modules)
+ ✓ Compiled in 322ms (397 modules)
+ ✓ Compiled in 273ms (397 modules)
+ ✓ Compiled in 240ms (397 modules)
+ ✓ Compiled in 173ms (397 modules)
+ ✓ Compiled in 363ms (397 modules)
+ ✓ Compiled in 262ms (397 modules)
+ ✓ Compiled in 158ms (397 modules)
+ ✓ Compiled in 138ms (397 modules)
+ ✓ Compiled in 161ms (397 modules)
+ ✓ Compiled in 900ms (397 modules)
+ ✓ Compiled in 2.3s (397 modules)
+ ✓ Compiled in 228ms (397 modules)
+ ✓ Compiled in 347ms (397 modules)
+ ✓ Compiled in 404ms (397 modules)
+ ✓ Compiled in 695ms (720 modules)
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 561ms (351 modules)
+ ✓ Compiled in 1723ms (720 modules)
+ ○ Compiling /player/leaderboard ...
+ ✓ Compiled /player/leaderboard in 3s (327 modules)
+ ✓ Compiled /favicon.ico in 346ms (355 modules)
+ ✓ Compiled in 2.3s (720 modules)
+ ✓ Compiled in 1883ms (720 modules)
+ ○ Compiling /profile/[id] ...
+ ✓ Compiled /profile/[id] in 1420ms (726 modules)
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 24.5s (355 modules)
+ ✓ Compiled in 2.7s (750 modules)
+ ✓ Compiled in 1128ms (722 modules)
+ ✓ Compiled in 1092ms (722 modules)
+ ⨯ ./app/player/leaderboard/page.tsx
+Error: 
+  [31mx[0m Unexpected token `div`. Expected jsx identifier
+     ,-[[36;1;4m/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/app/player/leaderboard/page.tsx[0m:188:1]
+ [2m188[0m |   };
+ [2m189[0m | 
+ [2m190[0m |   return (
+ [2m191[0m |     <div style={{ display: "flex", minHeight: "100vh", background: "#0a0a0f" }}>
+     : [31;1m     ^^^[0m
+ [2m192[0m |       <SideNav user={user} />
+ [2m193[0m |       <main style={{ flex: 1, padding: "28px 32px", overflow: "auto" }}>
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/player/leaderboard/page.tsx
+ ○ Compiling /_error ...
+ ⨯ ./app/player/leaderboard/page.tsx
+Error: 
+  [31mx[0m Expression expected
+     ,-[[36;1;4m/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/app/player/leaderboard/page.tsx[0m:900:1]
+ [2m900[0m |               </>
+ [2m901[0m |             );
+ [2m902[0m |           })()}
+ [2m903[0m |         </div>
+     : [31;1m         ^[0m
+ [2m904[0m | 
+ [2m905[0m |       </main>
+ [2m906[0m |     </div>
+     `----
+
+  [31mx[0m Expression expected
+     ,-[[36;1;4m/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/app/player/leaderboard/page.tsx[0m:900:1]
+ [2m900[0m |               </>
+ [2m901[0m |             );
+ [2m902[0m |           })()}
+ [2m903[0m |         </div>
+     : [31;1m          ^^^[0m
+ [2m904[0m | 
+ [2m905[0m |       </main>
+ [2m906[0m |     </div>
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/player/leaderboard/page.tsx
+ ✓ Compiled /_error in 1573ms (398 modules)
+ ○ Compiling /_error ...
+ ⨯ ./app/player/leaderboard/page.tsx
+Error: 
+  [31mx[0m Return statement is not allowed here
+     ,-[[36;1;4m/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/app/player/leaderboard/page.tsx[0m:771:1]
+ [2m771[0m |                   return { ...s, members, stakes, totalStaked, topMember, rank: idx + 1, isMyStudio };
+ [2m772[0m |                 });
+ [2m773[0m |     
+ [2m774[0m | [31;1m,[0m[31;1m-[0m[31;1m>[0m             return (
+ [2m775[0m | [31;1m|[0m                 <>
+ [2m776[0m | [31;1m|[0m                   {/* Top 2 podium */}
+ [2m777[0m | [31;1m|[0m                   <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px", marginBottom: "16px" }}>
+ [2m778[0m | [31;1m|[0m                     {studiosRanked.slice(0, 2).map(s => (
+ [2m779[0m | [31;1m|[0m                       <div key={s.id} style={{
+ [2m780[0m | [31;1m|[0m                         background: s.isMyStudio ? `rgba(${s.colorRgb},0.08)` : "rgba(8,14,20,0.97)",
+ [2m781[0m | [31;1m|[0m                         border: `1px solid rgba(${s.colorRgb},${s.isMyStudio ? "0.45" : "0.22"})`,
+ [2m782[0m | [31;1m|[0m                         borderRadius: "16px", padding: "22px",
+ [2m783[0m | [31;1m|[0m                         position: "relative", overflow: "hidden",
+ [2m784[0m | [31;1m|[0m                         boxShadow: `0 0 ${s.rank === 1 ? "30px" : "16px"} rgba(${s.colorRgb},${s.rank === 1 ? "0.14" : "0.06"})`,
+ [2m785[0m | [31;1m|[0m                       }}>
+ [2m786[0m | [31;1m|[0m                         {/* Bracket corners */}
+ [2m787[0m | [31;1m|[0m                         {[
+ [2m788[0m | [31;1m|[0m                           { top: 0, left: 0, borderTop: `2px solid rgba(${s.colorRgb},0.5)`, borderLeft: `2px solid rgba(${s.colorRgb},0.5)` },
+ [2m789[0m | [31;1m|[0m                           { top: 0, right: 0, borderTop: `2px solid rgba(${s.colorRgb},0.5)`, borderRight: `2px solid rgba(${s.colorRgb},0.5)` },
+ [2m790[0m | [31;1m|[0m                           { bottom: 0, left: 0, borderBottom: `2px solid rgba(${s.colorRgb},0.5)`, borderLeft: `2px solid rgba(${s.colorRgb},0.5)` },
+ [2m791[0m | [31;1m|[0m                           { bottom: 0, right: 0, borderBottom: `2px solid rgba(${s.colorRgb},0.5)`, borderRight: `2px solid rgba(${s.colorRgb},0.5)` },
+ [2m792[0m | [31;1m|[0m                         ].map((corner, i) => (
+ [2m793[0m | [31;1m|[0m                           <div key={i} style={{ position: "absolute", width: "12px", height: "12px", ...corner }} />
+ [2m794[0m | [31;1m|[0m                         ))}
+ [2m795[0m | [31;1m|[0m   
+ [2m796[0m | [31;1m|[0m                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+ [2m797[0m | [31;1m|[0m                           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+ [2m798[0m | [31;1m|[0m                             <div style={{
+ [2m799[0m | [31;1m|[0m                               width: "48px", height: "48px", borderRadius: "12px",
+ [2m800[0m | [31;1m|[0m                               background: `rgba(${s.colorRgb},0.15)`,
+ [2m801[0m | [31;1m|[0m                               border: `1px solid rgba(${s.colorRgb},0.35)`,
+ [2m802[0m | [31;1m|[0m                               display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px",
+ [2m803[0m | [31;1m|[0m                             }}>{s.icon}</div>
+ [2m804[0m | [31;1m|[0m                             <div>
+ [2m805[0m | [31;1m|[0m                               <div style={{ fontSize: "14px", fontWeight: 800, color: "#fff" }}>{s.name}</div>
+ [2m806[0m | [31;1m|[0m                               <div style={{ fontSize: "10px", color: `rgba(${s.colorRgb},0.7)`, fontStyle: "italic" }}>{s.tagline}</div>
+ [2m807[0m | [31;1m|[0m                             </div>
+ [2m808[0m | [31;1m|[0m                           </div>
+ [2m809[0m | [31;1m|[0m                           <div style={{
+ [2m810[0m | [31;1m|[0m                             fontSize: "28px", fontWeight: 900, color: s.color, lineHeight: 1,
+ [2m811[0m | [31;1m|[0m                             filter: `drop-shadow(0 0 8px rgba(${s.colorRgb},0.5))`,
+ [2m812[0m | [31;1m|[0m                           }}>
+ [2m813[0m | [31;1m|[0m                             {s.rank === 1 ? "🥇" : "🥈"}
+ [2m814[0m | [31;1m|[0m                           </div>
+ [2m815[0m | [31;1m|[0m                         </div>
+ [2m816[0m | [31;1m|[0m   
+ [2m817[0m | [31;1m|[0m                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px", marginBottom: "14px" }}>
+ [2m818[0m | [31;1m|[0m                           {[
+ [2m819[0m | [31;1m|[0m                             { label: "XC POOL", value: s.xcPool.toLocaleString(), color: s.color },
+ [2m820[0m | [31;1m|[0m                             { label: "MEMBERS", value: String(s.members.length), color: "rgba(255,255,255,0.7)" },
+ [2m821[0m | [31;1m|[0m                             { label: "STAKED", value: `${s.totalStaked.toLocaleString()} XC`, color: "#4ade80" },
+ [2m822[0m | [31;1m|[0m                           ].map(stat => (
+ [2m823[0m | [31;1m|[0m                             <div key={stat.label} style={{
+ [2m824[0m | [31;1m|[0m                               background: `rgba(${s.colorRgb},0.07)`,
+ [2m825[0m | [31;1m|[0m                               border: `1px solid rgba(${s.colorRgb},0.14)`,
+ [2m826[0m | [31;1m|[0m                               borderRadius: "8px", padding: "8px", textAlign: "center",
+ [2m827[0m | [31;1m|[0m                             }}>
+ [2m828[0m | [31;1m|[0m                               <div style={{ fontSize: "12px", fontWeight: 800, color: stat.color }}>{stat.value}</div>
+ [2m829[0m | [31;1m|[0m                               <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.3)", fontWeight: 700, letterSpacing: "0.1em" }}>{stat.label}</div>
+ [2m830[0m | [31;1m|[0m                             </div>
+ [2m831[0m | [31;1m|[0m                           ))}
+ [2m832[0m | [31;1m|[0m                         </div>
+ [2m833[0m | [31;1m|[0m   
+ [2m834[0m | [31;1m|[0m                         {s.topMember && (
+ [2m835[0m | [31;1m|[0m                           <div style={{
+ [2m836[0m | [31;1m|[0m                             display: "flex", alignItems: "center", gap: "8px",
+ [2m837[0m | [31;1m|[0m                             background: "rgba(255,255,255,0.03)", borderRadius: "8px", padding: "8px 10px",
+ [2m838[0m | [31;1m|[0m                           }}>
+ [2m839[0m | [31;1m|[0m                             <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>🏆 Top Player:</span>
+ [2m840[0m | [31;1m|[0m                             <span style={{ fontSize: "12px", fontWeight: 700, color: s.color }}>{s.topMember.brandName || s.topMember.name}</span>
+ [2m841[0m | [31;1m|[0m                             <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginLeft: "auto" }}>{s.topMember.totalXcoin.toLocaleString()} XC</span>
+ [2m842[0m | [31;1m|[0m                           </div>
+ [2m843[0m | [31;1m|[0m                         )}
+ [2m844[0m | [31;1m|[0m   
+ [2m845[0m | [31;1m|[0m                         {s.isMyStudio && (
+ [2m846[0m | [31;1m|[0m                           <div style={{
+ [2m847[0m | [31;1m|[0m                             marginTop: "10px", padding: "6px 10px", borderRadius: "6px",
+ [2m848[0m | [31;1m|[0m                             background: `rgba(${s.colorRgb},0.15)`,
+ [2m849[0m | [31;1m|[0m                             border: `1px solid rgba(${s.colorRgb},0.3)`,
+ [2m850[0m | [31;1m|[0m                             fontSize: "10px", fontWeight: 700, color: s.color, textAlign: "center",
+ [2m851[0m | [31;1m|[0m                             letterSpacing: "0.1em",
+ [2m852[0m | [31;1m|[0m                           }}>
+ [2m853[0m | [31;1m|[0m                             ✦ YOUR STUDIO
+ [2m854[0m | [31;1m|[0m                           </div>
+ [2m855[0m | [31;1m|[0m                         )}
+ [2m856[0m | [31;1m|[0m                       </div>
+ [2m857[0m | [31;1m|[0m                     ))}
+ [2m858[0m | [31;1m|[0m                   </div>
+ [2m859[0m | [31;1m|[0m   
+ [2m860[0m | [31;1m|[0m                   {/* Bottom 2 studios */}
+ [2m861[0m | [31;1m|[0m                   <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
+ [2m862[0m | [31;1m|[0m                     {studiosRanked.slice(2).map(s => (
+ [2m863[0m | [31;1m|[0m                       <div key={s.id} style={{
+ [2m864[0m | [31;1m|[0m                         background: s.isMyStudio ? `rgba(${s.colorRgb},0.07)` : "rgba(8,14,20,0.97)",
+ [2m865[0m | [31;1m|[0m                         border: `1px solid rgba(${s.colorRgb},${s.isMyStudio ? "0.35" : "0.15"})`,
+ [2m866[0m | [31;1m|[0m                         borderRadius: "14px", padding: "18px",
+ [2m867[0m | [31;1m|[0m                         position: "relative",
+ [2m868[0m | [31;1m|[0m                       }}>
+ [2m869[0m | [31;1m|[0m                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+ [2m870[0m | [31;1m|[0m                           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+ [2m871[0m | [31;1m|[0m                             <div style={{
+ [2m872[0m | [31;1m|[0m                               width: "40px", height: "40px", borderRadius: "10px",
+ [2m873[0m | [31;1m|[0m                               background: `rgba(${s.colorRgb},0.12)`,
+ [2m874[0m | [31;1m|[0m                               border: `1px solid rgba(${s.colorRgb},0.28)`,
+ [2m875[0m | [31;1m|[0m                               display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px",
+ [2m876[0m | [31;1m|[0m                             }}>{s.icon}</div>
+ [2m877[0m | [31;1m|[0m                             <div>
+ [2m878[0m | [31;1m|[0m                               <div style={{ fontSize: "13px", fontWeight: 700, color: "#fff" }}>{s.name}</div>
+ [2m879[0m | [31;1m|[0m                               <div style={{ fontSize: "10px", color: `rgba(${s.colorRgb},0.6)`, fontStyle: "italic" }}>{s.tagline}</div>
+ [2m880[0m | [31;1m|[0m                             </div>
+ [2m881[0m | [31;1m|[0m                           </div>
+ [2m882[0m | [31;1m|[0m                           <div style={{ fontSize: "20px" }}>{s.rank === 3 ? "🥉" : "4️⃣"}</div>
+ [2m883[0m | [31;1m|[0m                         </div>
+ [2m884[0m | [31;1m|[0m   
+ [2m885[0m | [31;1m|[0m                         <div style={{ display: "flex", gap: "8px", fontSize: "11px", color: "rgba(255,255,255,0.4)", flexWrap: "wrap" }}>
+ [2m886[0m | [31;1m|[0m                           <span style={{ color: s.color, fontWeight: 700 }}>⚡ {s.xcPool.toLocaleString()} XC</span>
+ [2m887[0m | [31;1m|[0m                           <span>·</span>
+ [2m888[0m | [31;1m|[0m                           <span>{s.members.length} members</span>
+ [2m889[0m | [31;1m|[0m                           <span>·</span>
+ [2m890[0m | [31;1m|[0m                           <span style={{ color: "#4ade80" }}>+{s.totalStaked.toLocaleString()} staked</span>
+ [2m891[0m | [31;1m|[0m                           {s.isMyStudio && <span style={{ color: s.color, fontWeight: 700, marginLeft: "auto" }}>✦ YOUR STUDIO</span>}
+ [2m892[0m | [31;1m|[0m                         </div>
+ [2m893[0m | [31;1m|[0m                       </div>
+ [2m894[0m | [31;1m|[0m                     ))}
+ [2m895[0m | [31;1m|[0m                   </div>
+ [2m896[0m | [31;1m|[0m                 </>
+ [2m897[0m | [31;1m`[0m[31;1m-[0m[31;1m>[0m             );
+ [2m898[0m |               })()}
+ [2m899[0m |             </div>
+     `----
+
+  [31mx[0m Expression expected
+     ,-[[36;1;4m/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/app/player/leaderboard/page.tsx[0m:895:1]
+ [2m895[0m |                 </div>
+ [2m896[0m |               </>
+ [2m897[0m |             );
+ [2m898[0m |           })()}
+     : [31;1m          ^[0m
+ [2m899[0m |         </div>
+ [2m900[0m | 
+ [2m901[0m |       </main>
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/player/leaderboard/page.tsx
+ ⨯ ./app/player/leaderboard/page.tsx
+Error: 
+  [31mx[0m Return statement is not allowed here
+     ,-[[36;1;4m/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/app/player/leaderboard/page.tsx[0m:771:1]
+ [2m771[0m |                   return { ...s, members, stakes, totalStaked, topMember, rank: idx + 1, isMyStudio };
+ [2m772[0m |                 });
+ [2m773[0m |     
+ [2m774[0m | [31;1m,[0m[31;1m-[0m[31;1m>[0m             return (
+ [2m775[0m | [31;1m|[0m                 <>
+ [2m776[0m | [31;1m|[0m                   {/* Top 2 podium */}
+ [2m777[0m | [31;1m|[0m                   <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px", marginBottom: "16px" }}>
+ [2m778[0m | [31;1m|[0m                     {studiosRanked.slice(0, 2).map(s => (
+ [2m779[0m | [31;1m|[0m                       <div key={s.id} style={{
+ [2m780[0m | [31;1m|[0m                         background: s.isMyStudio ? `rgba(${s.colorRgb},0.08)` : "rgba(8,14,20,0.97)",
+ [2m781[0m | [31;1m|[0m                         border: `1px solid rgba(${s.colorRgb},${s.isMyStudio ? "0.45" : "0.22"})`,
+ [2m782[0m | [31;1m|[0m                         borderRadius: "16px", padding: "22px",
+ [2m783[0m | [31;1m|[0m                         position: "relative", overflow: "hidden",
+ [2m784[0m | [31;1m|[0m                         boxShadow: `0 0 ${s.rank === 1 ? "30px" : "16px"} rgba(${s.colorRgb},${s.rank === 1 ? "0.14" : "0.06"})`,
+ [2m785[0m | [31;1m|[0m                       }}>
+ [2m786[0m | [31;1m|[0m                         {/* Bracket corners */}
+ [2m787[0m | [31;1m|[0m                         {[
+ [2m788[0m | [31;1m|[0m                           { top: 0, left: 0, borderTop: `2px solid rgba(${s.colorRgb},0.5)`, borderLeft: `2px solid rgba(${s.colorRgb},0.5)` },
+ [2m789[0m | [31;1m|[0m                           { top: 0, right: 0, borderTop: `2px solid rgba(${s.colorRgb},0.5)`, borderRight: `2px solid rgba(${s.colorRgb},0.5)` },
+ [2m790[0m | [31;1m|[0m                           { bottom: 0, left: 0, borderBottom: `2px solid rgba(${s.colorRgb},0.5)`, borderLeft: `2px solid rgba(${s.colorRgb},0.5)` },
+ [2m791[0m | [31;1m|[0m                           { bottom: 0, right: 0, borderBottom: `2px solid rgba(${s.colorRgb},0.5)`, borderRight: `2px solid rgba(${s.colorRgb},0.5)` },
+ [2m792[0m | [31;1m|[0m                         ].map((corner, i) => (
+ [2m793[0m | [31;1m|[0m                           <div key={i} style={{ position: "absolute", width: "12px", height: "12px", ...corner }} />
+ [2m794[0m | [31;1m|[0m                         ))}
+ [2m795[0m | [31;1m|[0m   
+ [2m796[0m | [31;1m|[0m                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+ [2m797[0m | [31;1m|[0m                           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+ [2m798[0m | [31;1m|[0m                             <div style={{
+ [2m799[0m | [31;1m|[0m                               width: "48px", height: "48px", borderRadius: "12px",
+ [2m800[0m | [31;1m|[0m                               background: `rgba(${s.colorRgb},0.15)`,
+ [2m801[0m | [31;1m|[0m                               border: `1px solid rgba(${s.colorRgb},0.35)`,
+ [2m802[0m | [31;1m|[0m                               display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px",
+ [2m803[0m | [31;1m|[0m                             }}>{s.icon}</div>
+ [2m804[0m | [31;1m|[0m                             <div>
+ [2m805[0m | [31;1m|[0m                               <div style={{ fontSize: "14px", fontWeight: 800, color: "#fff" }}>{s.name}</div>
+ [2m806[0m | [31;1m|[0m                               <div style={{ fontSize: "10px", color: `rgba(${s.colorRgb},0.7)`, fontStyle: "italic" }}>{s.tagline}</div>
+ [2m807[0m | [31;1m|[0m                             </div>
+ [2m808[0m | [31;1m|[0m                           </div>
+ [2m809[0m | [31;1m|[0m                           <div style={{
+ [2m810[0m | [31;1m|[0m                             fontSize: "28px", fontWeight: 900, color: s.color, lineHeight: 1,
+ [2m811[0m | [31;1m|[0m                             filter: `drop-shadow(0 0 8px rgba(${s.colorRgb},0.5))`,
+ [2m812[0m | [31;1m|[0m                           }}>
+ [2m813[0m | [31;1m|[0m                             {s.rank === 1 ? "🥇" : "🥈"}
+ [2m814[0m | [31;1m|[0m                           </div>
+ [2m815[0m | [31;1m|[0m                         </div>
+ [2m816[0m | [31;1m|[0m   
+ [2m817[0m | [31;1m|[0m                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px", marginBottom: "14px" }}>
+ [2m818[0m | [31;1m|[0m                           {[
+ [2m819[0m | [31;1m|[0m                             { label: "XC POOL", value: s.xcPool.toLocaleString(), color: s.color },
+ [2m820[0m | [31;1m|[0m                             { label: "MEMBERS", value: String(s.members.length), color: "rgba(255,255,255,0.7)" },
+ [2m821[0m | [31;1m|[0m                             { label: "STAKED", value: `${s.totalStaked.toLocaleString()} XC`, color: "#4ade80" },
+ [2m822[0m | [31;1m|[0m                           ].map(stat => (
+ [2m823[0m | [31;1m|[0m                             <div key={stat.label} style={{
+ [2m824[0m | [31;1m|[0m                               background: `rgba(${s.colorRgb},0.07)`,
+ [2m825[0m | [31;1m|[0m                               border: `1px solid rgba(${s.colorRgb},0.14)`,
+ [2m826[0m | [31;1m|[0m                               borderRadius: "8px", padding: "8px", textAlign: "center",
+ [2m827[0m | [31;1m|[0m                             }}>
+ [2m828[0m | [31;1m|[0m                               <div style={{ fontSize: "12px", fontWeight: 800, color: stat.color }}>{stat.value}</div>
+ [2m829[0m | [31;1m|[0m                               <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.3)", fontWeight: 700, letterSpacing: "0.1em" }}>{stat.label}</div>
+ [2m830[0m | [31;1m|[0m                             </div>
+ [2m831[0m | [31;1m|[0m                           ))}
+ [2m832[0m | [31;1m|[0m                         </div>
+ [2m833[0m | [31;1m|[0m   
+ [2m834[0m | [31;1m|[0m                         {s.topMember && (
+ [2m835[0m | [31;1m|[0m                           <div style={{
+ [2m836[0m | [31;1m|[0m                             display: "flex", alignItems: "center", gap: "8px",
+ [2m837[0m | [31;1m|[0m                             background: "rgba(255,255,255,0.03)", borderRadius: "8px", padding: "8px 10px",
+ [2m838[0m | [31;1m|[0m                           }}>
+ [2m839[0m | [31;1m|[0m                             <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>🏆 Top Player:</span>
+ [2m840[0m | [31;1m|[0m                             <span style={{ fontSize: "12px", fontWeight: 700, color: s.color }}>{s.topMember.brandName || s.topMember.name}</span>
+ [2m841[0m | [31;1m|[0m                             <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginLeft: "auto" }}>{s.topMember.totalXcoin.toLocaleString()} XC</span>
+ [2m842[0m | [31;1m|[0m                           </div>
+ [2m843[0m | [31;1m|[0m                         )}
+ [2m844[0m | [31;1m|[0m   
+ [2m845[0m | [31;1m|[0m                         {s.isMyStudio && (
+ [2m846[0m | [31;1m|[0m                           <div style={{
+ [2m847[0m | [31;1m|[0m                             marginTop: "10px", padding: "6px 10px", borderRadius: "6px",
+ [2m848[0m | [31;1m|[0m                             background: `rgba(${s.colorRgb},0.15)`,
+ [2m849[0m | [31;1m|[0m                             border: `1px solid rgba(${s.colorRgb},0.3)`,
+ [2m850[0m | [31;1m|[0m                             fontSize: "10px", fontWeight: 700, color: s.color, textAlign: "center",
+ [2m851[0m | [31;1m|[0m                             letterSpacing: "0.1em",
+ [2m852[0m | [31;1m|[0m                           }}>
+ [2m853[0m | [31;1m|[0m                             ✦ YOUR STUDIO
+ [2m854[0m | [31;1m|[0m                           </div>
+ [2m855[0m | [31;1m|[0m                         )}
+ [2m856[0m | [31;1m|[0m                       </div>
+ [2m857[0m | [31;1m|[0m                     ))}
+ [2m858[0m | [31;1m|[0m                   </div>
+ [2m859[0m | [31;1m|[0m   
+ [2m860[0m | [31;1m|[0m                   {/* Bottom 2 studios */}
+ [2m861[0m | [31;1m|[0m                   <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
+ [2m862[0m | [31;1m|[0m                     {studiosRanked.slice(2).map(s => (
+ [2m863[0m | [31;1m|[0m                       <div key={s.id} style={{
+ [2m864[0m | [31;1m|[0m                         background: s.isMyStudio ? `rgba(${s.colorRgb},0.07)` : "rgba(8,14,20,0.97)",
+ [2m865[0m | [31;1m|[0m                         border: `1px solid rgba(${s.colorRgb},${s.isMyStudio ? "0.35" : "0.15"})`,
+ [2m866[0m | [31;1m|[0m                         borderRadius: "14px", padding: "18px",
+ [2m867[0m | [31;1m|[0m                         position: "relative",
+ [2m868[0m | [31;1m|[0m                       }}>
+ [2m869[0m | [31;1m|[0m                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+ [2m870[0m | [31;1m|[0m                           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+ [2m871[0m | [31;1m|[0m                             <div style={{
+ [2m872[0m | [31;1m|[0m                               width: "40px", height: "40px", borderRadius: "10px",
+ [2m873[0m | [31;1m|[0m                               background: `rgba(${s.colorRgb},0.12)`,
+ [2m874[0m | [31;1m|[0m                               border: `1px solid rgba(${s.colorRgb},0.28)`,
+ [2m875[0m | [31;1m|[0m                               display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px",
+ [2m876[0m | [31;1m|[0m                             }}>{s.icon}</div>
+ [2m877[0m | [31;1m|[0m                             <div>
+ [2m878[0m | [31;1m|[0m                               <div style={{ fontSize: "13px", fontWeight: 700, color: "#fff" }}>{s.name}</div>
+ [2m879[0m | [31;1m|[0m                               <div style={{ fontSize: "10px", color: `rgba(${s.colorRgb},0.6)`, fontStyle: "italic" }}>{s.tagline}</div>
+ [2m880[0m | [31;1m|[0m                             </div>
+ [2m881[0m | [31;1m|[0m                           </div>
+ [2m882[0m | [31;1m|[0m                           <div style={{ fontSize: "20px" }}>{s.rank === 3 ? "🥉" : "4️⃣"}</div>
+ [2m883[0m | [31;1m|[0m                         </div>
+ [2m884[0m | [31;1m|[0m   
+ [2m885[0m | [31;1m|[0m                         <div style={{ display: "flex", gap: "8px", fontSize: "11px", color: "rgba(255,255,255,0.4)", flexWrap: "wrap" }}>
+ [2m886[0m | [31;1m|[0m                           <span style={{ color: s.color, fontWeight: 700 }}>⚡ {s.xcPool.toLocaleString()} XC</span>
+ [2m887[0m | [31;1m|[0m                           <span>·</span>
+ [2m888[0m | [31;1m|[0m                           <span>{s.members.length} members</span>
+ [2m889[0m | [31;1m|[0m                           <span>·</span>
+ [2m890[0m | [31;1m|[0m                           <span style={{ color: "#4ade80" }}>+{s.totalStaked.toLocaleString()} staked</span>
+ [2m891[0m | [31;1m|[0m                           {s.isMyStudio && <span style={{ color: s.color, fontWeight: 700, marginLeft: "auto" }}>✦ YOUR STUDIO</span>}
+ [2m892[0m | [31;1m|[0m                         </div>
+ [2m893[0m | [31;1m|[0m                       </div>
+ [2m894[0m | [31;1m|[0m                     ))}
+ [2m895[0m | [31;1m|[0m                   </div>
+ [2m896[0m | [31;1m|[0m                 </>
+ [2m897[0m | [31;1m`[0m[31;1m-[0m[31;1m>[0m             );
+ [2m898[0m |               })()}
+ [2m899[0m |             </div>
+     `----
+
+  [31mx[0m Expression expected
+     ,-[[36;1;4m/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/app/player/leaderboard/page.tsx[0m:895:1]
+ [2m895[0m |                 </div>
+ [2m896[0m |               </>
+ [2m897[0m |             );
+ [2m898[0m |           })()}
+     : [31;1m          ^[0m
+ [2m899[0m |         </div>
+ [2m900[0m | 
+ [2m901[0m |       </main>
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/player/leaderboard/page.tsx
+ ⨯ ./app/player/leaderboard/page.tsx
+Error: 
+  [31mx[0m Return statement is not allowed here
+     ,-[[36;1;4m/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/app/player/leaderboard/page.tsx[0m:767:1]
+ [2m767[0m |               const totalStaked = stakes.reduce((sum, i) => sum + i.stakeXC, 0);
+ [2m768[0m |               const topMember = members.sort((a, b) => b.totalXcoin - a.totalXcoin)[0];
+ [2m769[0m |               const isMyStudio = user?.studioId === s.id;
+ [2m770[0m |               return { ...s, members, stakes, totalStaked, topMember, rank: idx + 1, isMyStudio };
+     : [31;1m              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+ [2m771[0m |             });
+ [2m772[0m | 
+ [2m773[0m |             return (
+     `----
+
+  [31mx[0m Expression expected
+     ,-[[36;1;4m/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/app/player/leaderboard/page.tsx[0m:768:1]
+ [2m768[0m |               const topMember = members.sort((a, b) => b.totalXcoin - a.totalXcoin)[0];
+ [2m769[0m |               const isMyStudio = user?.studioId === s.id;
+ [2m770[0m |               return { ...s, members, stakes, totalStaked, topMember, rank: idx + 1, isMyStudio };
+ [2m771[0m |             });
+     : [31;1m            ^[0m
+ [2m772[0m | 
+ [2m773[0m |             return (
+ [2m774[0m |               <>
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/player/leaderboard/page.tsx
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-win32-ia32-msvc isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-win32-x64-msvc isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-win32-arm64-msvc isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-linux-x64-gnu isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-linux-x64-musl isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-darwin-x64 isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-win32-ia32-msvc isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-win32-x64-msvc isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-linux-x64-gnu isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-win32-arm64-msvc isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-linux-x64-musl isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Managed item /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/@next/swc-darwin-x64 isn't a directory or doesn't contain a package.json (see snapshot.managedPaths option)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/cache/webpack/client-development-fallback/0.pack.gz_' -> '/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/cache/webpack/client-development-fallback/0.pack.gz'
+ ✓ Compiled /not-found in 1719ms (757 modules)
+ ✓ Compiled (743 modules)
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ✓ Compiled in 1682ms (757 modules)
+ ⨯ ./app/components/SideNav.tsx
+Error: 
+  [31mx[0m Expression expected
+    ,-[[36;1;4m/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/app/components/SideNav.tsx[0m:89:1]
+ [2m89[0m |   };
+ [2m90[0m | 
+ [2m91[0m |   return (
+ [2m92[0m |     <>
+    : [31;1m     ^[0m
+ [2m93[0m |     <PflxBadge />
+ [2m94[0m |     <nav style={{
+ [2m95[0m |       width: "230px",
+    `----
+
+  [31mx[0m Expected ',', got 'style'
+    ,-[[36;1;4m/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/app/components/SideNav.tsx[0m:91:1]
+ [2m91[0m |   return (
+ [2m92[0m |     <>
+ [2m93[0m |     <PflxBadge />
+ [2m94[0m |     <nav style={{
+    : [31;1m         ^^^^^[0m
+ [2m95[0m |       width: "230px",
+ [2m96[0m |       minWidth: "230px",
+ [2m97[0m |       height: "100vh",
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/components/SideNav.tsx
+./app/admin/page.tsx
+ ✓ Compiled in 1611ms (757 modules)
+ ✓ Compiled in 1192ms (727 modules)
+ ✓ Compiled /favicon.ico in 274ms (351 modules)
+ ✓ Compiled in 2.6s (722 modules)
+ ✓ Compiled in 1377ms (722 modules)
+ ✓ Compiled in 3.1s (722 modules)
+ ✓ Compiled /player/task-management in 366ms (351 modules)
+ ✓ Compiled (355 modules)
+ ✓ Compiled in 1436ms (754 modules)
+ ✓ Compiled in 5.7s (754 modules)
+ ✓ Compiled in 1388ms (754 modules)
+ ✓ Compiled in 0ms (355 modules)
+ ✓ Compiled in 1ms (355 modules)
+ ✓ Compiled in 1ms (355 modules)
+ ✓ Compiled in 2.2s (722 modules)
+ ✓ Compiled in 1103ms (722 modules)
+ ✓ Compiled in 3s (722 modules)
+ ✓ Compiled in 1300ms (722 modules)
+ ✓ Compiled in 2s (722 modules)
+ ✓ Compiled in 960ms (722 modules)
+ ✓ Compiled in 1274ms (722 modules)
+ ✓ Compiled in 1063ms (722 modules)
+ ✓ Compiled in 1665ms (722 modules)
+ ✓ Compiled in 4.1s (722 modules)
+ ○ Compiling /player/submit ...
+ ✓ Compiled /player/submit in 2.4s (327 modules)
+ ✓ Compiled in 3.9s (726 modules)
+ ✓ Compiled in 1737ms (722 modules)
+ ✓ Compiled in 1203ms (722 modules)
+ ✓ Compiled in 817ms (722 modules)
+ ✓ Compiled in 771ms (722 modules)
+ ✓ Compiled in 1396ms (722 modules)
+ ✓ Compiled in 1606ms (722 modules)
+ ✓ Compiled in 1105ms (722 modules)
+ ✓ Compiled in 479ms (399 modules)
+ ✓ Compiled in 5.5s (722 modules)
+ ✓ Compiled in 2.2s (722 modules)
+ ✓ Compiled in 1431ms (722 modules)
+ ✓ Compiled in 1395ms (722 modules)
+ ✓ Compiled in 5.5s (722 modules)
+ ✓ Compiled in 891ms (722 modules)
+ ✓ Compiled in 1581ms (722 modules)
+ ✓ Compiled in 2.3s (722 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 2.7s (722 modules)
+ ✓ Compiled in 1481ms (722 modules)
+ ✓ Compiled in 1041ms (399 modules)
+ ✓ Compiled in 322ms (399 modules)
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 811ms (351 modules)
+ ○ Compiling /player/task-management ...
+ ✓ Compiled /player/task-management in 1533ms (327 modules)
+ ○ Compiling /player ...
+ ✓ Compiled /player in 825ms (351 modules)
+ ✓ Compiled (355 modules)
+   Reload env: .env.local
+ ○ Compiling /player/marketplace ...
+ ✓ Compiled /player/marketplace in 1524.4s (726 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 384.5s (726 modules)
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 24s (331 modules)
+ ✓ Compiled in 335ms (399 modules)
+ ✓ Compiled in 86.5s (399 modules)
+ ✓ Compiled in 173ms (399 modules)
+ ✓ Compiled in 196ms (399 modules)
+ ✓ Compiled in 877ms (399 modules)
+ ✓ Compiled in 179ms (399 modules)
+ ○ Compiling /admin/leaderboard ...
+ ✓ Compiled /admin/leaderboard in 256.4s (754 modules)
+ ⨯ node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js (2:0) @ module
+ ⨯ TypeError: Cannot read properties of undefined (reading 'react-rsc')
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js:2:170)
+    at (rsc)/./node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2320:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-loader/module-proxy.js:11:21)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-loader/module-proxy.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2010:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/client/components/error-boundary.js:2:25)
+    at (rsc)/./node_modules/next/dist/client/components/error-boundary.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2040:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fprofile%2F%5Bid%5D%2Fpage&page=%2Fprofile%2F%5Bid%5D%2Fpage&appPaths=%2Fprofile%2F%5Bid%5D%2Fpage&pagePath=private-next-app-dir%2Fprofile%2F%5Bid%5D%2Fpage.tsx&appDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!:13:100)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fprofile%2F%5Bid%5D%2Fpage&page=%2Fprofile%2F%5Bid%5D%2Fpage&appPaths=%2Fprofile%2F%5Bid%5D%2Fpage&pagePath=private-next-app-dir%2Fprofile%2F%5Bid%5D%2Fpage.tsx&appDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D! (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/profile/[id]/page.js:132:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at __webpack_exec__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/profile/[id]/page.js:329:39)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/profile/[id]/page.js:330:104
+    at __webpack_require__.X (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:168:21)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/profile/[id]/page.js:330:47
+    at Object.<anonymous> (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/profile/[id]/page.js:333:3)
+    at Module._compile (node:internal/modules/cjs/loader:1358:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1416:10)
+    at Module.load (node:internal/modules/cjs/loader:1208:32)
+    at Module._load (node:internal/modules/cjs/loader:1024:12)
+    at Module.require (node:internal/modules/cjs/loader:1233:19)
+    at mod.require (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/require-hook.js:65:28)
+    at require (node:internal/modules/helpers:179:18)
+    at requirePage (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/require.js:109:84)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/load-components.js:74:84
+    at async loadComponentsImpl (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/load-components.js:74:26)
+    at async DevServer.findPageComponentsImpl (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/next-server.js:675:36) {
+  page: '/profile/admin-0'
+}
+null
+ ⨯ node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js (2:0) @ module
+ ⨯ TypeError: Cannot read properties of undefined (reading 'react-rsc')
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js:2:170)
+    at (rsc)/./node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2320:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-loader/module-proxy.js:11:21)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-loader/module-proxy.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2010:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/client/components/error-boundary.js:2:25)
+    at (rsc)/./node_modules/next/dist/client/components/error-boundary.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2040:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fadmin%2Fleaderboard%2Fpage&page=%2Fadmin%2Fleaderboard%2Fpage&appPaths=%2Fadmin%2Fleaderboard%2Fpage&pagePath=private-next-app-dir%2Fadmin%2Fleaderboard%2Fpage.tsx&appDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!:13:100)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fadmin%2Fleaderboard%2Fpage&page=%2Fadmin%2Fleaderboard%2Fpage&appPaths=%2Fadmin%2Fleaderboard%2Fpage&pagePath=private-next-app-dir%2Fadmin%2Fleaderboard%2Fpage.tsx&appDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D! (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/leaderboard/page.js:132:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at __webpack_exec__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/leaderboard/page.js:390:39)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/leaderboard/page.js:391:104
+    at __webpack_require__.X (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:168:21)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/leaderboard/page.js:391:47
+    at Object.<anonymous> (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/leaderboard/page.js:394:3)
+    at Module._compile (node:internal/modules/cjs/loader:1358:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1416:10)
+    at Module.load (node:internal/modules/cjs/loader:1208:32)
+    at Module._load (node:internal/modules/cjs/loader:1024:12)
+    at Module.require (node:internal/modules/cjs/loader:1233:19)
+    at mod.require (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/require-hook.js:65:28)
+    at require (node:internal/modules/helpers:179:18)
+    at requirePage (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/require.js:109:84)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/load-components.js:74:84
+    at async loadComponentsImpl (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/load-components.js:74:26)
+    at async DevServer.findPageComponentsImpl (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/next-server.js:675:36) {
+  page: '/admin/leaderboard'
+}
+null
+ ⨯ node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js (2:0) @ module
+ ⨯ TypeError: Cannot read properties of undefined (reading 'react-rsc')
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js:2:170)
+    at (rsc)/./node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2320:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-loader/module-proxy.js:11:21)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-loader/module-proxy.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2010:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/client/components/error-boundary.js:2:25)
+    at (rsc)/./node_modules/next/dist/client/components/error-boundary.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2040:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fadmin%2Fpage&page=%2Fadmin%2Fpage&appPaths=%2Fadmin%2Fpage&pagePath=private-next-app-dir%2Fadmin%2Fpage.tsx&appDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!:13:100)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fadmin%2Fpage&page=%2Fadmin%2Fpage&appPaths=%2Fadmin%2Fpage&pagePath=private-next-app-dir%2Fadmin%2Fpage.tsx&appDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D! (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/page.js:132:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at __webpack_exec__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/page.js:390:39)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/page.js:391:104
+    at __webpack_require__.X (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:168:21)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/page.js:391:47
+    at Object.<anonymous> (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/page.js:394:3)
+    at Module._compile (node:internal/modules/cjs/loader:1358:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1416:10)
+    at Module.load (node:internal/modules/cjs/loader:1208:32)
+    at Module._load (node:internal/modules/cjs/loader:1024:12)
+    at Module.require (node:internal/modules/cjs/loader:1233:19)
+    at mod.require (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/require-hook.js:65:28)
+    at require (node:internal/modules/helpers:179:18)
+    at requirePage (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/require.js:109:84)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/load-components.js:74:84
+    at async loadComponentsImpl (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/load-components.js:74:26)
+    at async DevServer.findPageComponentsImpl (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/next-server.js:675:36) {
+  page: '/admin'
+}
+null
+ ⨯ node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js (2:0) @ module
+ ⨯ TypeError: Cannot read properties of undefined (reading 'react-rsc')
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js:2:170)
+    at (rsc)/./node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2320:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-loader/module-proxy.js:11:21)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-loader/module-proxy.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2010:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/client/components/error-boundary.js:2:25)
+    at (rsc)/./node_modules/next/dist/client/components/error-boundary.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2040:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fadmin%2Fcoins%2Fpage&page=%2Fadmin%2Fcoins%2Fpage&appPaths=%2Fadmin%2Fcoins%2Fpage&pagePath=private-next-app-dir%2Fadmin%2Fcoins%2Fpage.tsx&appDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!:13:100)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fadmin%2Fcoins%2Fpage&page=%2Fadmin%2Fcoins%2Fpage&appPaths=%2Fadmin%2Fcoins%2Fpage&pagePath=private-next-app-dir%2Fadmin%2Fcoins%2Fpage.tsx&appDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D! (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/coins/page.js:132:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at __webpack_exec__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/coins/page.js:390:39)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/coins/page.js:391:104
+    at __webpack_require__.X (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:168:21)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/coins/page.js:391:47
+    at Object.<anonymous> (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/coins/page.js:394:3)
+    at Module._compile (node:internal/modules/cjs/loader:1358:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1416:10)
+    at Module.load (node:internal/modules/cjs/loader:1208:32)
+    at Module._load (node:internal/modules/cjs/loader:1024:12)
+    at Module.require (node:internal/modules/cjs/loader:1233:19)
+    at mod.require (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/require-hook.js:65:28)
+    at require (node:internal/modules/helpers:179:18)
+    at requirePage (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/require.js:109:84)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/load-components.js:74:84
+    at async loadComponentsImpl (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/load-components.js:74:26)
+    at async DevServer.findPageComponentsImpl (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/next-server.js:675:36) {
+  page: '/admin/coins'
+}
+null
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 35.9s (742 modules)
+ ⨯ node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js (2:0) @ module
+ ⨯ TypeError: Cannot read properties of undefined (reading 'react-rsc')
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js:2:170)
+    at (rsc)/./node_modules/next/dist/server/future/route-modules/app-page/vendored/rsc/react-server-dom-webpack-server-edge.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2320:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-loader/module-proxy.js:11:21)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-loader/module-proxy.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2010:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/client/components/error-boundary.js:2:25)
+    at (rsc)/./node_modules/next/dist/client/components/error-boundary.js (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/vendor-chunks/next.js:2040:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fadmin%2Fcoins%2Fpage&page=%2Fadmin%2Fcoins%2Fpage&appPaths=%2Fadmin%2Fcoins%2Fpage&pagePath=private-next-app-dir%2Fadmin%2Fcoins%2Fpage.tsx&appDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!:13:100)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fadmin%2Fcoins%2Fpage&page=%2Fadmin%2Fcoins%2Fpage&appPaths=%2Fadmin%2Fcoins%2Fpage&pagePath=private-next-app-dir%2Fadmin%2Fcoins%2Fpage.tsx&appDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fejohnson%2FDesktop%2FPFLX%20Apps%2FX-Coin%20Management%2Fpflx-xcoin-app&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D! (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/coins/page.js:132:1)
+    at __webpack_require__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:33:42)
+    at __webpack_exec__ (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/coins/page.js:390:39)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/coins/page.js:391:104
+    at __webpack_require__.X (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/webpack-runtime.js:168:21)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/coins/page.js:391:47
+    at Object.<anonymous> (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/.next/server/app/admin/coins/page.js:394:3)
+    at Module._compile (node:internal/modules/cjs/loader:1358:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1416:10)
+    at Module.load (node:internal/modules/cjs/loader:1208:32)
+    at Module._load (node:internal/modules/cjs/loader:1024:12)
+    at Module.require (node:internal/modules/cjs/loader:1233:19)
+    at mod.require (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/require-hook.js:65:28)
+    at require (node:internal/modules/helpers:179:18)
+    at requirePage (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/require.js:109:84)
+    at /Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/load-components.js:74:84
+    at async loadComponentsImpl (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/load-components.js:74:26)
+    at async DevServer.findPageComponentsImpl (/Users/ejohnson/Desktop/PFLX Apps/X-Coin Management/pflx-xcoin-app/node_modules/next/dist/server/next-server.js:675:36) {
+  page: '/admin/coins'
+}
+null
+ ✓ Compiled in 4.6s (400 modules)
+ ✓ Compiled in 313ms (400 modules)
+ ✓ Compiled in 443ms (400 modules)
+ ✓ Compiled in 596ms (401 modules)
+ ✓ Compiled in 9.5s (726 modules)
+ ✓ Compiled in 162ms (401 modules)
+ ✓ Compiled in 1349ms (401 modules)
+ ✓ Compiled in 214ms (401 modules)
+ ✓ Compiled in 572ms (401 modules)
+ ✓ Compiled in 192ms (401 modules)
+ ✓ Compiled in 176ms (401 modules)
+ ✓ Compiled in 277ms (401 modules)
+ ✓ Compiled in 213ms (401 modules)

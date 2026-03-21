@@ -1,0 +1,51 @@
+app/admin/task-management/page.tsx(103,68): error TS2353: Object literal may only specify known properties, and 'assignTo' does not exist in type 'SetStateAction<Partial<Checkpoint> & { bannerImage?: string | undefined; }>'.
+app/admin/task-management/page.tsx(133,31): error TS2352: Conversion of type '{ id: string; name: string; description: string; startDate: string; endDate: string; status: "active" | "upcoming" | "completed"; assignTo: any; bannerImage: string | undefined; }' to type 'Checkpoint' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'createdBy' is missing in type '{ id: string; name: string; description: string; startDate: string; endDate: string; status: "active" | "upcoming" | "completed"; assignTo: any; bannerImage: string | undefined; }' but required in type 'Checkpoint'.
+app/admin/task-management/page.tsx(140,27): error TS2551: Property 'assignTo' does not exist on type 'Partial<Checkpoint> & { bannerImage?: string | undefined; }'. Did you mean 'assignedTo'?
+app/admin/task-management/page.tsx(177,22): error TS2353: Object literal may only specify known properties, and 'coinType' does not exist in type 'SetStateAction<Partial<Task>>'.
+app/admin/task-management/page.tsx(184,25): error TS2352: Conversion of type '{ id: string; title: string; description: string; coinType: any; xpValue: any; cohort: any; status: "open" | "submitted" | "approved" | "rejected"; roundId: string | undefined; }' to type 'Task' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: string; title: string; description: string; coinType: any; xpValue: any; cohort: any; status: "open" | "submitted" | "approved" | "rejected"; roundId: string | undefined; }' is missing the following properties from type 'Task': rewardCoins, xcReward, dueDate, createdBy, and 2 more.
+app/admin/task-management/page.tsx(188,29): error TS2339: Property 'coinType' does not exist on type 'Partial<Task>'.
+app/admin/task-management/page.tsx(189,28): error TS2339: Property 'xpValue' does not exist on type 'Partial<Task>'.
+app/admin/task-management/page.tsx(190,27): error TS2339: Property 'cohort' does not exist on type 'Partial<Task>'.
+app/admin/task-management/page.tsx(208,21): error TS2353: Object literal may only specify known properties, and 'coinType' does not exist in type 'SetStateAction<Partial<Job>>'.
+app/admin/task-management/page.tsx(215,24): error TS2352: Conversion of type '{ id: string; title: string; description: string; coinType: any; xpValue: any; cohort: any; status: "open" | "closed"; }' to type 'Job' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: string; title: string; description: string; coinType: any; xpValue: any; cohort: any; status: "open" | "closed"; }' is missing the following properties from type 'Job': rewardCoins, xcReward, slots, filledSlots, and 4 more.
+app/admin/task-management/page.tsx(219,28): error TS2339: Property 'coinType' does not exist on type 'Partial<Job>'.
+app/admin/task-management/page.tsx(220,27): error TS2339: Property 'xpValue' does not exist on type 'Partial<Job>'.
+app/admin/task-management/page.tsx(221,26): error TS2339: Property 'cohort' does not exist on type 'Partial<Job>'.
+app/admin/task-management/page.tsx(235,9): error TS2322: Type 'Coin[]' is not assignable to type 'RewardCoin[]'.
+  Type 'Coin' is missing the following properties from type 'RewardCoin': coinName, amount
+app/admin/task-management/page.tsx(355,31): error TS2551: Property 'assignTo' does not exist on type 'Checkpoint'. Did you mean 'assignedTo'?
+app/admin/task-management/page.tsx(355,46): error TS2551: Property 'assignTo' does not exist on type 'Checkpoint'. Did you mean 'assignedTo'?
+app/admin/task-management/page.tsx(357,38): error TS2551: Property 'assignTo' does not exist on type 'Checkpoint'. Did you mean 'assignedTo'?
+app/admin/task-management/page.tsx(398,46): error TS2367: This comparison appears to be unintentional because the types '"open" | "submitted" | "approved" | "rejected"' and '"active"' have no overlap.
+app/admin/task-management/page.tsx(398,84): error TS2367: This comparison appears to be unintentional because the types '"open" | "submitted" | "approved" | "rejected"' and '"inactive"' have no overlap.
+app/admin/task-management/page.tsx(405,137): error TS2339: Property 'coinType' does not exist on type 'Task'.
+app/admin/task-management/page.tsx(407,105): error TS2339: Property 'xpValue' does not exist on type 'Task'.
+app/admin/task-management/page.tsx(409,120): error TS2339: Property 'cohort' does not exist on type 'Task'.
+app/admin/task-management/page.tsx(465,32): error TS2339: Property 'xpValue' does not exist on type 'Job'.
+app/admin/task-management/page.tsx(467,30): error TS2339: Property 'coinType' does not exist on type 'Job'.
+app/admin/task-management/page.tsx(467,176): error TS2339: Property 'coinType' does not exist on type 'Job'.
+app/admin/task-management/page.tsx(468,159): error TS2339: Property 'cohort' does not exist on type 'Job'.
+app/admin/task-management/page.tsx(569,44): error TS2551: Property 'assignTo' does not exist on type 'Partial<Checkpoint> & { bannerImage?: string | undefined; }'. Did you mean 'assignedTo'?
+app/admin/task-management/page.tsx(598,35): error TS2339: Property 'coinType' does not exist on type 'Task'.
+app/admin/task-management/page.tsx(598,53): error TS2339: Property 'xpValue' does not exist on type 'Task'.
+app/admin/task-management/page.tsx(649,46): error TS2339: Property 'coinType' does not exist on type 'Partial<Task>'.
+app/admin/task-management/page.tsx(652,55): error TS2339: Property 'name' does not exist on type 'RewardCoin'.
+app/admin/task-management/page.tsx(652,70): error TS2339: Property 'name' does not exist on type 'RewardCoin'.
+app/admin/task-management/page.tsx(652,79): error TS2339: Property 'name' does not exist on type 'RewardCoin'.
+app/admin/task-management/page.tsx(656,59): error TS2339: Property 'xpValue' does not exist on type 'Partial<Task>'.
+app/admin/task-management/page.tsx(662,46): error TS2339: Property 'cohort' does not exist on type 'Partial<Task>'.
+app/admin/task-management/page.tsx(718,45): error TS2339: Property 'coinType' does not exist on type 'Partial<Job>'.
+app/admin/task-management/page.tsx(721,55): error TS2339: Property 'name' does not exist on type 'RewardCoin'.
+app/admin/task-management/page.tsx(721,70): error TS2339: Property 'name' does not exist on type 'RewardCoin'.
+app/admin/task-management/page.tsx(721,79): error TS2339: Property 'name' does not exist on type 'RewardCoin'.
+app/admin/task-management/page.tsx(725,58): error TS2339: Property 'xpValue' does not exist on type 'Partial<Job>'.
+app/admin/task-management/page.tsx(731,45): error TS2339: Property 'cohort' does not exist on type 'Partial<Job>'.
+app/components/PlayerAssistant.tsx(95,43): error TS2367: This comparison appears to be unintentional because the types '"open" | "submitted" | "approved" | "rejected"' and '"pending"' have no overlap.
+app/components/PlayerAssistant.tsx(138,54): error TS2339: Property 'status' does not exist on type 'GamePeriod'.
+app/components/PlayerAssistant.tsx(141,58): error TS2339: Property 'name' does not exist on type 'GamePeriod'.
+app/components/PlayerAssistant.tsx(154,14): error TS2339: Property 'category' does not exist on type 'CoinCategory'.
+app/components/PlayerAssistant.tsx(199,27): error TS2304: Cannot find name 'SpeechRecognition'.
+TSC_DONE
