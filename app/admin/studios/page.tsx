@@ -368,7 +368,7 @@ export default function StudiosPage() {
                     </div>
                     <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)" }}>{p.brandName || p.name}</span>
                     <button
-                      onClick={() => setModal({ mode: "reassign", studioId: "studio-emagination" }) || setReassignPlayerId(p.id)}
+                      onClick={() => { setModal({ mode: "reassign", studioId: "studio-emagination" }); setReassignPlayerId(p.id); }}
                       style={{
                         background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.25)",
                         borderRadius: "5px", color: "#f59e0b", fontSize: "9px", fontWeight: 700,
