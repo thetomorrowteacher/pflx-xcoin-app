@@ -316,6 +316,9 @@ export default function AdminPlayers() {
 
   const confirmDelete = () => {
     if (deleteTarget) {
+      // Update mock array so auto-save detects the change
+      const idx = mockUsers.findIndex(u => u.id === deleteTarget.id);
+      if (idx !== -1) mockUsers.splice(idx, 1);
       setPlayers(players.filter(p => p.id !== deleteTarget.id));
       setShowDeleteModal(false);
       setDeleteTarget(null);
@@ -333,6 +336,9 @@ export default function AdminPlayers() {
     savePlayerImage(updatedPlayer.id, updatedPlayer.image ?? "");
 
     if (editingPlayer) {
+      // Update mock array so auto-save detects the change
+      const idx = mockUsers.findIndex(u => u.id === editingPlayer.id);
+      if (idx !== -1) mockUsers[idx] = updatedPlayer;
       setPlayers(players.map(p => (p.id === editingPlayer.id ? updatedPlayer : p)));
       // If the edited player is the currently logged-in user, also update
       // the pflx_user entry so the SideNav reflects the change immediately
@@ -345,6 +351,8 @@ export default function AdminPlayers() {
         }
       }
     } else {
+      // Add to mock array so auto-save detects the change
+      mockUsers.push(updatedPlayer);
       setPlayers([...players, updatedPlayer]);
     }
     setShowEditModal(false);

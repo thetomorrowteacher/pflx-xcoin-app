@@ -64,9 +64,12 @@ export default function AdminModifiers() {
   const saveModifier = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMod) return;
-    if (modifiers.find(m => m.id === editingMod.id)) {
+    const existIdx = mockModifiers.findIndex(m => m.id === editingMod.id);
+    if (existIdx !== -1) {
+      mockModifiers[existIdx] = editingMod;
       setModifiers(modifiers.map(m => m.id === editingMod.id ? editingMod : m));
     } else {
+      mockModifiers.push(editingMod);
       setModifiers([...modifiers, editingMod]);
     }
     playSuccess();
@@ -76,6 +79,8 @@ export default function AdminModifiers() {
   const deleteModifier = (id: string) => {
     if (confirm("Delete this modifier permanently?")) {
       playError();
+      const idx = mockModifiers.findIndex(m => m.id === id);
+      if (idx !== -1) mockModifiers.splice(idx, 1);
       setModifiers(modifiers.filter(m => m.id !== id));
     }
   };

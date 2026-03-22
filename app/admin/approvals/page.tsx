@@ -40,12 +40,16 @@ export default function AdminApprovals() {
   };
 
   const handleApproveTask = (taskId: string) => {
+    const idx = mockTasks.findIndex(t => t.id === taskId);
+    if (idx !== -1) (mockTasks[idx] as any).status = "approved";
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: "approved" as const } : t));
     playSuccess();
     showToast("Task approved! X-Coin & XP awarded. 🎉", "success");
   };
 
   const handleRejectTask = (taskId: string) => {
+    const idx = mockTasks.findIndex(t => t.id === taskId);
+    if (idx !== -1) (mockTasks[idx] as any).status = "rejected";
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: "rejected" as const } : t));
     playError();
     showToast("Task rejected.", "error");
