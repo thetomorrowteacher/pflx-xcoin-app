@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { initStore, saveAll, isStoreReady, needsSeed, clearSeedFlag } from "../lib/store";
+import { getPlayerImages } from "../lib/playerImages";
 import * as D from "../lib/data";
 
 // Snapshot the current state of all collections for dirty-checking
@@ -24,20 +25,42 @@ function snapshot() {
   });
 }
 
+/**
+ * Merge any profile images from localStorage into the mockUsers array.
+ * This ensures images are included when we save users to Supabase.
+ * Returns true if any images were merged (data changed).
+ */
+function mergeLocalImages(): boolean {
+  const imageMap = getPlayerImages();
+  if (Object.keys(imageMap).length === 0) return false;
+  let changed = false;
+  D.mockUsers.forEach((u) => {
+    if (imageMap[u.id] && imageMap[u.id] !== u.image) {
+      u.image = imageMap[u.id];
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 export default function StoreProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const lastSnap = useRef<string>("");
 
   useEffect(() => {
     initStore().then(() => {
+      // Merge any locally-stored profile images into mockUsers
+      const imagesChanged = mergeLocalImages();
+
       lastSnap.current = snapshot();
       setReady(true);
-      // If Supabase was empty, seed it with the default mock data immediately
-      if (needsSeed()) {
-        console.log("[StoreProvider] Seeding Supabase with default data...");
+
+      // If Supabase was empty OR images were merged, save everything
+      if (needsSeed() || imagesChanged) {
+        console.log("[StoreProvider] Saving data to Supabase (seed or image merge)...");
         saveAll().then(() => {
           clearSeedFlag();
-          console.log("[StoreProvider] Seed complete — all data saved to Supabase");
+          console.log("[StoreProvider] Save complete");
         });
       }
     });
@@ -47,6 +70,8 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (!ready) return;
     const interval = setInterval(() => {
+      // Also check for new localStorage images each tick
+      mergeLocalImages();
       const current = snapshot();
       if (current !== lastSnap.current) {
         lastSnap.current = current;
@@ -56,6 +81,7 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
 
     // Also save on page unload
     const handleUnload = () => {
+      mergeLocalImages();
       const current = snapshot();
       if (current !== lastSnap.current) {
         saveAll();
