@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { initStore, saveAll, isStoreReady } from "../lib/store";
+import { initStore, saveAll, isStoreReady, needsSeed, clearSeedFlag } from "../lib/store";
 import * as D from "../lib/data";
 
 // Snapshot the current state of all collections for dirty-checking
@@ -32,6 +32,14 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
     initStore().then(() => {
       lastSnap.current = snapshot();
       setReady(true);
+      // If Supabase was empty, seed it with the default mock data immediately
+      if (needsSeed()) {
+        console.log("[StoreProvider] Seeding Supabase with default data...");
+        saveAll().then(() => {
+          clearSeedFlag();
+          console.log("[StoreProvider] Seed complete — all data saved to Supabase");
+        });
+      }
     });
   }, []);
 

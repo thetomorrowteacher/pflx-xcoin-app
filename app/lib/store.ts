@@ -8,6 +8,7 @@ import * as D from "./data";
 let _initialized = false;
 let _loading = false;
 let _initPromise: Promise<void> | null = null;
+let _needsSeed = false; // True if Supabase was empty on first load
 
 // Listeners for re-render triggers
 type Listener = () => void;
@@ -35,21 +36,30 @@ export async function initStore(): Promise<void> {
     try {
       const all = await loadAllData();
 
-      // For each key, if Supabase has data, overwrite the mock
-      if (all.users?.length) D.mockUsers.splice(0, D.mockUsers.length, ...all.users);
-      if (all.checkpoints?.length) D.mockCheckpoints.splice(0, D.mockCheckpoints.length, ...all.checkpoints);
-      if (all.tasks?.length) D.mockTasks.splice(0, D.mockTasks.length, ...all.tasks);
-      if (all.jobs?.length) D.mockJobs.splice(0, D.mockJobs.length, ...all.jobs);
-      if (all.transactions?.length) D.mockTransactions.splice(0, D.mockTransactions.length, ...all.transactions);
-      if (all.modifiers?.length) D.mockModifiers.splice(0, D.mockModifiers.length, ...all.modifiers);
-      if (all.playerModifiers?.length) D.mockPlayerModifiers.splice(0, D.mockPlayerModifiers.length, ...all.playerModifiers);
-      if (all.pflxRanks?.length) D.mockPflxRanks.splice(0, D.mockPflxRanks.length, ...all.pflxRanks);
-      if (all.gamePeriods?.length) D.mockGamePeriods.splice(0, D.mockGamePeriods.length, ...all.gamePeriods);
-      if (all.submissions?.length) D.mockSubmissions.splice(0, D.mockSubmissions.length, ...all.submissions);
-      if (all.playerDeals?.length) D.mockPlayerDeals.splice(0, D.mockPlayerDeals.length, ...all.playerDeals);
-      if (all.startupStudios?.length) D.mockStartupStudios.splice(0, D.mockStartupStudios.length, ...all.startupStudios);
-      if (all.studioInvestments?.length) D.mockStudioInvestments.splice(0, D.mockStudioInvestments.length, ...all.studioInvestments);
-      if (all.projects?.length) D.mockProjects.splice(0, D.mockProjects.length, ...all.projects);
+      // Check if Supabase has any data at all
+      const hasData = Object.keys(all).length > 0 && all.users?.length > 0;
+
+      if (hasData) {
+        // Supabase has data — overwrite mocks
+        if (all.users?.length) D.mockUsers.splice(0, D.mockUsers.length, ...all.users);
+        if (all.checkpoints?.length) D.mockCheckpoints.splice(0, D.mockCheckpoints.length, ...all.checkpoints);
+        if (all.tasks?.length) D.mockTasks.splice(0, D.mockTasks.length, ...all.tasks);
+        if (all.jobs?.length) D.mockJobs.splice(0, D.mockJobs.length, ...all.jobs);
+        if (all.transactions?.length) D.mockTransactions.splice(0, D.mockTransactions.length, ...all.transactions);
+        if (all.modifiers?.length) D.mockModifiers.splice(0, D.mockModifiers.length, ...all.modifiers);
+        if (all.playerModifiers?.length) D.mockPlayerModifiers.splice(0, D.mockPlayerModifiers.length, ...all.playerModifiers);
+        if (all.pflxRanks?.length) D.mockPflxRanks.splice(0, D.mockPflxRanks.length, ...all.pflxRanks);
+        if (all.gamePeriods?.length) D.mockGamePeriods.splice(0, D.mockGamePeriods.length, ...all.gamePeriods);
+        if (all.submissions?.length) D.mockSubmissions.splice(0, D.mockSubmissions.length, ...all.submissions);
+        if (all.playerDeals?.length) D.mockPlayerDeals.splice(0, D.mockPlayerDeals.length, ...all.playerDeals);
+        if (all.startupStudios?.length) D.mockStartupStudios.splice(0, D.mockStartupStudios.length, ...all.startupStudios);
+        if (all.studioInvestments?.length) D.mockStudioInvestments.splice(0, D.mockStudioInvestments.length, ...all.studioInvestments);
+        if (all.projects?.length) D.mockProjects.splice(0, D.mockProjects.length, ...all.projects);
+      } else {
+        // Supabase is empty — seed it with mock defaults
+        _needsSeed = true;
+        console.log("[store] Supabase empty — seeding with default data");
+      }
 
       _initialized = true;
       notify();
@@ -63,6 +73,12 @@ export async function initStore(): Promise<void> {
   return _initPromise;
 }
 
+export function needsSeed() {
+  return _needsSeed;
+}
+export function clearSeedFlag() {
+  _needsSeed = false;
+}
 export function isStoreReady() {
   return _initialized;
 }
