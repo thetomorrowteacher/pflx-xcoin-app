@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Ticker from "./components/Ticker";
+import StoreProvider from "./components/StoreProvider";
 
 export const metadata: Metadata = {
   title: "PFLX X-Coin",
@@ -15,8 +16,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {children}
-        <Ticker />
+        <StoreProvider>
+          {children}
+          <Ticker />
+        </StoreProvider>
       </body>
     </html>
   );

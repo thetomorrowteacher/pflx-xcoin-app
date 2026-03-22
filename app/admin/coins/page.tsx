@@ -15,6 +15,7 @@ import { applyPlayerImages } from "../../lib/playerImages";
 import { playReward, playSuccess, playClick } from "../../lib/sounds";
 import { updatePlayerStats } from "../../lib/playerStats";
 
+
 export default function ManageCoinsPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -38,6 +39,7 @@ export default function ManageCoinsPage() {
     const newCats = [...categories];
     newCats[catIdx].coins.splice(coinIdx, 1);
     setCategories(newCats);
+    saveCoinCategories();
   };
 
   const handleSaveCoin = (e: React.FormEvent) => {
@@ -47,6 +49,7 @@ export default function ManageCoinsPage() {
     const newCats = [...categories];
     newCats[catIndex].coins[coinIndex] = coin;
     setCategories(newCats);
+    saveCoinCategories();
     setEditingCoin(null);
   };
 
@@ -73,6 +76,7 @@ export default function ManageCoinsPage() {
     const newCats = [...categories];
     newCats[catIdx].coins.push(newCoin);
     setCategories(newCats);
+    saveCoinCategories();
     setIsAdding(null);
   };
 
