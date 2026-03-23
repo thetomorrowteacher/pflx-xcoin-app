@@ -55,6 +55,7 @@ export async function initStore(): Promise<void> {
         if (all.startupStudios?.length) D.mockStartupStudios.splice(0, D.mockStartupStudios.length, ...all.startupStudios);
         if (all.studioInvestments?.length) D.mockStudioInvestments.splice(0, D.mockStudioInvestments.length, ...all.studioInvestments);
         if (all.projects?.length) D.mockProjects.splice(0, D.mockProjects.length, ...all.projects);
+        if (all.coinCategories?.length) D.COIN_CATEGORIES.splice(0, D.COIN_CATEGORIES.length, ...all.coinCategories);
       } else {
         // Supabase is empty — seed it with mock defaults
         _needsSeed = true;
@@ -153,5 +154,6 @@ export async function saveAll() {
     saveStartupStudios(),
     saveStudioInvestments(),
     saveProjects(),
+    saveCoinCategories(),
   ]);
 }

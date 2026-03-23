@@ -22,6 +22,7 @@ function snapshot() {
     ss: D.mockStartupStudios,
     si: D.mockStudioInvestments,
     p: D.mockProjects,
+    cc: D.COIN_CATEGORIES,
   });
 }
 

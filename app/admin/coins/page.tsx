@@ -14,6 +14,7 @@ import {
 import { applyPlayerImages } from "../../lib/playerImages";
 import { playReward, playSuccess, playClick } from "../../lib/sounds";
 import { updatePlayerStats } from "../../lib/playerStats";
+import { saveCoinCategories, saveUsers, saveSubmissions } from "../../lib/store";
 
 
 export default function ManageCoinsPage() {
@@ -38,7 +39,9 @@ export default function ManageCoinsPage() {
     if (!confirm("Are you sure you want to delete this coin?")) return;
     const newCats = [...categories];
     newCats[catIdx].coins.splice(coinIdx, 1);
-    setCategories(newCats);
+    setCategories([...newCats]);
+    // Sync back to mock array so auto-save picks it up
+    COIN_CATEGORIES.splice(0, COIN_CATEGORIES.length, ...newCats);
     saveCoinCategories();
   };
 
@@ -48,7 +51,9 @@ export default function ManageCoinsPage() {
     const { catIndex, coinIndex, coin } = editingCoin;
     const newCats = [...categories];
     newCats[catIndex].coins[coinIndex] = coin;
-    setCategories(newCats);
+    setCategories([...newCats]);
+    // Sync back to mock array so auto-save picks it up
+    COIN_CATEGORIES.splice(0, COIN_CATEGORIES.length, ...newCats);
     saveCoinCategories();
     setEditingCoin(null);
   };
@@ -75,7 +80,9 @@ export default function ManageCoinsPage() {
     };
     const newCats = [...categories];
     newCats[catIdx].coins.push(newCoin);
-    setCategories(newCats);
+    setCategories([...newCats]);
+    // Sync back to mock array so auto-save picks it up
+    COIN_CATEGORIES.splice(0, COIN_CATEGORIES.length, ...newCats);
     saveCoinCategories();
     setIsAdding(null);
   };
@@ -110,6 +117,10 @@ export default function ManageCoinsPage() {
         level: targetPlayer.level,
         rank: targetPlayer.rank,
       });
+
+      // Save to Supabase
+      saveUsers();
+      saveSubmissions();
 
       playReward();
       alert(`Successfully granted ${amount}x ${coin.name} to ${targetPlayer.name} (+${totalXcReward} XC)`);
