@@ -15,6 +15,7 @@ import { applyPlayerImages } from "../../lib/playerImages";
 import { playReward, playSuccess, playClick } from "../../lib/sounds";
 import { updatePlayerStats } from "../../lib/playerStats";
 import { saveCoinCategories, saveUsers, saveSubmissions } from "../../lib/store";
+import { showSaveToast } from "../../lib/saveToast";
 
 
 export default function ManageCoinsPage() {
@@ -54,7 +55,7 @@ export default function ManageCoinsPage() {
     setCategories([...newCats]);
     // Sync back to mock array so auto-save picks it up
     COIN_CATEGORIES.splice(0, COIN_CATEGORIES.length, ...newCats);
-    saveCoinCategories();
+    saveCoinCategories().then(() => showSaveToast("Coin saved ✓"));
     setEditingCoin(null);
   };
 

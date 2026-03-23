@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { initStore, saveAll, isStoreReady, needsSeed, clearSeedFlag } from "../lib/store";
 import { getPlayerImages } from "../lib/playerImages";
+import { showSaveToast } from "../lib/saveToast";
 import * as D from "../lib/data";
 
 // Per-collection snapshots for granular dirty-checking
@@ -50,6 +51,7 @@ async function saveDirty(lastSnaps: Record<string, string>): Promise<Record<stri
   if (saves.length > 0) {
     await Promise.all(saves);
     console.log("[auto-save] saved dirty collections:", dirtyKeys.join(", "));
+    showSaveToast();
   }
   return currentSnaps;
 }
@@ -92,6 +94,7 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
           clearSeedFlag();
           lastSnaps.current = snapshotAll(); // re-snapshot after seed
           console.log("[StoreProvider] Seed complete");
+          showSaveToast("Data initialized ✓");
         });
       }
     });
