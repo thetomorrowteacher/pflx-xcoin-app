@@ -36,8 +36,9 @@ export async function initStore(): Promise<void> {
     try {
       const all = await loadAllData();
 
-      // Check if Supabase has any data at all
-      const hasData = Object.keys(all).length > 0 && all.users?.length > 0;
+      // Check if Supabase has any PFLX data (not just pathway keys)
+      const pflxKeys = ['users','checkpoints','tasks','jobs','transactions','modifiers','coinCategories'];
+      const hasData = pflxKeys.some(k => all[k] && Array.isArray(all[k]) && all[k].length > 0);
 
       if (hasData) {
         // Supabase has data — overwrite mocks

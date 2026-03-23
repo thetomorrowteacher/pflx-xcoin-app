@@ -5,25 +5,53 @@ import { initStore, saveAll, isStoreReady, needsSeed, clearSeedFlag } from "../l
 import { getPlayerImages } from "../lib/playerImages";
 import * as D from "../lib/data";
 
-// Snapshot the current state of all collections for dirty-checking
-function snapshot() {
-  return JSON.stringify({
-    u: D.mockUsers,
-    c: D.mockCheckpoints,
-    t: D.mockTasks,
-    j: D.mockJobs,
-    tx: D.mockTransactions,
-    m: D.mockModifiers,
-    pm: D.mockPlayerModifiers,
-    r: D.mockPflxRanks,
-    g: D.mockGamePeriods,
-    s: D.mockSubmissions,
-    pd: D.mockPlayerDeals,
-    ss: D.mockStartupStudios,
-    si: D.mockStudioInvestments,
-    p: D.mockProjects,
-    cc: D.COIN_CATEGORIES,
-  });
+// Per-collection snapshots for granular dirty-checking
+// Only save collections that actually changed, not everything
+type CollectionKey = string;
+const COLLECTIONS: { key: CollectionKey; getData: () => any; save: () => Promise<any> }[] = [
+  { key: "u",  getData: () => D.mockUsers,            save: () => import("../lib/store").then(m => m.saveUsers()) },
+  { key: "c",  getData: () => D.mockCheckpoints,      save: () => import("../lib/store").then(m => m.saveCheckpoints()) },
+  { key: "t",  getData: () => D.mockTasks,             save: () => import("../lib/store").then(m => m.saveTasks()) },
+  { key: "j",  getData: () => D.mockJobs,              save: () => import("../lib/store").then(m => m.saveJobs()) },
+  { key: "tx", getData: () => D.mockTransactions,      save: () => import("../lib/store").then(m => m.saveTransactions()) },
+  { key: "m",  getData: () => D.mockModifiers,         save: () => import("../lib/store").then(m => m.saveModifiers()) },
+  { key: "pm", getData: () => D.mockPlayerModifiers,   save: () => import("../lib/store").then(m => m.savePlayerModifiers()) },
+  { key: "r",  getData: () => D.mockPflxRanks,         save: () => import("../lib/store").then(m => m.savePflxRanks()) },
+  { key: "g",  getData: () => D.mockGamePeriods,       save: () => import("../lib/store").then(m => m.saveGamePeriods()) },
+  { key: "s",  getData: () => D.mockSubmissions,       save: () => import("../lib/store").then(m => m.saveSubmissions()) },
+  { key: "pd", getData: () => D.mockPlayerDeals,       save: () => import("../lib/store").then(m => m.savePlayerDeals()) },
+  { key: "ss", getData: () => D.mockStartupStudios,    save: () => import("../lib/store").then(m => m.saveStartupStudios()) },
+  { key: "si", getData: () => D.mockStudioInvestments, save: () => import("../lib/store").then(m => m.saveStudioInvestments()) },
+  { key: "p",  getData: () => D.mockProjects,          save: () => import("../lib/store").then(m => m.saveProjects()) },
+  { key: "cc", getData: () => D.COIN_CATEGORIES,       save: () => import("../lib/store").then(m => m.saveCoinCategories()) },
+];
+
+function snapshotAll(): Record<string, string> {
+  const snaps: Record<string, string> = {};
+  for (const c of COLLECTIONS) {
+    snaps[c.key] = JSON.stringify(c.getData());
+  }
+  return snaps;
+}
+
+// Save ONLY the collections that differ from the last snapshot
+async function saveDirty(lastSnaps: Record<string, string>): Promise<Record<string, string>> {
+  const currentSnaps: Record<string, string> = {};
+  const saves: Promise<any>[] = [];
+  const dirtyKeys: string[] = [];
+  for (const c of COLLECTIONS) {
+    const snap = JSON.stringify(c.getData());
+    currentSnaps[c.key] = snap;
+    if (snap !== lastSnaps[c.key]) {
+      saves.push(c.save());
+      dirtyKeys.push(c.key);
+    }
+  }
+  if (saves.length > 0) {
+    await Promise.all(saves);
+    console.log("[auto-save] saved dirty collections:", dirtyKeys.join(", "));
+  }
+  return currentSnaps;
 }
 
 /**
@@ -46,47 +74,44 @@ function mergeLocalImages(): boolean {
 
 export default function StoreProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
-  const lastSnap = useRef<string>("");
+  const lastSnaps = useRef<Record<string, string>>({});
 
   useEffect(() => {
     initStore().then(() => {
       // Merge any locally-stored profile images into mockUsers
-      const imagesChanged = mergeLocalImages();
+      mergeLocalImages();
 
-      lastSnap.current = snapshot();
+      // Take per-collection snapshots AFTER load + image merge
+      lastSnaps.current = snapshotAll();
       setReady(true);
 
-      // If Supabase was empty OR images were merged, save everything
-      if (needsSeed() || imagesChanged) {
-        console.log("[StoreProvider] Saving data to Supabase (seed or image merge)...");
+      // If Supabase was empty, seed with defaults
+      if (needsSeed()) {
+        console.log("[StoreProvider] Supabase empty — seeding all data...");
         saveAll().then(() => {
           clearSeedFlag();
-          console.log("[StoreProvider] Save complete");
+          lastSnaps.current = snapshotAll(); // re-snapshot after seed
+          console.log("[StoreProvider] Seed complete");
         });
       }
     });
   }, []);
 
-  // Auto-save every 2 seconds if data changed
+  // Auto-save every 2 seconds — only dirty collections
   useEffect(() => {
     if (!ready) return;
-    const interval = setInterval(() => {
-      // Also check for new localStorage images each tick
+    const interval = setInterval(async () => {
+      // Check for new localStorage images each tick
       mergeLocalImages();
-      const current = snapshot();
-      if (current !== lastSnap.current) {
-        lastSnap.current = current;
-        saveAll().then(() => console.log("[auto-save] saved to Supabase"));
-      }
+      // Save only collections that actually changed
+      lastSnaps.current = await saveDirty(lastSnaps.current);
     }, 2000);
 
     // Also save on page unload
     const handleUnload = () => {
       mergeLocalImages();
-      const current = snapshot();
-      if (current !== lastSnap.current) {
-        saveAll();
-      }
+      // Fire-and-forget dirty save
+      saveDirty(lastSnaps.current);
     };
     window.addEventListener("beforeunload", handleUnload);
 
