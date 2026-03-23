@@ -25,6 +25,7 @@ export default function ManageCoinsPage() {
   const [editingCoin, setEditingCoin] = useState<{catIndex: number, coinIndex: number, coin: Coin} | null>(null);
   const [isAdding, setIsAdding] = useState<number | null>(null); // Category index
   const [grantTarget, setGrantTarget] = useState<{playerId: string, coin: Coin, amount: number} | null>(null);
+  const [newCoinImage, setNewCoinImage] = useState<string>(""); // base64 for new coin image
 
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
@@ -51,24 +52,53 @@ export default function ManageCoinsPage() {
     e.preventDefault();
     if (!editingCoin) return;
     const { catIndex, coinIndex, coin } = editingCoin;
+    console.log(`[coins] Saving coin "${coin.name}", image: ${coin.image ? `${(coin.image.length / 1024).toFixed(1)}KB` : "none"}`);
     const newCats = [...categories];
     newCats[catIndex].coins[coinIndex] = coin;
     setCategories([...newCats]);
     // Sync back to mock array so auto-save picks it up
     COIN_CATEGORIES.splice(0, COIN_CATEGORIES.length, ...newCats);
+    playSuccess();
     saveAndToast([saveCoinCategories], "Coin saved to cloud ✓");
     setEditingCoin(null);
   };
 
-  const handleImageUpload = (file: File, isEditing: boolean) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      if (isEditing && editingCoin) {
-        setEditingCoin({ ...editingCoin, coin: { ...editingCoin.coin, image: base64String } });
-      }
-    };
-    reader.readAsDataURL(file);
+  // Compress image to max 200x200 JPEG to keep Supabase payload small
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX = 200;
+          let w = img.width, h = img.height;
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL("image/jpeg", 0.8));
+          } else {
+            resolve(reader.result as string);
+          }
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageUpload = async (file: File, isEditing: boolean) => {
+    const compressed = await compressImage(file);
+    console.log(`[coins] Image compressed: ${(compressed.length / 1024).toFixed(1)}KB`);
+    if (isEditing && editingCoin) {
+      setEditingCoin({ ...editingCoin, coin: { ...editingCoin.coin, image: compressed } });
+    } else {
+      setNewCoinImage(compressed);
+    }
   };
 
   const handleCreateCoin = (e: React.FormEvent, catIdx: number) => {
@@ -78,15 +108,18 @@ export default function ManageCoinsPage() {
       name: formData.get("name") as string,
       description: formData.get("description") as string,
       xc: parseInt(formData.get("xc") as string) || 0,
-      image: (e.target as any).querySelector('#new-coin-image-preview')?.src || undefined,
+      image: newCoinImage || undefined, // Use state instead of DOM query
     };
+    console.log(`[coins] Creating coin "${newCoin.name}", image: ${newCoin.image ? `${(newCoin.image.length / 1024).toFixed(1)}KB` : "none"}`);
     const newCats = [...categories];
     newCats[catIdx].coins.push(newCoin);
     setCategories([...newCats]);
     // Sync back to mock array so auto-save picks it up
     COIN_CATEGORIES.splice(0, COIN_CATEGORIES.length, ...newCats);
-    saveCoinCategories();
+    playSuccess();
+    saveAndToast([saveCoinCategories], "Badge created — saved to cloud ✓");
     setIsAdding(null);
+    setNewCoinImage(""); // Reset for next creation
   };
 
   const handleGrantCoin = () => {
@@ -121,11 +154,8 @@ export default function ManageCoinsPage() {
       });
 
       // Save to Supabase
-      saveUsers();
-      saveSubmissions();
-
       playReward();
-      alert(`Successfully granted ${amount}x ${coin.name} to ${targetPlayer.name} (+${totalXcReward} XC)`);
+      saveAndToast([saveUsers, saveSubmissions], `${amount}x ${coin.name} granted — saved to cloud ✓`);
     }
     setGrantTarget(null);
   };
@@ -236,11 +266,13 @@ export default function ManageCoinsPage() {
                       hidden 
                       onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], true)}
                     />
-                    <label htmlFor="edit-coin-file" style={{ 
-                      flex: 1, padding: "12px", background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.2)", 
-                      borderRadius: "12px", color: "rgba(255,255,255,0.6)", fontSize: "13px", textAlign: "center", cursor: "pointer"
+                    <label htmlFor="edit-coin-file" style={{
+                      flex: 1, padding: "12px",
+                      background: editingCoin.coin.image ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.03)",
+                      border: `1px dashed ${editingCoin.coin.image ? "rgba(34,197,94,0.4)" : "rgba(255,255,255,0.2)"}`,
+                      borderRadius: "12px", color: editingCoin.coin.image ? "#22c55e" : "rgba(255,255,255,0.6)", fontSize: "13px", textAlign: "center", cursor: "pointer"
                     }}>
-                      {editingCoin.coin.image ? "Change Image" : "Upload Custom Image"}
+                      {editingCoin.coin.image ? "✓ Image Set — Click to Change" : "Upload Custom Image"}
                     </label>
                   </div>
                 </div>
@@ -269,36 +301,24 @@ export default function ManageCoinsPage() {
                   <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Coin Image</label>
                   <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                     <div style={{ width: "64px", height: "64px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <img id="new-coin-image-preview" src="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "none" }} />
-                      <span id="new-coin-placeholder" style={{ fontSize: "24px" }}>🪙</span>
+                      {newCoinImage ? <img src={newCoinImage} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "24px" }}>🪙</span>}
                     </div>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      id="add-coin-file" 
-                      hidden 
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id="add-coin-file"
+                      hidden
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            const preview = document.getElementById('new-coin-image-preview') as HTMLImageElement;
-                            const placeholder = document.getElementById('new-coin-placeholder');
-                            if (preview && placeholder) {
-                              preview.src = reader.result as string;
-                              preview.style.display = 'block';
-                              placeholder.style.display = 'none';
-                            }
-                          };
-                          reader.readAsDataURL(file);
-                        }
+                        if (file) handleImageUpload(file, false);
                       }}
                     />
-                    <label htmlFor="add-coin-file" style={{ 
-                      flex: 1, padding: "12px", background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.2)", 
-                      borderRadius: "12px", color: "rgba(255,255,255,0.6)", fontSize: "13px", textAlign: "center", cursor: "pointer"
+                    <label htmlFor="add-coin-file" style={{
+                      flex: 1, padding: "12px", background: newCoinImage ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.03)",
+                      border: `1px dashed ${newCoinImage ? "rgba(34,197,94,0.4)" : "rgba(255,255,255,0.2)"}`,
+                      borderRadius: "12px", color: newCoinImage ? "#22c55e" : "rgba(255,255,255,0.6)", fontSize: "13px", textAlign: "center", cursor: "pointer"
                     }}>
-                      Upload Badge Image
+                      {newCoinImage ? "✓ Image Ready — Click to Change" : "Upload Badge Image"}
                     </label>
                   </div>
                 </div>
