@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import SideNav from "../components/SideNav";
 import { User, mockTasks, mockUsers, mockModifiers, mockTransactions, COIN_CATEGORIES, isHostUser } from "../lib/data";
 import { applyPlayerImages } from "../lib/playerImages";
+import { saveUsers, saveTransactions } from "../lib/store";
+import { showSaveToast } from "../lib/saveToast";
 
 // ── Multi-select player picker ────────────────────────────────────────────────
 function PlayerPicker({
@@ -334,6 +336,8 @@ export default function AdminDashboard() {
   const [grantNote, setGrantNote] = useState("");
   const [grantItems, setGrantItems] = useState<{ coinName: string; amount: string }[]>([{ coinName: "", amount: "1" }]);
   const [grantXpAmount, setGrantXpAmount] = useState("");
+  const [_tick, setTick] = useState(0);
+  const forceUpdate = () => setTick(t => t + 1);
 
   useEffect(() => {
     try {
@@ -346,6 +350,9 @@ export default function AdminDashboard() {
       localStorage.removeItem("pflx_user");
       router.push("/");
     }
+    // Re-read mockUsers periodically so new players from other pages appear
+    const interval = setInterval(() => setTick(t => t + 1), 2000);
+    return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -390,6 +397,8 @@ export default function AdminDashboard() {
         count++;
       });
     });
+    Promise.all([saveUsers(), saveTransactions()]).then(() => showSaveToast("Fines saved to cloud ✓"));
+    forceUpdate();
     showToast(`${count} fine(s) applied to ${taxPlayerIds.length} player(s).`, "success");
     setTaxPlayerIds([]); setTaxIds([]);
   };
@@ -407,6 +416,7 @@ export default function AdminDashboard() {
         mockTransactions.push({ id: `tx-${Date.now()}-${pid}`, userId: pid, type: "admin_grant",
           amount: amt, currency: "xcoin", description: grantNote || "Admin XC Grant", createdAt: now });
       });
+      Promise.all([saveUsers(), saveTransactions()]).then(() => showSaveToast("XC granted — saved to cloud ✓"));
       showToast(`+${amt.toLocaleString()} XC granted to ${grantPlayerIds.length} player(s).`, "success");
     } else {
       const validItems = grantItems.filter(gi => gi.coinName && parseInt(gi.amount) > 0);
@@ -415,10 +425,21 @@ export default function AdminDashboard() {
       grantPlayerIds.forEach(pid => {
         const target = mockUsers.find(u => u.id === pid);
         if (!target) return;
+        // Ensure badgeCounts exists
+        if (!target.badgeCounts) target.badgeCounts = { signature: 0, executive: 0, premium: 0, primary: 0 };
         validItems.forEach(gi => {
           const amt = parseInt(gi.amount);
           const coinDef = COIN_CATEGORIES.flatMap(c => c.coins).find(c => c.name === gi.coinName);
           target.digitalBadges += amt;
+          // Update per-type badge breakdown
+          const category = COIN_CATEGORIES.find(cat => cat.coins.some(c => c.name === gi.coinName));
+          if (category) {
+            const catName = category.name.toLowerCase();
+            if (catName.includes("primary")) target.badgeCounts.primary += amt;
+            else if (catName.includes("premium")) target.badgeCounts.premium += amt;
+            else if (catName.includes("executive")) target.badgeCounts.executive += amt;
+            else if (catName.includes("signature")) target.badgeCounts.signature += amt;
+          }
           if (coinDef) { target.xcoin += coinDef.xc * amt; target.totalXcoin += coinDef.xc * amt; }
           mockTransactions.push({ id: `tx-${Date.now()}-${pid}-${gi.coinName}-${totalAwarded}`,
             userId: pid, type: "admin_grant", amount: amt, currency: "xcoin",
@@ -426,8 +447,11 @@ export default function AdminDashboard() {
           totalAwarded += amt;
         });
       });
+      Promise.all([saveUsers(), saveTransactions()]).then(() => showSaveToast("Badges saved to cloud ✓"));
+      forceUpdate();
       showToast(`${totalAwarded} badge(s) across ${validItems.length} type(s) to ${grantPlayerIds.length} player(s).`, "success");
     }
+    forceUpdate();
     setGrantPlayerIds([]); setGrantXpAmount(""); setGrantNote("");
     setGrantItems([{ coinName: "", amount: "1" }]);
   };

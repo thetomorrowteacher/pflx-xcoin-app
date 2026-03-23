@@ -8,6 +8,8 @@ import {
   mockStudioInvestments, getCurrentRank,
   getStudioMaxStakePercent,
 } from "../../lib/data";
+import { saveStartupStudios } from "../../lib/store";
+import { showSaveToast } from "../../lib/saveToast";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function avatarInitials(name: string) {
@@ -97,6 +99,7 @@ export default function StudiosPage() {
     setModal(null);
     setReassignPlayerId("");
     setReassignTargetStudioId("");
+    Promise.all([saveStartupStudios(), import("../../lib/store").then(m => m.saveUsers())]).then(() => showSaveToast("Player reassigned — saved to cloud ✓"));
   };
 
   const handleTaxUpdate = () => {
@@ -106,6 +109,7 @@ export default function StudiosPage() {
     if (studio) {
       studio.corporateTaxRate = rate / 100;
       setStudios([...mockStartupStudios]);
+      saveStartupStudios().then(() => showSaveToast("Tax rate updated — saved to cloud ✓"));
     }
     setModal(null);
     setTaxRateInput("");

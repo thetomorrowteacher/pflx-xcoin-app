@@ -8,6 +8,8 @@ import {
   COIN_CATEGORIES, RewardCoin, getMockCohorts,
   isHostUser,
 } from "../../lib/data";
+import { saveCheckpoints, saveTasks, saveJobs, saveProjects } from "../../lib/store";
+import { showSaveToast } from "../../lib/saveToast";
 import { playClick, playNav, playSuccess, playError } from "../../lib/sounds";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -183,6 +185,7 @@ export default function TaskManagement() {
     updatedTasks.forEach((t, i) => { mockTasks[i] = t; });
 
     playSuccess();
+    Promise.all([saveCheckpoints(), saveTasks()]).then(() => showSaveToast("Checkpoint saved to cloud ✓"));
     setCpModal(false);
   };
 
@@ -192,6 +195,7 @@ export default function TaskManagement() {
     const idx = mockCheckpoints.findIndex(c => c.id === cpId);
     if (idx >= 0) mockCheckpoints.splice(idx, 1);
     setTasks(prev => prev.map(t => t.roundId === cpId ? { ...t, roundId: undefined } : t));
+    Promise.all([saveCheckpoints(), saveTasks()]).then(() => showSaveToast("Checkpoint deleted — saved to cloud ✓"));
   };
 
   // ── Task handlers ─────────────────────────────────────────────────────────
@@ -222,6 +226,7 @@ export default function TaskManagement() {
       if (idx >= 0) mockTasks[idx] = saved;
     }
     playSuccess();
+    saveTasks().then(() => showSaveToast("Task saved to cloud ✓"));
     setTaskModal(false);
   };
 
@@ -252,6 +257,7 @@ export default function TaskManagement() {
       if (idx >= 0) mockJobs[idx] = saved;
     }
     playSuccess();
+    saveJobs().then(() => showSaveToast("Job saved to cloud ✓"));
     setJobModal(false);
   };
 
@@ -296,6 +302,7 @@ export default function TaskManagement() {
       if (idx >= 0) mockProjects[idx] = saved;
     }
     playSuccess();
+    saveProjects().then(() => showSaveToast("Project saved to cloud ✓"));
     setProjectModal(false);
   };
 
@@ -304,6 +311,7 @@ export default function TaskManagement() {
     setProjects(prev => prev.filter(p => p.id !== projId));
     const idx = mockProjects.findIndex(p => p.id === projId);
     if (idx >= 0) mockProjects.splice(idx, 1);
+    saveProjects().then(() => showSaveToast("Project deleted — saved to cloud ✓"));
   };
 
   const cohorts = getMockCohorts();

@@ -7,6 +7,8 @@ import {
   ModifierTrigger, ModifierEffect, triggerLabel, effectLabel
 } from "../../lib/data";
 import { playSuccess, playError, playClick } from "../../lib/sounds";
+import { saveModifiers } from "../../lib/store";
+import { showSaveToast } from "../../lib/saveToast";
 
 const TRIGGER_OPTIONS: ModifierTrigger[] = [
   "manual",
@@ -73,6 +75,7 @@ export default function AdminModifiers() {
       setModifiers([...modifiers, editingMod]);
     }
     playSuccess();
+    saveModifiers().then(() => showSaveToast("Modifier saved to cloud ✓"));
     setEditingMod(null);
   };
 
@@ -82,6 +85,7 @@ export default function AdminModifiers() {
       const idx = mockModifiers.findIndex(m => m.id === id);
       if (idx !== -1) mockModifiers.splice(idx, 1);
       setModifiers(modifiers.filter(m => m.id !== id));
+      saveModifiers().then(() => showSaveToast("Modifier deleted — saved to cloud ✓"));
     }
   };
 

@@ -5,6 +5,8 @@ import SideNav from "../../components/SideNav";
 import { User, mockPflxRanks, PFLXRank, mockGamePeriods, GamePeriod, isHostUser, COIN_CATEGORIES,
 } from "../../lib/data";
 import { getSoundSettings, saveSoundSettings, SoundSettings, playClick, playNav, playSuccess, playReward, playAlert, playError } from "../../lib/sounds";
+import { saveGamePeriods, savePflxRanks } from "../../lib/store";
+import { showSaveToast } from "../../lib/saveToast";
 
 export default function AdminSettings() {
   const router = useRouter();
@@ -94,6 +96,7 @@ export default function AdminSettings() {
     setPeriods(updated);
     mockGamePeriods.push(newSeason);
     setNewSeasonTitle("");
+    saveGamePeriods().then(() => showSaveToast("Season created — saved to cloud ✓"));
     showToast("Season created!", "success");
   };
 
@@ -102,6 +105,7 @@ export default function AdminSettings() {
     setPeriods(updated);
     const index = mockGamePeriods.findIndex(p => p.id === id);
     if (index >= 0) mockGamePeriods[index].isActive = !mockGamePeriods[index].isActive;
+    saveGamePeriods().then(() => showSaveToast("Season updated — saved to cloud ✓"));
     showToast("Season status updated.", "success");
   };
 
@@ -109,6 +113,7 @@ export default function AdminSettings() {
     setPeriods(periods.filter(p => p.id !== id));
     const index = mockGamePeriods.findIndex(p => p.id === id);
     if (index >= 0) mockGamePeriods.splice(index, 1);
+    saveGamePeriods().then(() => showSaveToast("Season deleted — saved to cloud ✓"));
     showToast("Season deleted.", "success");
   };
 

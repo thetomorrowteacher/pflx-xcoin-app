@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
 import { User, Task, mockTasks, mockUsers, CoinSubmission, mockSubmissions, mockModifiers, mockTransactions } from "../../lib/data";
 import { playSuccess, playError } from "../../lib/sounds";
+import { saveUsers, saveTransactions, saveSubmissions, saveTasks } from "../../lib/store";
+import { showSaveToast } from "../../lib/saveToast";
 
 export default function AdminApprovals() {
   const router = useRouter();
@@ -44,6 +46,7 @@ export default function AdminApprovals() {
     if (idx !== -1) (mockTasks[idx] as any).status = "approved";
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: "approved" as const } : t));
     playSuccess();
+    saveTasks().then(() => showSaveToast("Task approved — saved to cloud ✓"));
     showToast("Task approved! X-Coin & XP awarded. 🎉", "success");
   };
 
@@ -52,6 +55,7 @@ export default function AdminApprovals() {
     if (idx !== -1) (mockTasks[idx] as any).status = "rejected";
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: "rejected" as const } : t));
     playError();
+    saveTasks().then(() => showSaveToast("Task rejected — saved to cloud ✓"));
     showToast("Task rejected.", "error");
   };
 
@@ -86,6 +90,7 @@ export default function AdminApprovals() {
       createdAt: new Date().toISOString().split("T")[0]
     });
 
+    saveTransactions().then(() => showSaveToast("Fine saved to cloud ✓"));
     showToast(`Successfully issued fine: ${tax.name} (-${tax.costXcoin} XP)`, "success");
     setSelectedPlayerId("");
     setSelectedTaxId("");
