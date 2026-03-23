@@ -418,6 +418,7 @@ export default function AdminDashboard() {
         mockTransactions.push({ id: `tx-${Date.now()}-${pid}`, userId: pid, type: "admin_grant",
           amount: amt, currency: "xcoin", description: grantNote || "Admin XC Grant", createdAt: now });
       });
+      console.log(`[xc-grant] Granted ${amt} XC to ${grantPlayerIds.length} player(s), ${mockTransactions.length} total txns`);
       playCoin();
       saveAndToast([saveUsers, saveTransactions], "XC granted — saved to cloud ✓");
       showToast(`+${amt.toLocaleString()} XC granted to ${grantPlayerIds.length} player(s).`, "success");
@@ -450,6 +451,12 @@ export default function AdminDashboard() {
           totalAwarded += amt;
         });
       });
+      // Log badge state before saving
+      grantPlayerIds.forEach(pid => {
+        const u = mockUsers.find(x => x.id === pid);
+        if (u) console.log(`[badge-grant] Player "${u.brandName||u.name}": badges=${u.digitalBadges}, badgeCounts=`, u.badgeCounts, `xcoin=${u.xcoin}`);
+      });
+      console.log(`[badge-grant] mockUsers has ${mockUsers.length} users, mockTransactions has ${mockTransactions.length} txns`);
       playBadge();
       saveAndToast([saveUsers, saveTransactions], "Badges saved to cloud ✓");
       forceUpdate();

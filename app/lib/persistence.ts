@@ -56,6 +56,8 @@ export async function loadData<T>(key: DataKey): Promise<T | null> {
  */
 export async function saveData<T>(key: DataKey, value: T): Promise<boolean> {
   try {
+    const summary = Array.isArray(value) ? `${(value as any[]).length} items` : typeof value;
+    console.log(`[persistence] saveData("${key}") → ${summary}`);
     const { error } = await supabase.from("app_data").upsert(
       {
         key,
@@ -66,12 +68,13 @@ export async function saveData<T>(key: DataKey, value: T): Promise<boolean> {
     );
 
     if (error) {
-      console.error(`[persistence] saveData("${key}") error:`, error);
+      console.error(`[persistence] ✗ saveData("${key}") error:`, error.message, error.code, error.details);
       return false;
     }
+    console.log(`[persistence] ✓ saveData("${key}") success`);
     return true;
   } catch (err) {
-    console.error(`[persistence] saveData("${key}") exception:`, err);
+    console.error(`[persistence] ✗ saveData("${key}") exception:`, err);
     return false;
   }
 }

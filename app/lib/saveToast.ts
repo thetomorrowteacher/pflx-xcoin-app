@@ -1,8 +1,6 @@
 // Global "Saved to cloud" toast — works from any component or module
 // Injects a fixed-position toast into the DOM and auto-fades
-// Also plays the save SFX when showing success
-
-import { playSave } from "./sounds";
+// Sound import is lazy to prevent module-level failures
 
 let toastEl: HTMLDivElement | null = null;
 let hideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -40,13 +38,13 @@ export function showSaveToast(msg = "Saved to cloud ✓", playSound = true) {
   if (typeof window === "undefined") return; // SSR guard
   const el = getOrCreateToast();
   el.textContent = msg;
-  // Green-tinted for success
   el.style.background = "linear-gradient(135deg, #00d4ff, #7c3aed)";
   el.style.opacity = "1";
   el.style.transform = "translateX(-50%) translateY(0)";
 
+  // Lazy-load sound to avoid import failures crashing this module
   if (playSound) {
-    try { playSave(); } catch {}
+    import("./sounds").then(m => { try { m.playSave(); } catch {} }).catch(() => {});
   }
 
   if (hideTimer) clearTimeout(hideTimer);
@@ -79,15 +77,19 @@ export async function saveAndToast(
   saveFns: Array<() => Promise<boolean>>,
   successMsg = "Saved to cloud ✓",
 ): Promise<boolean> {
+  console.log("[saveAndToast] Saving", saveFns.length, "collection(s)...");
   try {
     const results = await Promise.all(saveFns.map(fn => fn()));
+    console.log("[saveAndToast] Results:", results);
     const allOk = results.every(r => r === true);
     if (allOk) {
+      console.log("[saveAndToast] ✓ All saved successfully");
       showSaveToast(successMsg);
     } else {
       // Some saves returned false — retry once
       console.warn("[saveAndToast] Some saves returned false, retrying...");
       const retryResults = await Promise.all(saveFns.map(fn => fn()));
+      console.log("[saveAndToast] Retry results:", retryResults);
       const retryOk = retryResults.every(r => r === true);
       if (retryOk) {
         showSaveToast(successMsg);
