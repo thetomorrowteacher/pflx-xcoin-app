@@ -1201,11 +1201,11 @@ function EditPlayerForm({ player, onSave, onCancel }: {
           gap: "16px",
         }}>
           <div>
-            <label style={labelStyle()}>Digital Badges</label>
+            <label style={labelStyle()}>XC</label>
             <input
               type="number"
-              value={form.digitalBadges}
-              onChange={(e) => setForm(f => ({ ...f, digitalBadges: parseInt(e.target.value) || 0 }))}
+              value={form.xcoin}
+              onChange={(e) => setForm(f => ({ ...f, xcoin: parseInt(e.target.value) || 0 }))}
               style={inputStyle()}
             />
           </div>
