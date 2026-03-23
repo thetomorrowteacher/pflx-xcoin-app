@@ -25,6 +25,8 @@ const COLLECTIONS: { key: CollectionKey; getData: () => any; save: () => Promise
   { key: "si", getData: () => D.mockStudioInvestments, save: () => import("../lib/store").then(m => m.saveStudioInvestments()) },
   { key: "p",  getData: () => D.mockProjects,          save: () => import("../lib/store").then(m => m.saveProjects()) },
   { key: "cc", getData: () => D.COIN_CATEGORIES,       save: () => import("../lib/store").then(m => m.saveCoinCategories()) },
+  { key: "tr", getData: () => D.mockTrades,            save: () => import("../lib/store").then(m => m.saveTrades()) },
+  { key: "iv", getData: () => D.mockInvestments,       save: () => import("../lib/store").then(m => m.saveInvestments()) },
 ];
 
 function snapshotAll(): Record<string, string> {

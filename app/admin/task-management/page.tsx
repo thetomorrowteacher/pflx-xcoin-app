@@ -11,6 +11,7 @@ import {
 import { saveCheckpoints, saveTasks, saveJobs, saveProjects } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
 import { playClick, playNav, playSuccess, playError, playDelete, playModalOpen, playModalClose } from "../../lib/sounds";
+import { compressBannerImage } from "../../lib/imageUtils";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -126,12 +127,12 @@ export default function TaskManagement() {
     setCpModal(true);
   };
 
-  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => setEditingCP(prev => ({ ...prev, bannerImage: ev.target?.result as string }));
-    reader.readAsDataURL(file);
+    const compressed = await compressBannerImage(file);
+    console.log(`[task-mgmt] Banner compressed: ${(compressed.length / 1024).toFixed(1)}KB`);
+    setEditingCP(prev => ({ ...prev, bannerImage: compressed }));
   };
 
   const toggleCpTask = (taskId: string) => {

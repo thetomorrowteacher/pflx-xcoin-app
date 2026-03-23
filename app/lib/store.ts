@@ -57,6 +57,8 @@ export async function initStore(): Promise<void> {
         if (all.studioInvestments?.length) D.mockStudioInvestments.splice(0, D.mockStudioInvestments.length, ...all.studioInvestments);
         if (all.projects?.length) D.mockProjects.splice(0, D.mockProjects.length, ...all.projects);
         if (all.coinCategories?.length) D.COIN_CATEGORIES.splice(0, D.COIN_CATEGORIES.length, ...all.coinCategories);
+        if (all.trades?.length) D.mockTrades.splice(0, D.mockTrades.length, ...all.trades);
+        if (all.investments?.length) D.mockInvestments.splice(0, D.mockInvestments.length, ...all.investments);
       } else {
         // Supabase is empty — seed it with mock defaults
         _needsSeed = true;
@@ -135,6 +137,12 @@ export function saveProjects() {
 export function saveCoinCategories() {
   return saveData("coinCategories", D.COIN_CATEGORIES);
 }
+export function saveTrades() {
+  return saveData("trades", D.mockTrades);
+}
+export function saveInvestments() {
+  return saveData("investments", D.mockInvestments);
+}
 
 /**
  * Convenience: save everything at once (used after bulk operations).
@@ -156,5 +164,7 @@ export async function saveAll() {
     saveStudioInvestments(),
     saveProjects(),
     saveCoinCategories(),
+    saveTrades(),
+    saveInvestments(),
   ]);
 }

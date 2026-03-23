@@ -16,6 +16,7 @@ import { playReward, playSuccess, playClick, playDelete } from "../../lib/sounds
 import { updatePlayerStats } from "../../lib/playerStats";
 import { saveCoinCategories, saveUsers, saveSubmissions } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
+import { compressImage } from "../../lib/imageUtils";
 
 
 export default function ManageCoinsPage() {
@@ -26,6 +27,13 @@ export default function ManageCoinsPage() {
   const [isAdding, setIsAdding] = useState<number | null>(null); // Category index
   const [grantTarget, setGrantTarget] = useState<{playerId: string, coin: Coin, amount: number} | null>(null);
   const [newCoinImage, setNewCoinImage] = useState<string>(""); // base64 for new coin image
+  const [_tick, setTick] = useState(0);
+
+  // Refresh player list every 2s so newly added players appear in picker
+  useEffect(() => {
+    const iv = setInterval(() => setTick(t => t + 1), 2000);
+    return () => clearInterval(iv);
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
@@ -61,34 +69,6 @@ export default function ManageCoinsPage() {
     playSuccess();
     saveAndToast([saveCoinCategories], "Coin saved to cloud ✓");
     setEditingCoin(null);
-  };
-
-  // Compress image to max 200x200 JPEG to keep Supabase payload small
-  const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const MAX = 200;
-          let w = img.width, h = img.height;
-          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-          else { w = Math.round(w * MAX / h); h = MAX; }
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL("image/jpeg", 0.8));
-          } else {
-            resolve(reader.result as string);
-          }
-        };
-        img.src = reader.result as string;
-      };
-      reader.readAsDataURL(file);
-    });
   };
 
   const handleImageUpload = async (file: File, isEditing: boolean) => {

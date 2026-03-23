@@ -7,6 +7,7 @@ import { User, mockPflxRanks, PFLXRank, mockGamePeriods, GamePeriod, isHostUser,
 import { getSoundSettings, saveSoundSettings, SoundSettings, playClick, playNav, playSuccess, playReward, playAlert, playError, playDelete, playSave, playCoin, playBadge, playTax, playToggle, playModalOpen, playModalClose, playLevelUp } from "../../lib/sounds";
 import { saveGamePeriods, savePflxRanks } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
+import { compressImage, compressBannerImage } from "../../lib/imageUtils";
 
 export default function AdminSettings() {
   const router = useRouter();
@@ -49,30 +50,24 @@ export default function AdminSettings() {
     setRanks(updated);
     const rankIndex = mockPflxRanks.findIndex(r => r.level === updatedRank.level);
     if (rankIndex >= 0) mockPflxRanks[rankIndex] = updatedRank;
+    playSuccess();
+    saveAndToast([savePflxRanks], "Rank saved to cloud ✓");
     showToast("Rank updated successfully!", "success");
     setEditingRank(null);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0] || !editingRank) return;
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      setEditingRank({ ...editingRank, image: base64, icon: undefined });
-    };
-    reader.readAsDataURL(file);
+    const compressed = await compressImage(e.target.files[0]);
+    console.log(`[settings] Rank image compressed: ${(compressed.length / 1024).toFixed(1)}KB`);
+    setEditingRank({ ...editingRank, image: compressed, icon: undefined });
   };
 
-  const handlePeriodImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePeriodImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0] || !editingPeriod) return;
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      setEditingPeriod({ ...editingPeriod, image: base64 });
-    };
-    reader.readAsDataURL(file);
+    const compressed = await compressBannerImage(e.target.files[0]);
+    console.log(`[settings] Period image compressed: ${(compressed.length / 1024).toFixed(1)}KB`);
+    setEditingPeriod({ ...editingPeriod, image: compressed });
   };
 
   const handleSavePeriod = (updatedPeriod: GamePeriod) => {
@@ -80,6 +75,8 @@ export default function AdminSettings() {
     setPeriods(updated);
     const index = mockGamePeriods.findIndex(p => p.id === updatedPeriod.id);
     if (index >= 0) mockGamePeriods[index] = updatedPeriod;
+    playSuccess();
+    saveAndToast([saveGamePeriods], "Season saved to cloud ✓");
     showToast("Season updated!", "success");
     setEditingPeriod(null);
   };

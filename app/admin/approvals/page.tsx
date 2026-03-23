@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
 import { User, Task, mockTasks, mockUsers, CoinSubmission, mockSubmissions, mockModifiers, mockTransactions } from "../../lib/data";
 import { playSuccess, playError } from "../../lib/sounds";
-import { saveUsers, saveTransactions, saveSubmissions, saveTasks } from "../../lib/store";
+import { saveUsers, saveTransactions, saveSubmissions, saveTasks, saveTrades, saveInvestments } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
 
 export default function AdminApprovals() {
@@ -19,6 +19,7 @@ export default function AdminApprovals() {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("");
   const [selectedTaxId, setSelectedTaxId] = useState<string>("");
   const availableTaxes = mockModifiers.filter(m => m.type === "tax");
+  const [_tick, setTick] = useState(0);
 
   useEffect(() => {
     // Load mock data
@@ -26,6 +27,9 @@ export default function AdminApprovals() {
       setTrades(data.mockTrades);
       setInvestments(data.mockInvestments);
     });
+    // Refresh player list every 2s so newly added players appear
+    const iv = setInterval(() => setTick(t => t + 1), 2000);
+    return () => clearInterval(iv);
   }, []);
 
   useEffect(() => {
@@ -60,14 +64,32 @@ export default function AdminApprovals() {
   };
 
   const handleApproveTrade = (id: string) => {
-    setTrades(prev => prev.map(t => t.id === id ? { ...t, status: "approved" } : t));
+    setTrades(prev => {
+      const updated = prev.map(t => t.id === id ? { ...t, status: "approved" } : t);
+      // Sync to mock array
+      import("../../lib/data").then(d => {
+        const idx = d.mockTrades.findIndex((t: any) => t.id === id);
+        if (idx >= 0) d.mockTrades[idx].status = "approved";
+      });
+      return updated;
+    });
     playSuccess();
+    saveAndToast([saveTrades], "Trade approved — saved to cloud ✓");
     showToast("XP Trade approved! Credits transferred.", "success");
   };
 
   const handleApproveInvestment = (id: string) => {
-    setInvestments(prev => prev.map(inv => inv.id === id ? { ...inv, status: "active" } : inv));
+    setInvestments(prev => {
+      const updated = prev.map(inv => inv.id === id ? { ...inv, status: "active" } : inv);
+      // Sync to mock array
+      import("../../lib/data").then(d => {
+        const idx = d.mockInvestments.findIndex((inv: any) => inv.id === id);
+        if (idx >= 0) d.mockInvestments[idx].status = "active";
+      });
+      return updated;
+    });
     playSuccess();
+    saveAndToast([saveInvestments], "Investment approved — saved to cloud ✓");
     showToast("Investment Proposal approved! Stake is now active.", "success");
   };
 

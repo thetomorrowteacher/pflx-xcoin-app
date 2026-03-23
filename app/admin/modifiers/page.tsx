@@ -9,6 +9,7 @@ import {
 import { playSuccess, playError, playClick, playDelete } from "../../lib/sounds";
 import { saveModifiers } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
+import { compressImage } from "../../lib/imageUtils";
 
 const TRIGGER_OPTIONS: ModifierTrigger[] = [
   "manual",
@@ -104,14 +105,12 @@ export default function AdminModifiers() {
     });
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && editingMod) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setEditingMod({ ...editingMod, image: event.target?.result as string, isCustomImage: true });
-      };
-      reader.readAsDataURL(file);
+      const compressed = await compressImage(file);
+      console.log(`[modifiers] Image compressed: ${(compressed.length / 1024).toFixed(1)}KB`);
+      setEditingMod({ ...editingMod, image: compressed, isCustomImage: true });
     }
   };
 
