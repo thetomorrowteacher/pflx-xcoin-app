@@ -1093,6 +1093,7 @@ function EditPlayerForm({ player, onSave, onCancel }: {
       joinedAt: new Date().toISOString().split("T")[0],
       pin: generatePin(),
       image: "",
+      email: "",
     }
   );
   const [showPin, setShowPin] = useState(false);
@@ -1167,6 +1168,16 @@ function EditPlayerForm({ player, onSave, onCancel }: {
             style={inputStyle()}
           />
         </div>
+        <div>
+          <label style={labelStyle()}>Email</label>
+          <input
+            type="email"
+            value={form.email || ""}
+            onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
+            placeholder="player@school.edu"
+            style={inputStyle()}
+          />
+        </div>
       </div>
 
       <div style={{
@@ -1190,20 +1201,11 @@ function EditPlayerForm({ player, onSave, onCancel }: {
           gap: "16px",
         }}>
           <div>
-            <label style={labelStyle()}>XP</label>
-            <input
-              type="number"
-              value={form.xcoin}
-              onChange={(e) => setForm(f => ({ ...f, xp: parseInt(e.target.value) || 0 }))}
-              style={inputStyle()}
-            />
-          </div>
-          <div>
             <label style={labelStyle()}>Digital Badges</label>
             <input
               type="number"
               value={form.digitalBadges}
-              onChange={(e) => setForm(f => ({ ...f, xc: parseInt(e.target.value) || 0 }))}
+              onChange={(e) => setForm(f => ({ ...f, digitalBadges: parseInt(e.target.value) || 0 }))}
               style={inputStyle()}
             />
           </div>
