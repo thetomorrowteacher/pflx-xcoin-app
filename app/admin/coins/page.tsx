@@ -12,10 +12,10 @@ import {
   CoinSubmission
 } from "../../lib/data";
 import { applyPlayerImages } from "../../lib/playerImages";
-import { playReward, playSuccess, playClick } from "../../lib/sounds";
+import { playReward, playSuccess, playClick, playDelete } from "../../lib/sounds";
 import { updatePlayerStats } from "../../lib/playerStats";
 import { saveCoinCategories, saveUsers, saveSubmissions } from "../../lib/store";
-import { showSaveToast } from "../../lib/saveToast";
+import { saveAndToast } from "../../lib/saveToast";
 
 
 export default function ManageCoinsPage() {
@@ -43,7 +43,8 @@ export default function ManageCoinsPage() {
     setCategories([...newCats]);
     // Sync back to mock array so auto-save picks it up
     COIN_CATEGORIES.splice(0, COIN_CATEGORIES.length, ...newCats);
-    saveCoinCategories();
+    playDelete();
+    saveAndToast([saveCoinCategories], "Coin deleted — saved to cloud ✓");
   };
 
   const handleSaveCoin = (e: React.FormEvent) => {
@@ -55,7 +56,7 @@ export default function ManageCoinsPage() {
     setCategories([...newCats]);
     // Sync back to mock array so auto-save picks it up
     COIN_CATEGORIES.splice(0, COIN_CATEGORIES.length, ...newCats);
-    saveCoinCategories().then(() => showSaveToast("Coin saved ✓"));
+    saveAndToast([saveCoinCategories], "Coin saved to cloud ✓");
     setEditingCoin(null);
   };
 

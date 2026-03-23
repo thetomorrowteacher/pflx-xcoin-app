@@ -138,6 +138,148 @@ export function playAlert(): void {
   makeTone(ctx, 440, now + 0.12, 0.08, "sine", v);
 }
 
+/** Cloud save confirmation — short digital chirp */
+export function playSave(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.rewards) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.3;
+  const now = ctx.currentTime;
+  makeTone(ctx, 880, now, 0.06, "sine", v);
+  makeTone(ctx, 1320, now + 0.06, 0.08, "sine", v * 0.8);
+  makeTone(ctx, 1760, now + 0.12, 0.06, "sine", v * 0.5);
+}
+
+/** Coin / XC transaction — metallic coin drop sound */
+export function playCoin(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.rewards) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.35;
+  const now = ctx.currentTime;
+  // Metallic shimmer
+  makeTone(ctx, 2400, now, 0.05, "square", v * 0.4);
+  makeTone(ctx, 3200, now + 0.01, 0.04, "sine", v * 0.6);
+  makeTone(ctx, 1800, now + 0.04, 0.12, "sine", v);
+  makeTone(ctx, 2200, now + 0.06, 0.1, "sine", v * 0.3);
+}
+
+/** Badge award — sparkle cascade */
+export function playBadge(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.rewards) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.4;
+  const now = ctx.currentTime;
+  // Sparkle ascending with shimmer
+  [784, 988, 1175, 1319, 1568, 1976].forEach((f, i) => {
+    makeTone(ctx, f, now + i * 0.06, 0.15, "sine", v * (1 - i * 0.1));
+  });
+  // Sub-layer warmth
+  makeTone(ctx, 392, now, 0.4, "sine", v * 0.25);
+}
+
+/** Delete / remove — descending thud */
+export function playDelete(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.alerts) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.3;
+  const now = ctx.currentTime;
+  makeTone(ctx, 400, now, 0.08, "sawtooth", v);
+  makeTone(ctx, 250, now + 0.06, 0.1, "sawtooth", v * 0.7);
+  makeTone(ctx, 120, now + 0.12, 0.15, "sine", v * 0.5);
+}
+
+/** Level-up / rank promotion — triumphant fanfare */
+export function playLevelUp(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.rewards) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.5;
+  const now = ctx.currentTime;
+  // Trumpet-like arpeggio
+  [[523, 0, 0.15], [659, 0.12, 0.15], [784, 0.24, 0.15], [1047, 0.36, 0.3]].forEach(([f, t, d]) => {
+    makeTone(ctx, f, now + t, d, "sine", v);
+    makeTone(ctx, f * 1.005, now + t, d, "sine", v * 0.3); // slight detune for richness
+  });
+  // Bass foundation
+  makeTone(ctx, 131, now, 0.6, "sine", v * 0.3);
+}
+
+/** Tax / fine applied — stern buzz */
+export function playTax(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.alerts) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.3;
+  const now = ctx.currentTime;
+  makeTone(ctx, 330, now, 0.06, "square", v * 0.5);
+  makeTone(ctx, 220, now + 0.06, 0.1, "sawtooth", v);
+  makeTone(ctx, 165, now + 0.14, 0.12, "sawtooth", v * 0.6);
+}
+
+/** Toggle / switch — soft pop */
+export function playToggle(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.clicks) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.2;
+  makeTone(ctx, 600, ctx.currentTime, 0.04, "sine", v);
+  makeTone(ctx, 800, ctx.currentTime + 0.03, 0.04, "sine", v * 0.7);
+}
+
+/** Modal open — whoosh in */
+export function playModalOpen(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.clicks) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.2;
+  const now = ctx.currentTime;
+  // Rising sweep
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(200, now);
+  osc.frequency.exponentialRampToValueAtTime(800, now + 0.12);
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(v, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+  osc.start(now);
+  osc.stop(now + 0.2);
+}
+
+/** Modal close — whoosh out */
+export function playModalClose(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.clicks) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.18;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(700, now);
+  osc.frequency.exponentialRampToValueAtTime(200, now + 0.1);
+  gain.gain.setValueAtTime(v, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+  osc.start(now);
+  osc.stop(now + 0.15);
+}
+
 // ── Ambient HUD hum ─────────────────────────────────────────────────────────
 let _ambOsc: OscillatorNode | null = null;
 let _ambGain: GainNode | null = null;

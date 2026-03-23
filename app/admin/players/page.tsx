@@ -9,7 +9,8 @@ import {
 } from "../../lib/data";
 import { savePlayerImage, applyPlayerImages } from "../../lib/playerImages";
 import { saveUsers } from "../../lib/store";
-import { showSaveToast } from "../../lib/saveToast";
+import { saveAndToast } from "../../lib/saveToast";
+import { playSuccess, playError, playClick, playDelete, playModalOpen, playModalClose } from "../../lib/sounds";
 
 // ─── Avatar color palette (deterministic by id) ───────────────────────────────
 const AVATAR_COLORS = [
@@ -324,7 +325,8 @@ export default function AdminPlayers() {
       setPlayers(players.filter(p => p.id !== deleteTarget.id));
       setShowDeleteModal(false);
       setDeleteTarget(null);
-      saveUsers().then(() => showSaveToast("Player deleted — saved to cloud ✓"));
+      playDelete();
+      saveAndToast([saveUsers], "Player deleted — saved to cloud ✓");
       setToast({ msg: "Player deleted successfully", type: "success" });
     }
   };
@@ -359,7 +361,8 @@ export default function AdminPlayers() {
       setPlayers([...players, updatedPlayer]);
     }
     setShowEditModal(false);
-    saveUsers().then(() => showSaveToast(`Player ${editingPlayer ? "updated" : "created"} — saved to cloud ✓`));
+    playSuccess();
+    saveAndToast([saveUsers], `Player ${editingPlayer ? "updated" : "created"} — saved to cloud ✓`);
     setToast({ msg: `Player ${editingPlayer ? "updated" : "created"} successfully`, type: "success" });
   };
 
@@ -414,7 +417,8 @@ export default function AdminPlayers() {
       setPlayers([...players, ...newPlayers]);
       setShowImportModal(false);
       setImportCSV("");
-      saveUsers().then(() => showSaveToast(`${newPlayers.length} player(s) imported — saved to cloud ✓`));
+      playSuccess();
+      saveAndToast([saveUsers], `${newPlayers.length} player(s) imported — saved to cloud ✓`);
       setToast({ msg: `${newPlayers.length} player${newPlayers.length !== 1 ? "s" : ""} imported successfully`, type: "success" });
     } catch {
       setToast({ msg: "Import failed: check your CSV format", type: "error" });

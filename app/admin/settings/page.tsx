@@ -4,9 +4,9 @@ import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
 import { User, mockPflxRanks, PFLXRank, mockGamePeriods, GamePeriod, isHostUser, COIN_CATEGORIES,
 } from "../../lib/data";
-import { getSoundSettings, saveSoundSettings, SoundSettings, playClick, playNav, playSuccess, playReward, playAlert, playError } from "../../lib/sounds";
+import { getSoundSettings, saveSoundSettings, SoundSettings, playClick, playNav, playSuccess, playReward, playAlert, playError, playDelete, playSave, playCoin, playBadge, playTax, playToggle, playModalOpen, playModalClose, playLevelUp } from "../../lib/sounds";
 import { saveGamePeriods, savePflxRanks } from "../../lib/store";
-import { showSaveToast } from "../../lib/saveToast";
+import { saveAndToast } from "../../lib/saveToast";
 
 export default function AdminSettings() {
   const router = useRouter();
@@ -96,7 +96,8 @@ export default function AdminSettings() {
     setPeriods(updated);
     mockGamePeriods.push(newSeason);
     setNewSeasonTitle("");
-    saveGamePeriods().then(() => showSaveToast("Season created — saved to cloud ✓"));
+    playSuccess();
+    saveAndToast([saveGamePeriods], "Season created — saved to cloud ✓");
     showToast("Season created!", "success");
   };
 
@@ -105,7 +106,8 @@ export default function AdminSettings() {
     setPeriods(updated);
     const index = mockGamePeriods.findIndex(p => p.id === id);
     if (index >= 0) mockGamePeriods[index].isActive = !mockGamePeriods[index].isActive;
-    saveGamePeriods().then(() => showSaveToast("Season updated — saved to cloud ✓"));
+    playToggle();
+    saveAndToast([saveGamePeriods], "Season updated — saved to cloud ✓");
     showToast("Season status updated.", "success");
   };
 
@@ -113,7 +115,8 @@ export default function AdminSettings() {
     setPeriods(periods.filter(p => p.id !== id));
     const index = mockGamePeriods.findIndex(p => p.id === id);
     if (index >= 0) mockGamePeriods.splice(index, 1);
-    saveGamePeriods().then(() => showSaveToast("Season deleted — saved to cloud ✓"));
+    playDelete();
+    saveAndToast([saveGamePeriods], "Season deleted — saved to cloud ✓");
     showToast("Season deleted.", "success");
   };
 
@@ -395,12 +398,40 @@ export default function AdminSettings() {
               })}
             </div>
 
+            {/* Individual SFX preview buttons */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "16px" }}>
+              {[
+                { label: "Click", fn: playClick, color: "#4f8ef7" },
+                { label: "Nav", fn: playNav, color: "#4f8ef7" },
+                { label: "Toggle", fn: playToggle, color: "#4f8ef7" },
+                { label: "Success", fn: playSuccess, color: "#22c55e" },
+                { label: "Reward", fn: playReward, color: "#f5c842" },
+                { label: "Badge", fn: playBadge, color: "#f5c842" },
+                { label: "Coin", fn: playCoin, color: "#f5c842" },
+                { label: "Save", fn: playSave, color: "#00d4ff" },
+                { label: "Level Up", fn: playLevelUp, color: "#a855f7" },
+                { label: "Tax", fn: playTax, color: "#ef4444" },
+                { label: "Error", fn: playError, color: "#ef4444" },
+                { label: "Delete", fn: playDelete, color: "#ef4444" },
+                { label: "Alert", fn: playAlert, color: "#f97316" },
+                { label: "Modal Open", fn: playModalOpen, color: "#4f8ef7" },
+                { label: "Modal Close", fn: playModalClose, color: "#4f8ef7" },
+              ].map(s => (
+                <button key={s.label} onClick={() => s.fn()}
+                  style={{ padding: "10px 6px", borderRadius: "8px", border: `1px solid ${s.color}33`, background: `${s.color}11`,
+                    color: s.color, fontSize: "11px", fontWeight: 700, cursor: "pointer", fontFamily: "monospace", letterSpacing: "0.04em",
+                    transition: "all 0.15s" }}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+
             {/* Test all button */}
             <button
-              onClick={() => { playSuccess(); setTimeout(playReward, 700); }}
+              onClick={() => { playSuccess(); setTimeout(playReward, 400); setTimeout(playBadge, 900); setTimeout(playLevelUp, 1500); }}
               style={{ width: "100%", padding: "14px", background: "linear-gradient(135deg, rgba(79,142,247,0.2), rgba(139,92,246,0.2))", border: "1px solid rgba(79,142,247,0.3)", borderRadius: "12px", color: "#4f8ef7", fontWeight: 800, fontSize: "14px", cursor: "pointer", letterSpacing: "0.05em" }}
             >
-              🎵 Test Sound System
+              🎵 Test Full Sound Sequence
             </button>
           </div>
         )}

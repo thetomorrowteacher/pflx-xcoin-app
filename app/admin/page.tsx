@@ -5,7 +5,8 @@ import SideNav from "../components/SideNav";
 import { User, mockTasks, mockUsers, mockModifiers, mockTransactions, COIN_CATEGORIES, isHostUser } from "../lib/data";
 import { applyPlayerImages } from "../lib/playerImages";
 import { saveUsers, saveTransactions } from "../lib/store";
-import { showSaveToast } from "../lib/saveToast";
+import { saveAndToast } from "../lib/saveToast";
+import { playReward, playBadge, playCoin, playTax, playError, playClick, playNav, playToggle } from "../lib/sounds";
 
 // ── Multi-select player picker ────────────────────────────────────────────────
 function PlayerPicker({
@@ -379,7 +380,7 @@ export default function AdminDashboard() {
 
   const handleApplyTax = () => {
     if (taxPlayerIds.length === 0 || taxIds.length === 0) {
-      showToast("Select at least one player and one violation.", "error"); return;
+      playError(); showToast("Select at least one player and one violation.", "error"); return;
     }
     const now = new Date().toISOString().split("T")[0];
     let count = 0;
@@ -397,18 +398,19 @@ export default function AdminDashboard() {
         count++;
       });
     });
-    Promise.all([saveUsers(), saveTransactions()]).then(() => showSaveToast("Fines saved to cloud ✓"));
+    playTax();
+    saveAndToast([saveUsers, saveTransactions], "Fines saved to cloud ✓");
     forceUpdate();
     showToast(`${count} fine(s) applied to ${taxPlayerIds.length} player(s).`, "success");
     setTaxPlayerIds([]); setTaxIds([]);
   };
 
   const handleGrant = () => {
-    if (grantPlayerIds.length === 0) { showToast("Select at least one player.", "error"); return; }
+    if (grantPlayerIds.length === 0) { playError(); showToast("Select at least one player.", "error"); return; }
     const now = new Date().toISOString().split("T")[0];
     if (grantType === "xp") {
       const amt = parseInt(grantXpAmount) || 0;
-      if (amt <= 0) { showToast("Enter a valid XC amount.", "error"); return; }
+      if (amt <= 0) { playError(); showToast("Enter a valid XC amount.", "error"); return; }
       grantPlayerIds.forEach(pid => {
         const target = mockUsers.find(u => u.id === pid);
         if (!target) return;
@@ -416,11 +418,12 @@ export default function AdminDashboard() {
         mockTransactions.push({ id: `tx-${Date.now()}-${pid}`, userId: pid, type: "admin_grant",
           amount: amt, currency: "xcoin", description: grantNote || "Admin XC Grant", createdAt: now });
       });
-      Promise.all([saveUsers(), saveTransactions()]).then(() => showSaveToast("XC granted — saved to cloud ✓"));
+      playCoin();
+      saveAndToast([saveUsers, saveTransactions], "XC granted — saved to cloud ✓");
       showToast(`+${amt.toLocaleString()} XC granted to ${grantPlayerIds.length} player(s).`, "success");
     } else {
       const validItems = grantItems.filter(gi => gi.coinName && parseInt(gi.amount) > 0);
-      if (validItems.length === 0) { showToast("Add at least one badge.", "error"); return; }
+      if (validItems.length === 0) { playError(); showToast("Add at least one badge.", "error"); return; }
       let totalAwarded = 0;
       grantPlayerIds.forEach(pid => {
         const target = mockUsers.find(u => u.id === pid);
@@ -447,7 +450,8 @@ export default function AdminDashboard() {
           totalAwarded += amt;
         });
       });
-      Promise.all([saveUsers(), saveTransactions()]).then(() => showSaveToast("Badges saved to cloud ✓"));
+      playBadge();
+      saveAndToast([saveUsers, saveTransactions], "Badges saved to cloud ✓");
       forceUpdate();
       showToast(`${totalAwarded} badge(s) across ${validItems.length} type(s) to ${grantPlayerIds.length} player(s).`, "success");
     }
@@ -677,7 +681,7 @@ export default function AdminDashboard() {
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px" }}>
                   {([{val:"xc" as const,label:"🪙 Digital Badge",accent:"#f5c842"},{val:"xp" as const,label:"⚡ XC",accent:CYAN}]).map(opt => (
                     <button key={opt.val} type="button"
-                      onClick={() => { setGrantType(opt.val); setGrantItems([{coinName:"",amount:"1"}]); setGrantXpAmount(""); }}
+                      onClick={() => { playToggle(); setGrantType(opt.val); setGrantItems([{coinName:"",amount:"1"}]); setGrantXpAmount(""); }}
                       style={{ padding:"9px", borderRadius:"8px", cursor:"pointer", fontSize:"12px", fontWeight:700, fontFamily:"monospace",
                         border:`1px solid ${grantType===opt.val ? opt.accent : "rgba(0,212,255,0.12)"}`,
                         background: grantType===opt.val ? `${opt.accent}18` : "transparent",
