@@ -85,31 +85,47 @@ export async function saveData<T>(key: DataKey, value: T): Promise<boolean> {
  * CRITICAL: callers MUST check .ok — a failed load is NOT the same as an empty DB.
  */
 export async function loadAllData(): Promise<{ ok: boolean; data: Record<string, any> }> {
-  try {
-    // Race the Supabase query against a 8-second timeout
-    // so the app doesn't hang on "Loading" if the connection is slow
-    const timeoutPromise = new Promise<{ data: null; error: { message: string; code: string } }>((resolve) =>
-      setTimeout(() => resolve({ data: null, error: { message: "Load timeout (8s)", code: "TIMEOUT" } }), 8000)
-    );
+  const MAX_RETRIES = 5;
+  const TIMEOUT_MS = 10000; // 10s per attempt
 
-    const queryPromise = supabase.from("app_data").select("key, data");
-    const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[persistence] loadAllData attempt ${attempt}/${MAX_RETRIES}...`);
 
-    if (error) {
-      console.error("[persistence] loadAllData error:", error.message, error.code);
+      // Race against timeout so we don't hang forever
+      const timeoutPromise = new Promise<{ data: null; error: { message: string; code: string } }>((resolve) =>
+        setTimeout(() => resolve({ data: null, error: { message: `Timeout (${TIMEOUT_MS}ms)`, code: "TIMEOUT" } }), TIMEOUT_MS)
+      );
+
+      const queryPromise = supabase.from("app_data").select("key, data");
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+
+      if (error) {
+        console.warn(`[persistence] loadAllData attempt ${attempt} failed:`, error.message);
+        if (attempt < MAX_RETRIES) {
+          // Wait 1s, 2s, 3s, 4s between retries
+          await new Promise(r => setTimeout(r, attempt * 1000));
+          continue;
+        }
+        return { ok: false, data: {} };
+      }
+
+      const result: Record<string, any> = {};
+      for (const row of data || []) {
+        result[row.key] = row.data;
+      }
+      console.log(`[persistence] ✓ loadAllData: ${Object.keys(result).length} keys loaded (attempt ${attempt})`);
+      return { ok: true, data: result };
+    } catch (err) {
+      console.warn(`[persistence] loadAllData attempt ${attempt} exception:`, err);
+      if (attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, attempt * 1000));
+        continue;
+      }
       return { ok: false, data: {} };
     }
-
-    const result: Record<string, any> = {};
-    for (const row of data || []) {
-      result[row.key] = row.data;
-    }
-    console.log(`[persistence] loadAllData: ${Object.keys(result).length} keys loaded`);
-    return { ok: true, data: result };
-  } catch (err) {
-    console.error("[persistence] loadAllData exception:", err);
-    return { ok: false, data: {} };
   }
+  return { ok: false, data: {} };
 }
 
 /**

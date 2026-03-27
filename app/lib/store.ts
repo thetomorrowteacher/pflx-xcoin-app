@@ -37,14 +37,17 @@ export async function initStore(): Promise<void> {
     try {
       const result = await loadAllData();
 
-      // CRITICAL: if the load FAILED (network error, timeout, etc.)
-      // do NOT seed — just use mock defaults and let auto-save work.
-      // Seeding on error would OVERWRITE real data with defaults!
+      // If all retries failed, DON'T fall back to defaults — keep retrying
       if (!result.ok) {
-        console.warn("[store] Supabase load failed — using local defaults (will NOT seed, will NOT auto-save)");
+        console.warn("[store] All load attempts failed — will retry in 5s...");
         _loadFailed = true;
-        _initialized = true;
-        notify();
+        _initPromise = null; // Allow initStore to be called again
+        _loading = false;
+        // Schedule a fresh retry
+        setTimeout(() => {
+          _loadFailed = false;
+          initStore();
+        }, 5000);
         return;
       }
 
@@ -83,11 +86,9 @@ export async function initStore(): Promise<void> {
       _initialized = true;
       notify();
     } catch (err) {
-      console.error("[store] initStore failed:", err);
-      // On crash, still mark initialized so the UI isn't stuck on loading
-      // but do NOT seed — that would wipe any data that IS in Supabase
-      _initialized = true;
-      notify();
+      console.error("[store] initStore crashed:", err, "— retrying in 5s...");
+      _initPromise = null;
+      setTimeout(() => initStore(), 5000);
     } finally {
       _loading = false;
     }
