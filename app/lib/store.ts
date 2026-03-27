@@ -8,7 +8,8 @@ import * as D from "./data";
 let _initialized = false;
 let _loading = false;
 let _initPromise: Promise<void> | null = null;
-let _needsSeed = false; // True if Supabase was empty on first load
+let _needsSeed = false; // True if Supabase was genuinely empty on first load
+let _loadFailed = false; // True if Supabase load errored — prevent auto-save from overwriting
 
 // Listeners for re-render triggers
 type Listener = () => void;
@@ -34,7 +35,20 @@ export async function initStore(): Promise<void> {
   _loading = true;
   _initPromise = (async () => {
     try {
-      const all = await loadAllData();
+      const result = await loadAllData();
+
+      // CRITICAL: if the load FAILED (network error, timeout, etc.)
+      // do NOT seed — just use mock defaults and let auto-save work.
+      // Seeding on error would OVERWRITE real data with defaults!
+      if (!result.ok) {
+        console.warn("[store] Supabase load failed — using local defaults (will NOT seed, will NOT auto-save)");
+        _loadFailed = true;
+        _initialized = true;
+        notify();
+        return;
+      }
+
+      const all = result.data;
 
       // Check if Supabase has any PFLX data (not just pathway keys)
       const pflxKeys = ['users','checkpoints','tasks','jobs','transactions','modifiers','coinCategories'];
@@ -59,16 +73,21 @@ export async function initStore(): Promise<void> {
         if (all.coinCategories?.length) D.COIN_CATEGORIES.splice(0, D.COIN_CATEGORIES.length, ...all.coinCategories);
         if (all.trades?.length) D.mockTrades.splice(0, D.mockTrades.length, ...all.trades);
         if (all.investments?.length) D.mockInvestments.splice(0, D.mockInvestments.length, ...all.investments);
+        console.log("[store] ✓ Loaded", Object.keys(all).length, "collections from Supabase");
       } else {
-        // Supabase is empty — seed it with mock defaults
+        // Supabase load SUCCEEDED but returned no data — genuinely empty
         _needsSeed = true;
-        console.log("[store] Supabase empty — seeding with default data");
+        console.log("[store] Supabase genuinely empty — will seed with default data");
       }
 
       _initialized = true;
       notify();
     } catch (err) {
       console.error("[store] initStore failed:", err);
+      // On crash, still mark initialized so the UI isn't stuck on loading
+      // but do NOT seed — that would wipe any data that IS in Supabase
+      _initialized = true;
+      notify();
     } finally {
       _loading = false;
     }
@@ -88,6 +107,9 @@ export function isStoreReady() {
 }
 export function isStoreLoading() {
   return _loading;
+}
+export function didLoadFail() {
+  return _loadFailed;
 }
 
 // ─── Save helpers (call after any mutation) ──────────────────────

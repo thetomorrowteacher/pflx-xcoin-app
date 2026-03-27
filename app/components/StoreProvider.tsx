@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { initStore, saveAll, isStoreReady, needsSeed, clearSeedFlag } from "../lib/store";
+import { initStore, saveAll, isStoreReady, needsSeed, clearSeedFlag, didLoadFail } from "../lib/store";
 import { getPlayerImages } from "../lib/playerImages";
 import { showSaveToast } from "../lib/saveToast";
 import * as D from "../lib/data";
@@ -103,8 +103,14 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
   }, []);
 
   // Auto-save every 2 seconds — only dirty collections
+  // CRITICAL: skip auto-save entirely if the initial load failed,
+  // otherwise we'd overwrite real Supabase data with hardcoded defaults
   useEffect(() => {
     if (!ready) return;
+    if (didLoadFail()) {
+      console.warn("[StoreProvider] Skipping auto-save — initial Supabase load failed");
+      return;
+    }
     const interval = setInterval(async () => {
       // Check for new localStorage images each tick
       mergeLocalImages();

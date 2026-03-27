@@ -81,25 +81,27 @@ export async function saveData<T>(key: DataKey, value: T): Promise<boolean> {
 
 /**
  * Load ALL collections at once (batch).
- * Returns a map of key → data, with null for missing keys.
+ * Returns { ok: true, data: {...} } on success, or { ok: false } on error.
+ * CRITICAL: callers MUST check .ok — a failed load is NOT the same as an empty DB.
  */
-export async function loadAllData(): Promise<Record<string, any>> {
+export async function loadAllData(): Promise<{ ok: boolean; data: Record<string, any> }> {
   try {
     const { data, error } = await supabase.from("app_data").select("key, data");
 
     if (error) {
       console.error("[persistence] loadAllData error:", error);
-      return {};
+      return { ok: false, data: {} };
     }
 
     const result: Record<string, any> = {};
     for (const row of data || []) {
       result[row.key] = row.data;
     }
-    return result;
+    console.log(`[persistence] loadAllData: ${Object.keys(result).length} keys loaded`);
+    return { ok: true, data: result };
   } catch (err) {
     console.error("[persistence] loadAllData exception:", err);
-    return {};
+    return { ok: false, data: {} };
   }
 }
 
