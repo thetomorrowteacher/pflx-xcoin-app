@@ -84,12 +84,15 @@ export async function saveData<T>(key: DataKey, value: T): Promise<boolean> {
  * Returns { ok: true, data: {...} } on success, or { ok: false } on error.
  * CRITICAL: callers MUST check .ok — a failed load is NOT the same as an empty DB.
  */
-export async function loadAllData(): Promise<{ ok: boolean; data: Record<string, any> }> {
+export async function loadAllData(
+  onProgress?: (attempt: number, maxRetries: number) => void,
+): Promise<{ ok: boolean; data: Record<string, any> }> {
   const MAX_RETRIES = 5;
   const TIMEOUT_MS = 10000; // 10s per attempt
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
+      onProgress?.(attempt, MAX_RETRIES);
       console.log(`[persistence] loadAllData attempt ${attempt}/${MAX_RETRIES}...`);
 
       // Race against timeout so we don't hang forever

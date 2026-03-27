@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { initStore, saveAll, isStoreReady, needsSeed, clearSeedFlag, didLoadFail } from "../lib/store";
+import { initStore, saveAll, isStoreReady, needsSeed, clearSeedFlag, didLoadFail, onLoadProgress } from "../lib/store";
 import { getPlayerImages } from "../lib/playerImages";
 import { showSaveToast } from "../lib/saveToast";
 import * as D from "../lib/data";
@@ -78,7 +78,17 @@ function mergeLocalImages(): boolean {
 
 export default function StoreProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
+  const [loadProgress, setLoadProgress] = useState(0);
+  const [loadStatus, setLoadStatus] = useState("Connecting...");
   const lastSnaps = useRef<Record<string, string>>({});
+
+  // Subscribe to load progress from the store
+  useEffect(() => {
+    return onLoadProgress((progress, status) => {
+      setLoadProgress(progress);
+      setLoadStatus(status);
+    });
+  }, []);
 
   useEffect(() => {
     initStore().then(() => {
@@ -159,43 +169,50 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
           PFLX
         </div>
 
-        {/* Loading bar container */}
+        {/* Progress bar container */}
         <div style={{
-          width: "240px",
-          height: "4px",
-          borderRadius: "4px",
-          background: "rgba(0,212,255,0.1)",
+          width: "280px",
+          height: "6px",
+          borderRadius: "6px",
+          background: "rgba(0,212,255,0.08)",
           overflow: "hidden",
           position: "relative",
+          boxShadow: "inset 0 0 4px rgba(0,0,0,0.4)",
         }}>
-          {/* Animated bar */}
+          {/* Filled portion */}
           <div style={{
             position: "absolute",
             top: 0,
             left: 0,
             height: "100%",
-            width: "40%",
-            borderRadius: "4px",
-            background: "linear-gradient(90deg, transparent, #00d4ff, #a78bfa, transparent)",
-            animation: "loadSlide 1.4s ease-in-out infinite",
+            width: `${loadProgress}%`,
+            borderRadius: "6px",
+            background: "linear-gradient(90deg, #00d4ff, #a78bfa)",
+            boxShadow: "0 0 12px rgba(0,212,255,0.5), 0 0 4px rgba(167,139,250,0.3)",
+            transition: "width 0.4s ease-out",
           }} />
         </div>
 
+        {/* Percentage */}
         <div style={{
-          fontSize: "0.65rem",
-          color: "rgba(0,229,255,0.4)",
-          letterSpacing: "0.15em",
-          textTransform: "uppercase",
+          fontSize: "0.7rem",
+          fontWeight: 700,
+          color: "#00d4ff",
+          letterSpacing: "0.1em",
         }}>
-          Syncing with cloud
+          {loadProgress}%
         </div>
 
-        <style>{`
-          @keyframes loadSlide {
-            0%   { left: -40%; }
-            100% { left: 100%; }
-          }
-        `}</style>
+        {/* Status label */}
+        <div style={{
+          fontSize: "0.6rem",
+          color: "rgba(0,229,255,0.35)",
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          minHeight: "1em",
+        }}>
+          {loadStatus}
+        </div>
       </div>
     );
   }
