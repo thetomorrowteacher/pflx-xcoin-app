@@ -144,15 +144,58 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
         color: "#00e5ff",
         fontFamily: "monospace",
         fontSize: "1.2rem",
-        gap: "16px",
+        gap: "20px",
       }}>
-        <div style={{ animation: "pulse 1.5s ease-in-out infinite", letterSpacing: "0.1em" }}>
-          Loading PFLX Data…
+        {/* PFLX logo text */}
+        <div style={{
+          fontSize: "2rem",
+          fontWeight: 900,
+          letterSpacing: "0.2em",
+          background: "linear-gradient(90deg, #00d4ff, #a78bfa, #00d4ff)",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          filter: "drop-shadow(0 0 20px rgba(0,212,255,0.4))",
+        }}>
+          PFLX
         </div>
-        <div style={{ fontSize: "0.7rem", color: "rgba(0,229,255,0.4)", letterSpacing: "0.15em" }}>
-          SYNCING WITH CLOUD
+
+        {/* Loading bar container */}
+        <div style={{
+          width: "240px",
+          height: "4px",
+          borderRadius: "4px",
+          background: "rgba(0,212,255,0.1)",
+          overflow: "hidden",
+          position: "relative",
+        }}>
+          {/* Animated bar */}
+          <div style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            height: "100%",
+            width: "40%",
+            borderRadius: "4px",
+            background: "linear-gradient(90deg, transparent, #00d4ff, #a78bfa, transparent)",
+            animation: "loadSlide 1.4s ease-in-out infinite",
+          }} />
         </div>
-        <style>{`@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
+
+        <div style={{
+          fontSize: "0.65rem",
+          color: "rgba(0,229,255,0.4)",
+          letterSpacing: "0.15em",
+          textTransform: "uppercase",
+        }}>
+          Syncing with cloud
+        </div>
+
+        <style>{`
+          @keyframes loadSlide {
+            0%   { left: -40%; }
+            100% { left: 100%; }
+          }
+        `}</style>
       </div>
     );
   }
