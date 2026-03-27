@@ -51,80 +51,83 @@ export async function initStore(): Promise<void> {
 
   _loading = true;
   setProgress(5, "Connecting to cloud...");
+
+  // CRITICAL: The promise only resolves when data is SUCCESSFULLY loaded.
+  // On failure we loop/retry inside the same promise so StoreProvider
+  // never sees a resolved promise with default data.
   _initPromise = (async () => {
-    try {
-      setProgress(10, "Fetching saved data...");
-      const result = await loadAllData((attempt, max) => {
-        // Map retry attempts to 10–60% of the bar
-        const p = 10 + Math.round((attempt / max) * 50);
-        setProgress(p, attempt > 1 ? `Retrying... (${attempt}/${max})` : "Fetching saved data...");
-      });
+    let retryRound = 0;
 
-      // If all retries failed, DON'T fall back to defaults — keep retrying
-      if (!result.ok) {
-        console.warn("[store] All load attempts failed — will retry in 5s...");
-        setProgress(10, "Connection lost — retrying...");
-        _loadFailed = true;
-        _initPromise = null;
-        _loading = false;
-        setTimeout(() => {
+    while (true) {
+      try {
+        retryRound++;
+        setProgress(10, retryRound > 1 ? `Reconnecting (round ${retryRound})...` : "Fetching saved data...");
+
+        const result = await loadAllData((attempt, max) => {
+          const p = 10 + Math.round((attempt / max) * 50);
+          setProgress(p, attempt > 1 ? `Retrying... (${attempt}/${max})` : "Fetching saved data...");
+        });
+
+        // If all retries in loadAllData failed, wait and loop again
+        if (!result.ok) {
+          console.warn(`[store] Load round ${retryRound} failed — waiting 5s then retrying...`);
+          setProgress(10, "Connection lost — retrying...");
+          _loadFailed = true;
+          await new Promise(r => setTimeout(r, 5000));
           _loadFailed = false;
-          initStore();
-        }, 5000);
-        return;
-      }
-
-      setProgress(65, "Processing collections...");
-      const all = result.data;
-
-      // Check if Supabase has any PFLX data (not just pathway keys)
-      const pflxKeys = ['users','checkpoints','tasks','jobs','transactions','modifiers','coinCategories'];
-      const hasData = pflxKeys.some(k => all[k] && Array.isArray(all[k]) && all[k].length > 0);
-
-      if (hasData) {
-        // Supabase has data — overwrite mocks
-        const spliceOps: [string, () => void][] = [
-          ["users",             () => { if (all.users?.length)             D.mockUsers.splice(0, D.mockUsers.length, ...all.users); }],
-          ["checkpoints",       () => { if (all.checkpoints?.length)       D.mockCheckpoints.splice(0, D.mockCheckpoints.length, ...all.checkpoints); }],
-          ["tasks",             () => { if (all.tasks?.length)             D.mockTasks.splice(0, D.mockTasks.length, ...all.tasks); }],
-          ["jobs",              () => { if (all.jobs?.length)              D.mockJobs.splice(0, D.mockJobs.length, ...all.jobs); }],
-          ["transactions",      () => { if (all.transactions?.length)      D.mockTransactions.splice(0, D.mockTransactions.length, ...all.transactions); }],
-          ["modifiers",         () => { if (all.modifiers?.length)         D.mockModifiers.splice(0, D.mockModifiers.length, ...all.modifiers); }],
-          ["playerModifiers",   () => { if (all.playerModifiers?.length)   D.mockPlayerModifiers.splice(0, D.mockPlayerModifiers.length, ...all.playerModifiers); }],
-          ["pflxRanks",         () => { if (all.pflxRanks?.length)         D.mockPflxRanks.splice(0, D.mockPflxRanks.length, ...all.pflxRanks); }],
-          ["gamePeriods",       () => { if (all.gamePeriods?.length)       D.mockGamePeriods.splice(0, D.mockGamePeriods.length, ...all.gamePeriods); }],
-          ["submissions",       () => { if (all.submissions?.length)       D.mockSubmissions.splice(0, D.mockSubmissions.length, ...all.submissions); }],
-          ["playerDeals",       () => { if (all.playerDeals?.length)       D.mockPlayerDeals.splice(0, D.mockPlayerDeals.length, ...all.playerDeals); }],
-          ["startupStudios",    () => { if (all.startupStudios?.length)    D.mockStartupStudios.splice(0, D.mockStartupStudios.length, ...all.startupStudios); }],
-          ["studioInvestments", () => { if (all.studioInvestments?.length) D.mockStudioInvestments.splice(0, D.mockStudioInvestments.length, ...all.studioInvestments); }],
-          ["projects",          () => { if (all.projects?.length)          D.mockProjects.splice(0, D.mockProjects.length, ...all.projects); }],
-          ["coinCategories",    () => { if (all.coinCategories?.length)    D.COIN_CATEGORIES.splice(0, D.COIN_CATEGORIES.length, ...all.coinCategories); }],
-          ["trades",            () => { if (all.trades?.length)            D.mockTrades.splice(0, D.mockTrades.length, ...all.trades); }],
-          ["investments",       () => { if (all.investments?.length)       D.mockInvestments.splice(0, D.mockInvestments.length, ...all.investments); }],
-        ];
-        for (let i = 0; i < spliceOps.length; i++) {
-          spliceOps[i][1]();
-          // Map collection loading to 65–95%
-          setProgress(65 + Math.round(((i + 1) / spliceOps.length) * 30), `Loading ${spliceOps[i][0]}...`);
+          continue; // stay in the loop — promise stays pending
         }
-        console.log("[store] ✓ Loaded", Object.keys(all).length, "collections from Supabase");
-      } else {
-        // Supabase load SUCCEEDED but returned no data — genuinely empty
-        _needsSeed = true;
-        setProgress(80, "First launch — preparing data...");
-        console.log("[store] Supabase genuinely empty — will seed with default data");
-      }
 
-      setProgress(100, "Ready");
-      _initialized = true;
-      notify();
-    } catch (err) {
-      console.error("[store] initStore crashed:", err, "— retrying in 5s...");
-      setProgress(10, "Error — retrying...");
-      _initPromise = null;
-      setTimeout(() => initStore(), 5000);
-    } finally {
-      _loading = false;
+        // ── Success — process the data ──
+        setProgress(65, "Processing collections...");
+        const all = result.data;
+
+        const pflxKeys = ['users','checkpoints','tasks','jobs','transactions','modifiers','coinCategories'];
+        const hasData = pflxKeys.some(k => all[k] && Array.isArray(all[k]) && all[k].length > 0);
+
+        if (hasData) {
+          const spliceOps: [string, () => void][] = [
+            ["users",             () => { if (all.users?.length)             D.mockUsers.splice(0, D.mockUsers.length, ...all.users); }],
+            ["checkpoints",       () => { if (all.checkpoints?.length)       D.mockCheckpoints.splice(0, D.mockCheckpoints.length, ...all.checkpoints); }],
+            ["tasks",             () => { if (all.tasks?.length)             D.mockTasks.splice(0, D.mockTasks.length, ...all.tasks); }],
+            ["jobs",              () => { if (all.jobs?.length)              D.mockJobs.splice(0, D.mockJobs.length, ...all.jobs); }],
+            ["transactions",      () => { if (all.transactions?.length)      D.mockTransactions.splice(0, D.mockTransactions.length, ...all.transactions); }],
+            ["modifiers",         () => { if (all.modifiers?.length)         D.mockModifiers.splice(0, D.mockModifiers.length, ...all.modifiers); }],
+            ["playerModifiers",   () => { if (all.playerModifiers?.length)   D.mockPlayerModifiers.splice(0, D.mockPlayerModifiers.length, ...all.playerModifiers); }],
+            ["pflxRanks",         () => { if (all.pflxRanks?.length)         D.mockPflxRanks.splice(0, D.mockPflxRanks.length, ...all.pflxRanks); }],
+            ["gamePeriods",       () => { if (all.gamePeriods?.length)       D.mockGamePeriods.splice(0, D.mockGamePeriods.length, ...all.gamePeriods); }],
+            ["submissions",       () => { if (all.submissions?.length)       D.mockSubmissions.splice(0, D.mockSubmissions.length, ...all.submissions); }],
+            ["playerDeals",       () => { if (all.playerDeals?.length)       D.mockPlayerDeals.splice(0, D.mockPlayerDeals.length, ...all.playerDeals); }],
+            ["startupStudios",    () => { if (all.startupStudios?.length)    D.mockStartupStudios.splice(0, D.mockStartupStudios.length, ...all.startupStudios); }],
+            ["studioInvestments", () => { if (all.studioInvestments?.length) D.mockStudioInvestments.splice(0, D.mockStudioInvestments.length, ...all.studioInvestments); }],
+            ["projects",          () => { if (all.projects?.length)          D.mockProjects.splice(0, D.mockProjects.length, ...all.projects); }],
+            ["coinCategories",    () => { if (all.coinCategories?.length)    D.COIN_CATEGORIES.splice(0, D.COIN_CATEGORIES.length, ...all.coinCategories); }],
+            ["trades",            () => { if (all.trades?.length)            D.mockTrades.splice(0, D.mockTrades.length, ...all.trades); }],
+            ["investments",       () => { if (all.investments?.length)       D.mockInvestments.splice(0, D.mockInvestments.length, ...all.investments); }],
+          ];
+          for (let i = 0; i < spliceOps.length; i++) {
+            spliceOps[i][1]();
+            setProgress(65 + Math.round(((i + 1) / spliceOps.length) * 30), `Loading ${spliceOps[i][0]}...`);
+          }
+          console.log("[store] ✓ Loaded", Object.keys(all).length, "collections from Supabase");
+        } else {
+          _needsSeed = true;
+          setProgress(80, "First launch — preparing data...");
+          console.log("[store] Supabase genuinely empty — will seed with default data");
+        }
+
+        setProgress(100, "Ready");
+        _initialized = true;
+        _loading = false;
+        notify();
+        return; // ← only exit point — promise resolves ONLY here
+
+      } catch (err) {
+        console.error(`[store] initStore round ${retryRound} crashed:`, err, "— retrying in 5s...");
+        setProgress(10, "Error — retrying...");
+        await new Promise(r => setTimeout(r, 5000));
+        continue; // stay in loop — promise stays pending
+      }
     }
   })();
 

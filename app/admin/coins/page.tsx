@@ -56,7 +56,7 @@ export default function ManageCoinsPage() {
     saveAndToast([saveCoinCategories], "Coin deleted — saved to cloud ✓");
   };
 
-  const handleSaveCoin = (e: React.FormEvent) => {
+  const handleSaveCoin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCoin) return;
     const { catIndex, coinIndex, coin } = editingCoin;
@@ -66,9 +66,9 @@ export default function ManageCoinsPage() {
     setCategories([...newCats]);
     // Sync back to mock array so auto-save picks it up
     COIN_CATEGORIES.splice(0, COIN_CATEGORIES.length, ...newCats);
-    playSuccess();
-    saveAndToast([saveCoinCategories], "Coin saved to cloud ✓");
     setEditingCoin(null);
+    playSuccess();
+    await saveAndToast([saveCoinCategories], "Coin saved to cloud ✓");
   };
 
   const handleImageUpload = async (file: File, isEditing: boolean) => {
@@ -81,7 +81,7 @@ export default function ManageCoinsPage() {
     }
   };
 
-  const handleCreateCoin = (e: React.FormEvent, catIdx: number) => {
+  const handleCreateCoin = async (e: React.FormEvent, catIdx: number) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
     const newCoin: Coin = {
@@ -96,10 +96,10 @@ export default function ManageCoinsPage() {
     setCategories([...newCats]);
     // Sync back to mock array so auto-save picks it up
     COIN_CATEGORIES.splice(0, COIN_CATEGORIES.length, ...newCats);
-    playSuccess();
-    saveAndToast([saveCoinCategories], "Badge created — saved to cloud ✓");
     setIsAdding(null);
     setNewCoinImage(""); // Reset for next creation
+    playSuccess();
+    await saveAndToast([saveCoinCategories], "Badge created — saved to cloud ✓");
   };
 
   const handleGrantCoin = () => {

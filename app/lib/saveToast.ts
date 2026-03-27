@@ -51,7 +51,7 @@ export function showSaveToast(msg = "Saved to cloud ✓", playSound = true) {
   hideTimer = setTimeout(() => {
     el.style.opacity = "0";
     el.style.transform = "translateX(-50%) translateY(20px)";
-  }, 2200);
+  }, 3000);
 }
 
 export function showErrorToast(msg = "Save failed — retrying...") {
