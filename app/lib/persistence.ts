@@ -86,10 +86,17 @@ export async function saveData<T>(key: DataKey, value: T): Promise<boolean> {
  */
 export async function loadAllData(): Promise<{ ok: boolean; data: Record<string, any> }> {
   try {
-    const { data, error } = await supabase.from("app_data").select("key, data");
+    // Race the Supabase query against a 8-second timeout
+    // so the app doesn't hang on "Loading" if the connection is slow
+    const timeoutPromise = new Promise<{ data: null; error: { message: string; code: string } }>((resolve) =>
+      setTimeout(() => resolve({ data: null, error: { message: "Load timeout (8s)", code: "TIMEOUT" } }), 8000)
+    );
+
+    const queryPromise = supabase.from("app_data").select("key, data");
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
 
     if (error) {
-      console.error("[persistence] loadAllData error:", error);
+      console.error("[persistence] loadAllData error:", error.message, error.code);
       return { ok: false, data: {} };
     }
 

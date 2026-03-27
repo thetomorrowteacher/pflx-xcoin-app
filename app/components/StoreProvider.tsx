@@ -136,6 +136,7 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
     return (
       <div style={{
         display: "flex",
+        flexDirection: "column",
         justifyContent: "center",
         alignItems: "center",
         height: "100vh",
@@ -143,8 +144,15 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
         color: "#00e5ff",
         fontFamily: "monospace",
         fontSize: "1.2rem",
+        gap: "16px",
       }}>
-        Loading PFLX Data…
+        <div style={{ animation: "pulse 1.5s ease-in-out infinite", letterSpacing: "0.1em" }}>
+          Loading PFLX Data…
+        </div>
+        <div style={{ fontSize: "0.7rem", color: "rgba(0,229,255,0.4)", letterSpacing: "0.15em" }}>
+          SYNCING WITH CLOUD
+        </div>
+        <style>{`@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
       </div>
     );
   }
