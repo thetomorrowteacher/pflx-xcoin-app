@@ -70,10 +70,10 @@ export async function initStore(): Promise<void> {
 
         // If all retries in loadAllData failed, wait and loop again
         if (!result.ok) {
-          console.warn(`[store] Load round ${retryRound} failed — waiting 5s then retrying...`);
+          console.warn(`[store] Load round ${retryRound} failed — waiting 2s then retrying...`);
           setProgress(10, "Connection lost — retrying...");
           _loadFailed = true;
-          await new Promise(r => setTimeout(r, 5000));
+          await new Promise(r => setTimeout(r, 2000));
           _loadFailed = false;
           continue; // stay in the loop — promise stays pending
         }
@@ -123,9 +123,9 @@ export async function initStore(): Promise<void> {
         return; // ← only exit point — promise resolves ONLY here
 
       } catch (err) {
-        console.error(`[store] initStore round ${retryRound} crashed:`, err, "— retrying in 5s...");
+        console.error(`[store] initStore round ${retryRound} crashed:`, err, "— retrying in 2s...");
         setProgress(10, "Error — retrying...");
-        await new Promise(r => setTimeout(r, 5000));
+        await new Promise(r => setTimeout(r, 2000));
         continue; // stay in loop — promise stays pending
       }
     }

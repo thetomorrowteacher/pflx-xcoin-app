@@ -87,8 +87,8 @@ export async function saveData<T>(key: DataKey, value: T): Promise<boolean> {
 export async function loadAllData(
   onProgress?: (attempt: number, maxRetries: number) => void,
 ): Promise<{ ok: boolean; data: Record<string, any> }> {
-  const MAX_RETRIES = 5;
-  const TIMEOUT_MS = 10000; // 10s per attempt
+  const MAX_RETRIES = 3;
+  const TIMEOUT_MS = 4000; // 4s per attempt — Supabase typically responds in <2s
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -106,8 +106,8 @@ export async function loadAllData(
       if (error) {
         console.warn(`[persistence] loadAllData attempt ${attempt} failed:`, error.message);
         if (attempt < MAX_RETRIES) {
-          // Wait 1s, 2s, 3s, 4s between retries
-          await new Promise(r => setTimeout(r, attempt * 1000));
+          // Quick backoff: 500ms, 1s between retries
+          await new Promise(r => setTimeout(r, attempt * 500));
           continue;
         }
         return { ok: false, data: {} };
@@ -122,7 +122,7 @@ export async function loadAllData(
     } catch (err) {
       console.warn(`[persistence] loadAllData attempt ${attempt} exception:`, err);
       if (attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, attempt * 1000));
+        await new Promise(r => setTimeout(r, attempt * 500));
         continue;
       }
       return { ok: false, data: {} };
