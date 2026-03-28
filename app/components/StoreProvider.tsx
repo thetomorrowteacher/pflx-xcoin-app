@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { initStore, saveAll, isStoreReady, needsSeed, clearSeedFlag, didLoadFail, onLoadProgress } from "../lib/store";
+import { initStore, saveAll, isStoreReady, needsSeed, clearSeedFlag, didLoadFail, onLoadProgress, saveCoinCategories, saveUsers } from "../lib/store";
 import { getPlayerImages } from "../lib/playerImages";
 import { showSaveToast } from "../lib/saveToast";
+import { recompressBase64 } from "../lib/imageUtils";
 import * as D from "../lib/data";
 
 // Per-collection snapshots for granular dirty-checking
@@ -76,6 +77,57 @@ function mergeLocalImages(): boolean {
   return changed;
 }
 
+/**
+ * One-time migration: recompress oversized images in coinCategories and users.
+ * Old badge PNGs were full-res (~6.8MB total). This shrinks them to 200px JPEG
+ * so coinCategories fits easily in a Supabase upsert.
+ */
+async function migrateImages() {
+  let coinsDirty = false;
+  let usersDirty = false;
+
+  // Recompress coin/badge images
+  for (const cat of D.COIN_CATEGORIES) {
+    for (const coin of cat.coins) {
+      if (coin.image && (coin.image.startsWith("data:image/png") || coin.image.length > 20_000)) {
+        const before = coin.image.length;
+        coin.image = await recompressBase64(coin.image, 200, 0.7);
+        if (coin.image.length < before) {
+          console.log(`[migrate] coin "${coin.name}": ${(before/1024).toFixed(0)}KB → ${(coin.image.length/1024).toFixed(0)}KB`);
+          coinsDirty = true;
+        }
+      }
+    }
+  }
+
+  // Recompress user profile images
+  for (const u of D.mockUsers) {
+    if (u.image && (u.image.startsWith("data:image/png") || u.image.length > 30_000)) {
+      const before = u.image.length;
+      u.image = await recompressBase64(u.image, 200, 0.8);
+      if (u.image.length < before) {
+        console.log(`[migrate] user "${u.name}": ${(before/1024).toFixed(0)}KB → ${(u.image.length/1024).toFixed(0)}KB`);
+        usersDirty = true;
+      }
+    }
+  }
+
+  // Save migrated data back to Supabase
+  const saves: Promise<boolean>[] = [];
+  if (coinsDirty) {
+    console.log("[migrate] Saving recompressed coinCategories...");
+    saves.push(saveCoinCategories());
+  }
+  if (usersDirty) {
+    console.log("[migrate] Saving recompressed users...");
+    saves.push(saveUsers());
+  }
+  if (saves.length > 0) {
+    await Promise.all(saves);
+    console.log("[migrate] ✓ Image migration complete");
+  }
+}
+
 export default function StoreProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
@@ -91,11 +143,15 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
   }, []);
 
   useEffect(() => {
-    initStore().then(() => {
+    initStore().then(async () => {
       // Merge any locally-stored profile images into mockUsers
       mergeLocalImages();
 
-      // Take per-collection snapshots AFTER load + image merge
+      // ── One-time migration: recompress oversized images ──
+      // Old badge images are full-res PNGs (6.8MB total). Shrink to 200px JPEG.
+      await migrateImages();
+
+      // Take per-collection snapshots AFTER load + image merge + migration
       lastSnaps.current = snapshotAll();
       setReady(true);
 
