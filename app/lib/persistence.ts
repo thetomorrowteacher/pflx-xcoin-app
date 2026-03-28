@@ -88,7 +88,7 @@ export async function loadAllData(
   onProgress?: (attempt: number, maxRetries: number) => void,
 ): Promise<{ ok: boolean; data: Record<string, any> }> {
   const MAX_RETRIES = 3;
-  const TIMEOUT_MS = 6000; // 6s per attempt — allows for large payloads with images
+  const TIMEOUT_MS = 15000; // 15s — full payload is ~12MB with images, takes ~6s on good connection
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
