@@ -5,7 +5,7 @@ import Link from "next/link";
 import SideNav from "../../components/SideNav";
 import {
   User, mockUsers, getLevelFromXC, getCurrentRank, generatePin,
-  isHostUser,
+  isHostUser, mockStartupStudios,
 } from "../../lib/data";
 import { savePlayerImage, applyPlayerImages } from "../../lib/playerImages";
 import { saveUsers } from "../../lib/store";
@@ -692,6 +692,8 @@ export default function AdminPlayers() {
                   <ColHeader label="Name" sortKey="name" currentSort={sort} onSort={handleSort} />
                   <ColHeader label="Brand" sortKey="brandName" currentSort={sort} onSort={handleSort} />
                   <th style={{ padding: "12px 16px", textAlign: "left", background: "linear-gradient(90deg, rgba(0,212,255,0.05) 0%, rgba(0,212,255,0.02) 100%)", borderBottom: "2px solid #00d4ff", color: "rgba(0,212,255,0.7)", fontSize: "12px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" }}>Email</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", background: "linear-gradient(90deg, rgba(0,212,255,0.05) 0%, rgba(0,212,255,0.02) 100%)", borderBottom: "2px solid #00d4ff", color: "rgba(0,212,255,0.7)", fontSize: "12px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" }}>Cohort</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", background: "linear-gradient(90deg, rgba(0,212,255,0.05) 0%, rgba(0,212,255,0.02) 100%)", borderBottom: "2px solid #00d4ff", color: "rgba(0,212,255,0.7)", fontSize: "12px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" }}>Studio</th>
                   <ColHeader label="Level" sortKey="level" currentSort={sort} onSort={handleSort} />
                   <ColHeader label="XC" sortKey="xcoin" currentSort={sort} onSort={handleSort} />
                   <ColHeader label="Badges" sortKey="digitalBadges" currentSort={sort} onSort={handleSort} />
@@ -746,6 +748,32 @@ export default function AdminPlayers() {
                         {player.claimed === false && player.email && (
                           <span style={{ marginLeft: "6px", fontSize: "9px", fontWeight: 800, color: "#f5c842", background: "rgba(245,200,66,0.1)", border: "1px solid rgba(245,200,66,0.3)", borderRadius: "4px", padding: "1px 5px", letterSpacing: "0.05em" }}>UNCLAIMED</span>
                         )}
+                      </td>
+                      <td style={{ padding: "12px 16px", color: "rgba(224,232,255,0.8)", fontSize: "12px" }}>
+                        {player.cohort || <span style={{ color: "rgba(255,255,255,0.15)" }}>—</span>}
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        {(() => {
+                          const studio = mockStartupStudios.find(s => s.id === player.studioId);
+                          if (!studio) return <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.15)" }}>—</span>;
+                          const slug = studio.id.replace("studio-", "");
+                          return (
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <div style={{
+                                width: "22px", height: "22px", borderRadius: "6px", flexShrink: 0,
+                                background: studio.color, overflow: "hidden",
+                                border: `1px solid rgba(${studio.colorRgb},0.4)`,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                              }}>
+                                <img src={`/studio-${slug}.png`} alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                  style={{ width: "80%", height: "80%", objectFit: "contain", filter: "brightness(0) invert(1)" }} />
+                              </div>
+                              <span style={{ fontSize: "11px", fontWeight: 700, color: studio.color, whiteSpace: "nowrap" }}>
+                                {studio.name.replace(" Studios", "")}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td style={{ padding: "12px 16px", color: "#00d4ff", fontWeight: 600 }}>{level}</td>
                       <td style={{ padding: "12px 16px", color: "rgba(224,232,255,0.8)" }}>

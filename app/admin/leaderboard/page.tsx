@@ -6,7 +6,8 @@ import Link from "next/link";
 import SideNav from "../../components/SideNav";
 import {
   User, mockUsers, getCurrentRank, getXCProgress,
-  getMockCohorts, isHostUser, getBadgeBreakdown, getStatusScore, BadgeBreakdown
+  getMockCohorts, isHostUser, getBadgeBreakdown, getStatusScore, BadgeBreakdown,
+  mockStartupStudios, mockStudioInvestments,
 } from "../../lib/data";
 import { applyPlayerImages } from "../../lib/playerImages";
 
@@ -92,9 +93,39 @@ function ChipSelect<T extends string>({
   );
 }
 
+// ─── Studio logo helper ────────────────────────────────────────────────────
+function StudioLogo({ studioId, icon, color, colorRgb, size = 52 }: {
+  studioId: string; icon: string; color: string; colorRgb: string; size?: number;
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const slug = studioId.replace("studio-", "");
+  return (
+    <div style={{
+      width: `${size}px`, height: `${size}px`, borderRadius: `${Math.round(size * 0.25)}px`,
+      overflow: "hidden", flexShrink: 0,
+      background: imgFailed ? `rgba(${colorRgb},0.18)` : color,
+      border: `1.5px solid rgba(${colorRgb},0.5)`,
+      boxShadow: `0 0 16px rgba(${colorRgb},0.3)`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      {imgFailed ? (
+        <span style={{ fontSize: `${Math.round(size * 0.46)}px` }}>{icon}</span>
+      ) : (
+        <img
+          src={`/studio-${slug}.png`}
+          alt={studioId}
+          onError={() => setImgFailed(true)}
+          style={{ width: "80%", height: "80%", objectFit: "contain", filter: "brightness(0) invert(1)" }}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function AdminLeaderboard() {
   const router = useRouter();
   const [user, setUser]               = useState<User | null>(null);
+  const [view, setView]               = useState<"players" | "studios">("players");
   const [sortBy, setSortBy]           = useState<SortKey>("status");
   const [badgeFilter, setBadgeFilter] = useState<BadgeFilter>("all");
   const [tierFilter, setTierFilter]   = useState<TierFilter>("all");
@@ -140,6 +171,18 @@ export default function AdminLeaderboard() {
   const topThree = players.slice(0, 3);
   const hasFilters = badgeFilter !== "all" || tierFilter !== "all" || cohortFilter !== "all";
 
+  // ── Studios data ──────────────────────────────────────────────────────
+  const allPlayersForStudios = applyPlayerImages(mockUsers).filter(u => u.role === "player");
+  const studiosRanked = [...mockStartupStudios].sort((a, b) => b.xcPool - a.xcPool).map((s, idx) => {
+    const members = allPlayersForStudios.filter(p => p.studioId === s.id);
+    const stakes = mockStudioInvestments.filter(i => i.studioId === s.id && i.status === "active");
+    const totalStaked = stakes.reduce((sum, i) => sum + i.stakeXC, 0);
+    const topMember = [...members].sort((a, b) => b.totalXcoin - a.totalXcoin)[0];
+    return { ...s, members, stakes, totalStaked, topMember, rank: idx + 1 };
+  });
+  const studiosTotalXC = studiosRanked.reduce((s, st) => s + st.xcPool, 0);
+  const studiosTotalMembers = studiosRanked.reduce((s, st) => s + st.members.length, 0);
+
   const colHead = (key: SortKey, label: string) => (
     <button onClick={() => setSortBy(key)} style={{
       background: "none", border: "none", cursor: "pointer", padding: 0,
@@ -156,24 +199,66 @@ export default function AdminLeaderboard() {
       <SideNav user={user} />
       <main style={{ flex: 1, padding: "32px", overflow: "auto" }}>
 
-        {/* ── Header ─────────────────────────────────────────────────── */}
-        <div style={{ marginBottom: "28px" }}>
-          <h1 style={{ fontSize: "28px", fontWeight: 900, margin: "0 0 4px", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span>🏆</span>
-            <span style={{
-              background: "linear-gradient(90deg, #00d4ff, #a78bfa, #00d4ff)",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-              filter: "drop-shadow(0 0 10px rgba(0,212,255,0.4))",
-            }}>LEADERBOARD</span>
-          </h1>
-          <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.1em" }}>
-            [ STATUS STANDINGS · HOST VIEW ]
-          </p>
+        {/* ── Header + Toggle ─────────────────────────────────────────── */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "28px", flexWrap: "wrap", gap: "12px" }}>
+          <div>
+            <h1 style={{ fontSize: "28px", fontWeight: 900, margin: "0 0 4px", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>{view === "players" ? "🏆" : "🏢"}</span>
+              <span style={{
+                background: view === "players"
+                  ? "linear-gradient(90deg, #00d4ff, #a78bfa, #00d4ff)"
+                  : "linear-gradient(90deg, #a78bfa, #00d4ff, #a78bfa)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                filter: "drop-shadow(0 0 10px rgba(0,212,255,0.4))",
+              }}>{view === "players" ? "LEADERBOARD" : "STARTUP STUDIOS"}</span>
+            </h1>
+            <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.1em" }}>
+              {view === "players"
+                ? "[ STATUS STANDINGS · HOST VIEW ]"
+                : "[ STUDIO COMPETITION · XC POOLS · CORPORATE RANKINGS ]"}
+            </p>
+          </div>
+
+          {/* Toggle pill */}
+          <div style={{
+            display: "flex",
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: "12px", padding: "4px", gap: "4px",
+          }}>
+            {([
+              { id: "players" as const, label: "Players", icon: "👥" },
+              { id: "studios" as const, label: "Studios", icon: "🏢" },
+            ]).map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setView(tab.id)}
+                style={{
+                  padding: "8px 18px", borderRadius: "9px", border: "none",
+                  cursor: "pointer", fontWeight: 700, fontSize: "13px",
+                  display: "flex", alignItems: "center", gap: "6px",
+                  transition: "all 0.2s",
+                  background: view === tab.id
+                    ? tab.id === "players" ? "rgba(0,212,255,0.15)" : "rgba(167,139,250,0.15)"
+                    : "transparent",
+                  color: view === tab.id
+                    ? tab.id === "players" ? "#00d4ff" : "#a78bfa"
+                    : "rgba(255,255,255,0.35)",
+                  boxShadow: view === tab.id
+                    ? tab.id === "players" ? "0 0 14px rgba(0,212,255,0.15)" : "0 0 14px rgba(167,139,250,0.15)"
+                    : "none",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                <span>{tab.icon}</span> {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* ── Podium — Top 3 ─────────────────────────────────────────── */}
-        {topThree.length > 0 && (
+        {view === "players" && topThree.length > 0 && (
           <div style={{ marginBottom: "32px" }}>
             <p style={{ margin: "0 0 16px", fontSize: "11px", fontWeight: 700, letterSpacing: "0.15em", color: "rgba(0,212,255,0.5)" }}>
               [ TOP STATUS PERFORMERS ]
@@ -298,7 +383,7 @@ export default function AdminLeaderboard() {
         )}
 
         {/* ── Full Status Table ────────────────────────────────────────── */}
-        <div style={{ background: "rgba(10,10,26,0.85)", border: "1px solid rgba(0,212,255,0.1)", borderRadius: "16px", overflow: "hidden" }}>
+        {view === "players" && <div style={{ background: "rgba(10,10,26,0.85)", border: "1px solid rgba(0,212,255,0.1)", borderRadius: "16px", overflow: "hidden" }}>
 
           {/* ── Toolbar row (filters + sort inside the card) ─────────── */}
           <div style={{
@@ -378,13 +463,14 @@ export default function AdminLeaderboard() {
           {/* ── Column headers (clickable sort) ──────────────────────── */}
           <div style={{
             display: "grid",
-            gridTemplateColumns: "72px 1fr 130px 100px 100px 100px 100px 88px 100px 90px",
+            gridTemplateColumns: "72px 1fr 110px 130px 100px 100px 100px 100px 88px 100px 90px",
             padding: "9px 16px", gap: "0 6px", alignItems: "center",
             borderBottom: "1px solid rgba(0,212,255,0.08)",
             background: "rgba(0,212,255,0.02)",
           }}>
             {colHead("status", "STATUS")}
             <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", color: "rgba(0,212,255,0.35)" }}>PLAYER</span>
+            <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", color: "rgba(0,212,255,0.35)" }}>STUDIO</span>
             <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", color: "rgba(0,212,255,0.35)" }}>EVO RANK</span>
             <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em", color: "#ef4444", opacity: 0.8 }}>🟥 SIGNATURE</span>
             <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em", color: "#f5c842", opacity: 0.8 }}>🟨 EXECUTIVE</span>
@@ -410,7 +496,7 @@ export default function AdminLeaderboard() {
             return (
               <div key={p.id} style={{
                 display: "grid",
-                gridTemplateColumns: "72px 1fr 130px 100px 100px 100px 100px 88px 100px 90px",
+                gridTemplateColumns: "72px 1fr 110px 130px 100px 100px 100px 100px 88px 100px 90px",
                 padding: "12px 16px", gap: "0 8px", alignItems: "center",
                 borderBottom: i < players.length - 1 ? "1px solid rgba(0,212,255,0.05)" : "none",
                 background: i % 2 === 0 ? "transparent" : "rgba(0,212,255,0.015)",
@@ -454,6 +540,29 @@ export default function AdminLeaderboard() {
                     </p>
                   </div>
                 </div>
+
+                {/* Studio */}
+                {(() => {
+                  const studio = mockStartupStudios.find(s => s.id === p.studioId);
+                  if (!studio) return <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.15)" }}>—</div>;
+                  const slug = studio.id.replace("studio-", "");
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                      <div style={{
+                        width: "22px", height: "22px", borderRadius: "6px", flexShrink: 0,
+                        background: studio.color, overflow: "hidden",
+                        border: `1px solid rgba(${studio.colorRgb},0.4)`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <img src={`/studio-${slug}.png`} alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                          style={{ width: "80%", height: "80%", objectFit: "contain", filter: "brightness(0) invert(1)" }} />
+                      </div>
+                      <span style={{ fontSize: "10px", fontWeight: 700, color: studio.color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {studio.name.replace(" Studios", "")}
+                      </span>
+                    </div>
+                  );
+                })()}
 
                 {/* Evo Rank — actual rank name */}
                 <div>
@@ -558,7 +667,148 @@ export default function AdminLeaderboard() {
             <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>+ XC ÷100</span>
           </div>
 
-        </div>
+        </div>}
+
+        {/* ── Studios view ─────────────────────────────────────────────── */}
+        {view === "studios" && (
+          <div>
+            {/* Stats banner */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: "28px" }}>
+              {[
+                { label: "ACTIVE STUDIOS", value: "4", icon: "🏢", color: "#a78bfa", colorRgb: "167,139,250" },
+                { label: "TOTAL MEMBERS", value: String(studiosTotalMembers), icon: "👥", color: "#00d4ff", colorRgb: "0,212,255" },
+                { label: "TOTAL XC POOL", value: studiosTotalXC.toLocaleString(), icon: "⚡", color: "#f5c842", colorRgb: "245,200,66" },
+              ].map(stat => (
+                <div key={stat.label} style={{
+                  background: `rgba(${stat.colorRgb},0.05)`,
+                  border: `1px solid rgba(${stat.colorRgb},0.15)`,
+                  borderRadius: "12px", padding: "16px 20px",
+                  display: "flex", alignItems: "center", gap: "14px",
+                  position: "relative", overflow: "hidden",
+                }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, rgba(${stat.colorRgb},0.4), transparent)` }} />
+                  <span style={{ fontSize: "24px" }}>{stat.icon}</span>
+                  <div>
+                    <p style={{ margin: 0, fontSize: "20px", fontWeight: 900, color: stat.color, fontFamily: "monospace", lineHeight: 1 }}>{stat.value}</p>
+                    <p style={{ margin: "3px 0 0", fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.12em", fontWeight: 700 }}>{stat.label}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Ranked studio cards */}
+            {studiosRanked.map((s) => (
+              <div key={s.id} style={{
+                marginBottom: "16px",
+                background: "rgba(12,16,22,0.97)",
+                border: `1px solid rgba(${s.colorRgb},0.2)`,
+                borderRadius: "16px", padding: "22px 24px",
+                position: "relative", overflow: "hidden",
+                boxShadow: s.rank === 1
+                  ? `0 0 32px rgba(${s.colorRgb},0.12), inset 0 0 40px rgba(${s.colorRgb},0.03)`
+                  : `0 0 12px rgba(${s.colorRgb},0.04)`,
+              }}>
+                {/* Bracket corners */}
+                <div style={{ position: "absolute", top: "10px", left: "10px", width: "14px", height: "14px", borderTop: `2px solid rgba(${s.colorRgb},0.6)`, borderLeft: `2px solid rgba(${s.colorRgb},0.6)` }} />
+                <div style={{ position: "absolute", top: "10px", right: "10px", width: "14px", height: "14px", borderTop: `2px solid rgba(${s.colorRgb},0.6)`, borderRight: `2px solid rgba(${s.colorRgb},0.6)` }} />
+                <div style={{ position: "absolute", bottom: "10px", left: "10px", width: "14px", height: "14px", borderBottom: `2px solid rgba(${s.colorRgb},0.6)`, borderLeft: `2px solid rgba(${s.colorRgb},0.6)` }} />
+                <div style={{ position: "absolute", bottom: "10px", right: "10px", width: "14px", height: "14px", borderBottom: `2px solid rgba(${s.colorRgb},0.6)`, borderRight: `2px solid rgba(${s.colorRgb},0.6)` }} />
+
+                {/* Top row: logo + info + stats */}
+                <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
+                  {/* Logo + rank badge */}
+                  <div style={{ position: "relative", flexShrink: 0 }}>
+                    <StudioLogo studioId={s.id} icon={s.icon} color={s.color} colorRgb={s.colorRgb} size={76} />
+                    <div style={{
+                      position: "absolute", bottom: "-6px", right: "-6px",
+                      width: "26px", height: "26px", borderRadius: "50%",
+                      background: "#06090d", border: `1.5px solid rgba(${s.colorRgb},0.5)`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "13px",
+                    }}>
+                      {s.rank === 1 ? "🥇" : s.rank === 2 ? "🥈" : s.rank === 3 ? "🥉" : "4️⃣"}
+                    </div>
+                  </div>
+
+                  {/* Name + tagline + description */}
+                  <div style={{ flex: 1, minWidth: "180px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "3px", flexWrap: "wrap" }}>
+                      <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: "#fff", letterSpacing: "0.03em" }}>{s.name}</h3>
+                    </div>
+                    <p style={{ margin: "0 0 6px", fontSize: "12px", color: `rgba(${s.colorRgb},0.75)`, fontStyle: "italic" }}>{s.tagline}</p>
+                    <p style={{ margin: 0, fontSize: "10px", color: "rgba(255,255,255,0.3)", lineHeight: 1.55, maxWidth: "500px" }}>{s.description}</p>
+                  </div>
+
+                  {/* Stat pills */}
+                  <div style={{ display: "flex", gap: "10px", flexShrink: 0, flexWrap: "wrap" }}>
+                    {[
+                      { label: "XC POOL", value: `⚡ ${s.xcPool.toLocaleString()}`, color: s.color },
+                      { label: "MEMBERS", value: `👥 ${s.members.length}`, color: "rgba(255,255,255,0.75)" },
+                      { label: "STAKED", value: `📈 ${s.totalStaked.toLocaleString()}`, color: "#4ade80" },
+                      { label: "TAX RATE", value: `💼 ${Math.round(s.corporateTaxRate * 100)}%`, color: "#f59e0b" },
+                    ].map(stat => (
+                      <div key={stat.label} style={{
+                        background: `rgba(${s.colorRgb},0.06)`,
+                        border: `1px solid rgba(${s.colorRgb},0.14)`,
+                        borderRadius: "10px", padding: "10px 14px", textAlign: "center", minWidth: "82px",
+                      }}>
+                        <p style={{ margin: "0 0 3px", fontSize: "13px", fontWeight: 800, color: stat.color, fontFamily: "monospace" }}>{stat.value}</p>
+                        <p style={{ margin: 0, fontSize: "8px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", fontWeight: 700 }}>{stat.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bottom row: top player + member avatars */}
+                {s.topMember && (
+                  <div style={{
+                    marginTop: "16px", paddingTop: "14px",
+                    borderTop: `1px solid rgba(${s.colorRgb},0.12)`,
+                    display: "flex", alignItems: "center", gap: "18px", flexWrap: "wrap",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "9px", fontWeight: 700, color: "rgba(255,255,255,0.25)", letterSpacing: "0.12em" }}>🏆 TOP PLAYER</span>
+                      <div style={{
+                        width: "26px", height: "26px", borderRadius: "50%", overflow: "hidden",
+                        background: s.topMember.image ? "transparent" : `rgba(${s.colorRgb},0.3)`,
+                        border: `1.5px solid rgba(${s.colorRgb},0.5)`,
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px",
+                      }}>
+                        {s.topMember.image
+                          ? <img src={s.topMember.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          : s.topMember.avatar}
+                      </div>
+                      <span style={{ fontSize: "13px", fontWeight: 700, color: s.color }}>{s.topMember.brandName || s.topMember.name}</span>
+                      <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}>{s.topMember.totalXcoin.toLocaleString()} XC</span>
+                    </div>
+                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
+                      {s.members.slice(0, 10).map(m => (
+                        <div key={m.id} title={m.brandName || m.name} style={{
+                          width: "24px", height: "24px", borderRadius: "50%", overflow: "hidden",
+                          background: m.image ? "transparent" : `rgba(${s.colorRgb},0.2)`,
+                          border: `1px solid rgba(${s.colorRgb},0.3)`,
+                          display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px",
+                        }}>
+                          {m.image
+                            ? <img src={m.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            : m.avatar}
+                        </div>
+                      ))}
+                      {s.members.length > 10 && (
+                        <div style={{
+                          width: "24px", height: "24px", borderRadius: "50%",
+                          background: `rgba(${s.colorRgb},0.1)`, border: `1px solid rgba(${s.colorRgb},0.2)`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "8px", color: s.color, fontWeight: 700,
+                        }}>+{s.members.length - 10}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
       </main>
     </div>
