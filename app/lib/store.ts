@@ -63,9 +63,10 @@ export async function initStore(): Promise<void> {
         retryRound++;
         setProgress(10, retryRound > 1 ? `Reconnecting (round ${retryRound})...` : "Fetching saved data...");
 
-        const result = await loadAllData((attempt, max) => {
-          const p = 10 + Math.round((attempt / max) * 50);
-          setProgress(p, attempt > 1 ? `Retrying... (${attempt}/${max})` : "Fetching saved data...");
+        const result = await loadAllData((loaded, total) => {
+          // Map parallel fetches to 10–60% of the progress bar
+          const p = 10 + Math.round((loaded / total) * 50);
+          setProgress(p, `Loading collections... (${loaded}/${total})`);
         });
 
         // If all retries in loadAllData failed, wait and loop again

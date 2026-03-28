@@ -80,52 +80,75 @@ export async function saveData<T>(key: DataKey, value: T): Promise<boolean> {
 }
 
 /**
- * Load ALL collections at once (batch).
- * Returns { ok: true, data: {...} } on success, or { ok: false } on error.
- * CRITICAL: callers MUST check .ok — a failed load is NOT the same as an empty DB.
+ * Load ALL collections via parallel individual fetches.
  *
- * No artificial timeout — the payload is ~12MB with images so we let Supabase
- * fetch naturally. Uses AbortController so retries cancel stale requests.
+ * The old approach (SELECT * FROM app_data) returned ~12MB of JSONB in one query,
+ * which exceeded Supabase's PostgreSQL statement timeout (error 57014).
+ * Instead, we fetch each collection individually and in parallel — each query
+ * returns a single row and completes in <1s.
  */
 export async function loadAllData(
   onProgress?: (attempt: number, maxRetries: number) => void,
 ): Promise<{ ok: boolean; data: Record<string, any> }> {
-  const MAX_RETRIES = 2;
+  try {
+    onProgress?.(1, 1);
+    console.log(`[persistence] loadAllData — fetching ${DATA_KEYS.length} collections in parallel...`);
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      onProgress?.(attempt, MAX_RETRIES);
-      console.log(`[persistence] loadAllData attempt ${attempt}/${MAX_RETRIES}...`);
+    let completed = 0;
+    const total = DATA_KEYS.length;
 
-      const { data, error } = await supabase
-        .from("app_data")
-        .select("key, data");
+    const results = await Promise.all(
+      DATA_KEYS.map(async (key) => {
+        try {
+          const { data, error } = await supabase
+            .from("app_data")
+            .select("data")
+            .eq("key", key)
+            .single();
 
-      if (error) {
-        console.warn(`[persistence] loadAllData attempt ${attempt} failed:`, error.message);
-        if (attempt < MAX_RETRIES) {
-          await new Promise(r => setTimeout(r, 1000));
-          continue;
+          completed++;
+          // Report progress as each collection finishes
+          onProgress?.(completed, total);
+
+          if (error) {
+            // PGRST116 = row not found — expected if collection never saved
+            if (error.code === "PGRST116") return { key, data: null, ok: true };
+            console.warn(`[persistence] load "${key}" error:`, error.message);
+            return { key, data: null, ok: false };
+          }
+          return { key, data: data?.data, ok: true };
+        } catch (err) {
+          completed++;
+          onProgress?.(completed, total);
+          console.warn(`[persistence] load "${key}" exception:`, err);
+          return { key, data: null, ok: false };
         }
-        return { ok: false, data: {} };
-      }
+      })
+    );
 
-      const result: Record<string, any> = {};
-      for (const row of data || []) {
-        result[row.key] = row.data;
-      }
-      console.log(`[persistence] ✓ loadAllData: ${Object.keys(result).length} keys loaded (attempt ${attempt})`);
-      return { ok: true, data: result };
-    } catch (err) {
-      console.warn(`[persistence] loadAllData attempt ${attempt} exception:`, err);
-      if (attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, 1000));
-        continue;
-      }
+    // Check if the majority loaded successfully
+    const okCount = results.filter(r => r.ok).length;
+    const failCount = results.filter(r => !r.ok).length;
+    console.log(`[persistence] ✓ loadAllData: ${okCount} ok, ${failCount} failed out of ${total}`);
+
+    // If more than half failed, treat as a connection issue
+    if (failCount > total / 2) {
+      console.error("[persistence] Too many collections failed — treating as load failure");
       return { ok: false, data: {} };
     }
+
+    const result: Record<string, any> = {};
+    for (const r of results) {
+      if (r.data !== null && r.data !== undefined) {
+        result[r.key] = r.data;
+      }
+    }
+
+    return { ok: true, data: result };
+  } catch (err) {
+    console.error("[persistence] loadAllData exception:", err);
+    return { ok: false, data: {} };
   }
-  return { ok: false, data: {} };
 }
 
 /**
