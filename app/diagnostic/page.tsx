@@ -279,9 +279,9 @@ export default function DiagnosticPage() {
         <div style={{ textAlign: "center", marginBottom: "40px" }}>
           <p style={{ margin: "0 0 8px", fontSize: "12px", letterSpacing: "0.2em", color: "rgba(0,212,255,0.6)", fontWeight: 700 }}>PROTOTYPE FLX</p>
           <h1 style={{ margin: "0 0 6px", fontSize: "clamp(28px,5vw,44px)", fontWeight: 900, letterSpacing: "0.06em", background: "linear-gradient(90deg,#00d4ff,#a78bfa,#00d4ff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", filter: "drop-shadow(0 0 16px rgba(0,212,255,0.4))" }}>
-            CHECKPOINT ALPHA
+            PLAYER ONBOARDING
           </h1>
-          <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.12em" }}>[ CREATIVE IDENTITY DIAGNOSTIC ]</p>
+          <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.12em" }}>[ CREATIVE IDENTITY ASSESSMENT ]</p>
         </div>
 
         {/* ── INTRO ── */}
