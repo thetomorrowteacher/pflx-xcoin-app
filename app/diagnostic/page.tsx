@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import {
   User, DiagnosticResult, StartupStudio,
   mockUsers, mockStartupStudios,
-  assignStudioFromDiagnostic, getCurrentRank,
+  assignStudioFromDiagnostic, assignStudioFromVisionText, getCurrentRank,
 } from "../lib/data";
 
 // ─── Question data ────────────────────────────────────────────────────────────
@@ -158,12 +158,12 @@ const brandTypes: Record<string, { name: string; description: string; traits: st
 };
 
 const pathwayLabels: Record<string, { name: string; icon: string }> = {
-  "content-creator": { name: "Content Creator", icon: "🎬" },
-  "3d-modeler": { name: "3D Modeler", icon: "🎮" },
-  "sound-designer": { name: "Sound Designer", icon: "🎵" },
-  "digital-artist": { name: "Digital Artist", icon: "🎨" },
-  "computer-programmer": { name: "Computer Programmer", icon: "💻" },
-  "game-designer": { name: "Game Designer", icon: "🎯" },
+  "content-creator": { name: "Content Creator", icon: "\uD83C\uDFAC" },
+  "3d-modeler": { name: "3D Modeler", icon: "\uD83C\uDFAE" },
+  "sound-designer": { name: "Sound Designer", icon: "\uD83C\uDFB5" },
+  "digital-artist": { name: "Digital Artist", icon: "\uD83C\uDFA8" },
+  "computer-programmer": { name: "Computer Programmer", icon: "\uD83D\uDCBB" },
+  "game-designer": { name: "Game Designer", icon: "\uD83C\uDFAF" },
 };
 
 // ─── Calculate diagnostic results ────────────────────────────────
@@ -196,22 +196,51 @@ function calculateResults(answers: Record<string, any>): Omit<DiagnosticResult, 
 }
 
 // ─── Component ───────────────────────────────────────────────────
+type OnboardingStep = "intro" | "assessment" | "results" | "vision" | "branding" | "placement" | "welcome";
+
 export default function DiagnosticPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [step, setStep] = useState<"intro" | "assessment" | "results" | "vision" | "placement" | "welcome">("intro");
+  const [step, setStep] = useState<OnboardingStep>("intro");
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [results, setResults] = useState<Omit<DiagnosticResult, "completedAt"> | null>(null);
   const [vision, setVision] = useState({ create: "", impact: "", perspective: "", future: "" });
   const [assignedStudio, setAssignedStudio] = useState<StartupStudio | null>(null);
   const [placing, setPlacing] = useState(false);
 
+  // Branding state
+  const [brandName, setBrandName] = useState("");
+  const [slogan, setSlogan] = useState("");
+
+  // Skip/manual entry state
+  const [isSkipMode, setIsSkipMode] = useState(false);
+  const [manualBrandType, setManualBrandType] = useState("");
+  const [manualPathways, setManualPathways] = useState<string[]>([]);
+  const [manualVisionText, setManualVisionText] = useState("");
+
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
     if (!stored) { router.push("/"); return; }
     const u = JSON.parse(stored) as User;
-    if (u.diagnosticComplete) { router.push(u.role === "admin" ? "/admin" : "/player"); return; }
+    if (u.onboardingComplete) { router.push(u.role === "admin" ? "/admin" : "/player"); return; }
+    // If diagnostic is done but branding isn't, go to branding
+    if (u.diagnosticComplete && !u.brandingComplete) {
+      setUser(u);
+      setStep("branding");
+      if (u.diagnosticResult) setResults(u.diagnosticResult);
+      return;
+    }
+    // If both done, they're fully onboarded
+    if (u.diagnosticComplete && u.brandingComplete) {
+      const updated = { ...u, onboardingComplete: true };
+      localStorage.setItem("pflx_user", JSON.stringify(updated));
+      const idx = mockUsers.findIndex(mu => mu.id === u.id);
+      if (idx >= 0) mockUsers[idx].onboardingComplete = true;
+      router.push("/player");
+      return;
+    }
     setUser(u);
+    setBrandName(u.brandName || "");
   }, [router]);
 
   const answeredCount = Object.keys(answers).length;
@@ -224,10 +253,10 @@ export default function DiagnosticPage() {
     setStep("results");
   };
 
+  // Complete vision step → do placement (AI assigns studio)
   const handleVisionComplete = () => {
     setStep("placement");
     setPlacing(true);
-    // Simulate AI processing delay
     setTimeout(() => {
       if (!results) return;
       const fullResult: DiagnosticResult = {
@@ -239,7 +268,6 @@ export default function DiagnosticPage() {
       const studio = mockStartupStudios.find(s => s.id === studioId)!;
       setAssignedStudio(studio);
 
-      // Update user in localStorage and in mockUsers
       if (user) {
         const updatedUser: User = {
           ...user,
@@ -252,7 +280,6 @@ export default function DiagnosticPage() {
         const idx = mockUsers.findIndex(u => u.id === user.id);
         if (idx >= 0) {
           mockUsers[idx] = updatedUser;
-          // Add player to studio members
           const sIdx = mockStartupStudios.findIndex(s => s.id === studioId);
           if (sIdx >= 0 && !mockStartupStudios[sIdx].members.includes(user.id)) {
             mockStartupStudios[sIdx].members.push(user.id);
@@ -261,13 +288,79 @@ export default function DiagnosticPage() {
         setUser(updatedUser);
       }
       setPlacing(false);
-      setTimeout(() => setStep("welcome"), 600);
+      // Go to branding step (not welcome yet)
+      setTimeout(() => setStep("branding"), 600);
     }, 2800);
+  };
+
+  // Skip mode: manual entry → AI analyzes vision text → assigns studio
+  const handleSkipComplete = () => {
+    if (!user) return;
+    setStep("placement");
+    setPlacing(true);
+    setTimeout(() => {
+      // Build a result from manual entries
+      const brandType = (manualBrandType || "experience-designer") as DiagnosticResult["brandType"];
+      const topPathways = manualPathways.length > 0 ? manualPathways.slice(0, 3) : ["content-creator", "digital-artist", "game-designer"];
+      const visionStatement = { create: manualVisionText, impact: "", perspective: "", future: "" };
+
+      const fullResult: DiagnosticResult = {
+        brandType,
+        scores: { maker: 3, visionary: 3, storyteller: 3, technologist: 3 },
+        topPathways,
+        style: "modern",
+        visionStatement,
+        completedAt: new Date().toISOString(),
+      };
+
+      // Use AI vision text analysis for studio assignment
+      const studioId = assignStudioFromVisionText(manualVisionText || "creative experiences");
+      const studio = mockStartupStudios.find(s => s.id === studioId)!;
+      setAssignedStudio(studio);
+      setResults(fullResult);
+
+      const updatedUser: User = {
+        ...user,
+        studioId,
+        diagnosticComplete: true,
+        pathway: pathwayLabels[topPathways[0]]?.name || user.pathway,
+        diagnosticResult: fullResult,
+      };
+      localStorage.setItem("pflx_user", JSON.stringify(updatedUser));
+      const idx = mockUsers.findIndex(u => u.id === user.id);
+      if (idx >= 0) {
+        mockUsers[idx] = updatedUser;
+        const sIdx = mockStartupStudios.findIndex(s => s.id === studioId);
+        if (sIdx >= 0 && !mockStartupStudios[sIdx].members.includes(user.id)) {
+          mockStartupStudios[sIdx].members.push(user.id);
+        }
+      }
+      setUser(updatedUser);
+      setPlacing(false);
+      setTimeout(() => setStep("branding"), 600);
+    }, 2800);
+  };
+
+  // Complete branding → mark onboarding complete → welcome
+  const handleBrandingComplete = () => {
+    if (!user) return;
+    const updatedUser: User = {
+      ...user,
+      brandName: brandName || user.brandName,
+      brandingComplete: true,
+      onboardingComplete: true,
+    };
+    localStorage.setItem("pflx_user", JSON.stringify(updatedUser));
+    const idx = mockUsers.findIndex(u => u.id === user.id);
+    if (idx >= 0) mockUsers[idx] = updatedUser;
+    setUser(updatedUser);
+    setStep("welcome");
   };
 
   if (!user) return null;
 
   const CYAN = "#00d4ff";
+  const studio = assignedStudio || mockStartupStudios.find(s => s.id === user.studioId);
 
   return (
     <div style={{ minHeight: "100vh", background: "#060810", color: "#f0f0ff", fontFamily: "'Inter','Segoe UI',sans-serif", overflowX: "hidden" }}>
@@ -286,43 +379,53 @@ export default function DiagnosticPage() {
 
         {/* ── INTRO ── */}
         {step === "intro" && (
-          <div style={{ background: "rgba(0,212,255,0.03)", border: "1px solid rgba(0,212,255,0.15)", borderRadius: "24px", padding: "40px", position: "relative" }}>
-            <div style={{ position: "absolute", top: "10px", left: "10px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.35)", borderRight: "none", borderBottom: "none", borderRadius: "2px" }} />
-            <div style={{ position: "absolute", top: "10px", right: "10px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.35)", borderLeft: "none", borderBottom: "none", borderRadius: "2px" }} />
-            <div style={{ position: "absolute", bottom: "10px", left: "10px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.35)", borderRight: "none", borderTop: "none", borderRadius: "2px" }} />
-            <div style={{ position: "absolute", bottom: "10px", right: "10px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.35)", borderLeft: "none", borderTop: "none", borderRadius: "2px" }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div style={{ background: "rgba(0,212,255,0.03)", border: "1px solid rgba(0,212,255,0.15)", borderRadius: "24px", padding: "40px", position: "relative" }}>
+              <div style={{ position: "absolute", top: "10px", left: "10px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.35)", borderRight: "none", borderBottom: "none", borderRadius: "2px" }} />
+              <div style={{ position: "absolute", top: "10px", right: "10px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.35)", borderLeft: "none", borderBottom: "none", borderRadius: "2px" }} />
+              <div style={{ position: "absolute", bottom: "10px", left: "10px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.35)", borderRight: "none", borderTop: "none", borderRadius: "2px" }} />
+              <div style={{ position: "absolute", bottom: "10px", right: "10px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.35)", borderLeft: "none", borderTop: "none", borderRadius: "2px" }} />
 
-            <h2 style={{ margin: "0 0 12px", fontSize: "22px", fontWeight: 800, color: CYAN }}>Welcome, {user.brandName || user.name}.</h2>
-            <p style={{ margin: "0 0 28px", fontSize: "14px", color: "rgba(255,255,255,0.5)", lineHeight: 1.7 }}>
-              Before you enter the PFLX ecosystem, you need to discover your <strong style={{ color: "#f0f0ff" }}>Creative Identity</strong> and find your <strong style={{ color: "#f0f0ff" }}>Startup Studio</strong> — the team you'll compete with, collaborate with, and build your brand inside.
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "32px" }}>
-              {[
-                { icon: "✨", label: "Your Everyday Interests", sub: "How you spend your time and what excites you", color: CYAN },
-                { icon: "🎯", label: "Creative Identity Matrix", sub: "Your personality brand type and working style", color: "#a78bfa" },
-                { icon: "🚀", label: "Pathway & Style Discovery", sub: "Which PFLX pathways and creative style match you", color: "#f472b6" },
-                { icon: "🏢", label: "Startup Studio Placement", sub: "AI assigns you to your studio based on your results", color: "#f5c842" },
-              ].map(item => (
-                <div key={item.label} style={{ display: "flex", alignItems: "center", gap: "16px", background: `rgba(0,0,0,0.3)`, border: `1px solid rgba(255,255,255,0.06)`, borderRadius: "14px", padding: "16px 20px" }}>
-                  <span style={{ fontSize: "22px" }}>{item.icon}</span>
-                  <div>
-                    <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: item.color }}>{item.label}</p>
-                    <p style={{ margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.35)" }}>{item.sub}</p>
+              <h2 style={{ margin: "0 0 12px", fontSize: "22px", fontWeight: 800, color: CYAN }}>Welcome, {user.brandName || user.name}.</h2>
+              <p style={{ margin: "0 0 28px", fontSize: "14px", color: "rgba(255,255,255,0.5)", lineHeight: 1.7 }}>
+                Before you enter the PFLX ecosystem, you need to discover your <strong style={{ color: "#f0f0ff" }}>Creative Identity</strong>, build your <strong style={{ color: "#f0f0ff" }}>Personal Brand</strong>, and find your <strong style={{ color: "#f0f0ff" }}>Startup Studio</strong>.
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "32px" }}>
+                {[
+                  { icon: "\u2728", label: "Creative Identity Assessment", sub: "22 questions about your interests and creative style", color: CYAN },
+                  { icon: "\uD83C\uDFAF", label: "Vision Statement Builder", sub: "Craft your personal creative mission", color: "#a78bfa" },
+                  { icon: "\uD83C\uDFA8", label: "Personal Branding", sub: "Brand name, slogan, and creative identity", color: "#f472b6" },
+                  { icon: "\uD83C\uDFE2", label: "Startup Studio Placement", sub: "AI assigns you to your studio based on your profile", color: "#f5c842" },
+                ].map(item => (
+                  <div key={item.label} style={{ display: "flex", alignItems: "center", gap: "16px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "16px 20px" }}>
+                    <span style={{ fontSize: "22px" }}>{item.icon}</span>
+                    <div>
+                      <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: item.color }}>{item.label}</p>
+                      <p style={{ margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.35)" }}>{item.sub}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              <button
+                onClick={() => setStep("assessment")}
+                style={{ width: "100%", padding: "18px", borderRadius: "14px", border: "none", cursor: "pointer", background: "linear-gradient(90deg,#00d4ff,#a78bfa)", color: "#000", fontSize: "15px", fontWeight: 900, letterSpacing: "0.06em", marginBottom: "12px" }}
+              >
+                BEGIN FULL ASSESSMENT &rarr;
+              </button>
             </div>
+
+            {/* Skip option */}
             <button
-              onClick={() => setStep("assessment")}
-              style={{ width: "100%", padding: "18px", borderRadius: "14px", border: "none", cursor: "pointer", background: "linear-gradient(90deg,#00d4ff,#a78bfa)", color: "#000", fontSize: "15px", fontWeight: 900, letterSpacing: "0.06em" }}
+              onClick={() => { setIsSkipMode(true); setStep("assessment"); }}
+              style={{ padding: "14px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.02)", color: "rgba(255,255,255,0.4)", fontSize: "13px", fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
             >
-              BEGIN ASSESSMENT →
+              Already completed the assessment? Skip &amp; enter manually &rarr;
             </button>
           </div>
         )}
 
-        {/* ── ASSESSMENT ── */}
-        {step === "assessment" && (
+        {/* ── ASSESSMENT (full or skip/manual) ── */}
+        {step === "assessment" && !isSkipMode && (
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             {/* Progress bar */}
             <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: "100px", height: "6px", overflow: "hidden" }}>
@@ -361,8 +464,74 @@ export default function DiagnosticPage() {
               onClick={handleCalculate}
               disabled={answeredCount < questions.length}
               style={{ padding: "18px", borderRadius: "14px", border: "none", cursor: answeredCount < questions.length ? "not-allowed" : "pointer", background: answeredCount < questions.length ? "rgba(255,255,255,0.06)" : "linear-gradient(90deg,#00d4ff,#a78bfa)", color: answeredCount < questions.length ? "rgba(255,255,255,0.25)" : "#000", fontSize: "15px", fontWeight: 900, letterSpacing: "0.06em", transition: "all 0.2s" }}>
-              {answeredCount < questions.length ? `${answeredCount}/${questions.length} Questions Answered` : "SEE MY RESULTS →"}
+              {answeredCount < questions.length ? `${answeredCount}/${questions.length} Questions Answered` : "SEE MY RESULTS \u2192"}
             </button>
+          </div>
+        )}
+
+        {/* ── SKIP / MANUAL ENTRY ── */}
+        {step === "assessment" && isSkipMode && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div style={{ background: "rgba(245,200,66,0.05)", border: "1px solid rgba(245,200,66,0.2)", borderRadius: "18px", padding: "24px" }}>
+              <h2 style={{ margin: "0 0 8px", fontSize: "20px", fontWeight: 800, color: "#f5c842" }}>Manual Entry Mode</h2>
+              <p style={{ margin: "0 0 24px", fontSize: "13px", color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
+                If you&apos;ve already completed the assessment externally, enter your results below. The AI will analyze your vision to assign your Startup Studio.
+              </p>
+
+              {/* Brand Type */}
+              <div style={{ marginBottom: "20px" }}>
+                <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 700, color: CYAN, letterSpacing: "0.1em", textTransform: "uppercase" }}>Personality Brand Type</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                  {Object.entries(brandTypes).map(([key, bt]) => (
+                    <button key={key} onClick={() => setManualBrandType(key)}
+                      style={{ padding: "12px", borderRadius: "10px", border: `2px solid ${manualBrandType === key ? CYAN : "rgba(255,255,255,0.08)"}`, background: manualBrandType === key ? "rgba(0,212,255,0.08)" : "transparent", color: manualBrandType === key ? CYAN : "rgba(255,255,255,0.5)", fontSize: "12px", fontWeight: 700, textAlign: "left", cursor: "pointer" }}>
+                      {bt.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Top Pathways */}
+              <div style={{ marginBottom: "20px" }}>
+                <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 700, color: CYAN, letterSpacing: "0.1em", textTransform: "uppercase" }}>Top Pathways (select up to 3)</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                  {Object.entries(pathwayLabels).map(([key, pw]) => (
+                    <button key={key} onClick={() => {
+                      setManualPathways(prev => prev.includes(key) ? prev.filter(p => p !== key) : prev.length < 3 ? [...prev, key] : prev);
+                    }}
+                      style={{ padding: "12px", borderRadius: "10px", border: `2px solid ${manualPathways.includes(key) ? "#a78bfa" : "rgba(255,255,255,0.08)"}`, background: manualPathways.includes(key) ? "rgba(167,139,250,0.08)" : "transparent", color: manualPathways.includes(key) ? "#a78bfa" : "rgba(255,255,255,0.5)", fontSize: "12px", fontWeight: 700, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span>{pw.icon}</span> {pw.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Vision text for AI analysis */}
+              <div style={{ marginBottom: "20px" }}>
+                <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 700, color: CYAN, letterSpacing: "0.1em", textTransform: "uppercase" }}>Vision Statement (AI will analyze this)</p>
+                <textarea
+                  value={manualVisionText}
+                  onChange={e => setManualVisionText(e.target.value)}
+                  placeholder="Describe what you want to create, the impact you want to make, and what you'll be known for in 2 years..."
+                  rows={4}
+                  style={{ width: "100%", padding: "14px", borderRadius: "12px", border: "1px solid rgba(0,212,255,0.2)", background: "rgba(0,212,255,0.04)", color: "#fff", fontSize: "13px", fontFamily: "inherit", resize: "vertical", outline: "none", boxSizing: "border-box", lineHeight: 1.6 }}
+                />
+                <p style={{ margin: "6px 0 0", fontSize: "10px", color: "rgba(0,212,255,0.3)" }}>The AI will analyze your vision to match you with the best Startup Studio</p>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button onClick={() => { setIsSkipMode(false); setStep("intro"); }}
+                style={{ flex: 1, padding: "14px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "rgba(255,255,255,0.4)", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
+                &larr; Back
+              </button>
+              <button
+                onClick={handleSkipComplete}
+                disabled={!manualVisionText.trim()}
+                style={{ flex: 2, padding: "18px", borderRadius: "14px", border: "none", cursor: manualVisionText.trim() ? "pointer" : "not-allowed", background: manualVisionText.trim() ? "linear-gradient(90deg,#f5c842,#f97316)" : "rgba(255,255,255,0.06)", color: manualVisionText.trim() ? "#000" : "rgba(255,255,255,0.25)", fontSize: "15px", fontWeight: 900, letterSpacing: "0.06em" }}>
+                ANALYZE &amp; FIND MY STUDIO &rarr;
+              </button>
+            </div>
           </div>
         )}
 
@@ -375,7 +544,7 @@ export default function DiagnosticPage() {
               <div style={{ position: "absolute", top: "10px", right: "10px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.4)", borderLeft: "none", borderBottom: "none", borderRadius: "2px" }} />
               <div style={{ position: "absolute", bottom: "10px", left: "10px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.4)", borderRight: "none", borderTop: "none", borderRadius: "2px" }} />
               <div style={{ position: "absolute", bottom: "10px", right: "10px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.4)", borderLeft: "none", borderTop: "none", borderRadius: "2px" }} />
-              <div style={{ fontSize: "48px", marginBottom: "12px" }}>✨</div>
+              <div style={{ fontSize: "48px", marginBottom: "12px" }}>{"\u2728"}</div>
               <p style={{ margin: "0 0 4px", fontSize: "12px", letterSpacing: "0.15em", color: "rgba(0,212,255,0.5)", fontWeight: 700 }}>YOUR PERSONALITY BRAND</p>
               <h2 style={{ margin: "0 0 16px", fontSize: "32px", fontWeight: 900, background: "linear-gradient(90deg,#00d4ff,#a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                 {brandTypes[results.brandType].name}
@@ -430,7 +599,7 @@ export default function DiagnosticPage() {
 
             <button onClick={() => setStep("vision")}
               style={{ padding: "18px", borderRadius: "14px", border: "none", cursor: "pointer", background: "linear-gradient(90deg,#00d4ff,#a78bfa)", color: "#000", fontSize: "15px", fontWeight: 900, letterSpacing: "0.06em" }}>
-              BUILD YOUR VISION STATEMENT →
+              BUILD YOUR VISION STATEMENT &rarr;
             </button>
           </div>
         )}
@@ -443,8 +612,8 @@ export default function DiagnosticPage() {
               <p style={{ margin: "0 0 28px", fontSize: "13px", color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
                 Complete the four parts below. This becomes your brand identity inside PFLX.
               </p>
-              {(["create", "impact", "perspective", "future"] as const).map((field, fi) => {
-                const labels = { create: "I want to create…", impact: "…that will…", perspective: "My unique perspective is…", future: "In two years, I'll be known for…" };
+              {(["create", "impact", "perspective", "future"] as const).map((field) => {
+                const labels = { create: "I want to create\u2026", impact: "\u2026that will\u2026", perspective: "My unique perspective is\u2026", future: "In two years, I\u2019ll be known for\u2026" };
                 return (
                   <div key={field} style={{ marginBottom: "24px" }}>
                     <p style={{ margin: "0 0 12px", fontSize: "13px", fontWeight: 700, color: "rgba(0,212,255,0.7)" }}>{labels[field]}</p>
@@ -456,11 +625,11 @@ export default function DiagnosticPage() {
                         </button>
                       ))}
                       <input
-                        placeholder="Or type your own…"
+                        placeholder="Or type your own\u2026"
                         value={!visionOptions[field].includes(vision[field]) ? vision[field] : ""}
                         onChange={e => setVision(v => ({ ...v, [field]: e.target.value }))}
                         className="input-field"
-                        style={{ fontSize: "13px", padding: "12px 14px", marginTop: "4px" }}
+                        style={{ fontSize: "13px", padding: "12px 14px", marginTop: "4px", background: "rgba(0,212,255,0.04)", border: "1px solid rgba(0,212,255,0.15)", borderRadius: "10px", color: "#fff", outline: "none" }}
                       />
                     </div>
                   </div>
@@ -473,7 +642,7 @@ export default function DiagnosticPage() {
               <div style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.25)", borderRadius: "18px", padding: "24px" }}>
                 <p style={{ margin: "0 0 10px", fontSize: "11px", fontWeight: 700, color: "rgba(167,139,250,0.7)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Your Vision Statement</p>
                 <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.8)", lineHeight: 1.8, fontStyle: "italic" }}>
-                  "I want to create <strong style={{ color: "#a78bfa" }}>{vision.create}</strong> that will <strong style={{ color: "#a78bfa" }}>{vision.impact}</strong>. My unique perspective is <strong style={{ color: "#a78bfa" }}>{vision.perspective}</strong>. In two years, I'll be known for <strong style={{ color: "#a78bfa" }}>{vision.future}</strong>."
+                  &quot;I want to create <strong style={{ color: "#a78bfa" }}>{vision.create}</strong> that will <strong style={{ color: "#a78bfa" }}>{vision.impact}</strong>. My unique perspective is <strong style={{ color: "#a78bfa" }}>{vision.perspective}</strong>. In two years, I&apos;ll be known for <strong style={{ color: "#a78bfa" }}>{vision.future}</strong>.&quot;
                 </p>
               </div>
             )}
@@ -482,7 +651,7 @@ export default function DiagnosticPage() {
               onClick={handleVisionComplete}
               disabled={!vision.create || !vision.impact || !vision.perspective || !vision.future}
               style={{ padding: "18px", borderRadius: "14px", border: "none", cursor: (!vision.create || !vision.impact || !vision.perspective || !vision.future) ? "not-allowed" : "pointer", background: (!vision.create || !vision.impact || !vision.perspective || !vision.future) ? "rgba(255,255,255,0.06)" : "linear-gradient(90deg,#f5c842,#f97316)", color: (!vision.create || !vision.impact || !vision.perspective || !vision.future) ? "rgba(255,255,255,0.2)" : "#000", fontSize: "15px", fontWeight: 900, letterSpacing: "0.06em" }}>
-              FIND MY STARTUP STUDIO →
+              FIND MY STARTUP STUDIO &rarr;
             </button>
           </div>
         )}
@@ -492,50 +661,132 @@ export default function DiagnosticPage() {
           <div style={{ minHeight: "60vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: "24px" }}>
             <div style={{ width: "80px", height: "80px", borderRadius: "50%", border: "3px solid rgba(0,212,255,0.3)", borderTopColor: CYAN, animation: "spin 0.8s linear infinite" }} />
             <div>
-              <p style={{ margin: "0 0 8px", fontSize: "20px", fontWeight: 800, color: CYAN }}>Analyzing your profile…</p>
+              <p style={{ margin: "0 0 8px", fontSize: "20px", fontWeight: 800, color: CYAN }}>Analyzing your profile&hellip;</p>
               <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>The AI is finding your perfect Startup Studio match</p>
             </div>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         )}
 
-        {/* ── STUDIO WELCOME ── */}
-        {step === "welcome" && assignedStudio && (
+        {/* ── PERSONAL BRANDING ── */}
+        {step === "branding" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            {/* Studio assignment preview */}
+            {studio && (
+              <div style={{
+                background: `rgba(${studio.colorRgb},0.08)`, border: `2px solid rgba(${studio.colorRgb},0.3)`,
+                borderRadius: "18px", padding: "20px", display: "flex", alignItems: "center", gap: "16px",
+              }}>
+                <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: `rgba(${studio.colorRgb},0.2)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", flexShrink: 0 }}>{studio.icon}</div>
+                <div>
+                  <p style={{ margin: 0, fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.12em", fontWeight: 700 }}>YOUR STARTUP STUDIO</p>
+                  <p style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: studio.color }}>{studio.name}</p>
+                </div>
+              </div>
+            )}
+
+            <div style={{ background: "rgba(244,114,182,0.04)", border: "1px solid rgba(244,114,182,0.2)", borderRadius: "24px", padding: "32px" }}>
+              <h2 style={{ margin: "0 0 8px", fontSize: "22px", fontWeight: 800, color: "#f472b6" }}>Build Your Personal Brand</h2>
+              <p style={{ margin: "0 0 24px", fontSize: "13px", color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
+                Your brand is how people experience you in the PFLX ecosystem. Complete the steps below to establish your creative identity.
+              </p>
+
+              {/* Step 1: Brand Name */}
+              <div style={{ marginBottom: "24px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+                  <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "rgba(0,212,255,0.15)", border: "1px solid rgba(0,212,255,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 900, color: CYAN }}>1</div>
+                  <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: CYAN }}>Brand Name</p>
+                </div>
+                <p style={{ margin: "0 0 8px", fontSize: "12px", color: "rgba(255,255,255,0.35)" }}>
+                  Keep it memorable, easy to say/spell, and future-proof. You can keep your character name, shorten it, or add a twist.
+                </p>
+                <input
+                  value={brandName}
+                  onChange={e => setBrandName(e.target.value)}
+                  placeholder="e.g., LumaTech, NovaCreates, PixelForge"
+                  style={{ width: "100%", padding: "14px 16px", borderRadius: "10px", border: "1px solid rgba(244,114,182,0.25)", background: "rgba(244,114,182,0.04)", color: "#fff", fontSize: "15px", fontWeight: 600, outline: "none", boxSizing: "border-box" }}
+                />
+              </div>
+
+              {/* Step 2: Slogan */}
+              <div style={{ marginBottom: "24px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+                  <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 900, color: "#a78bfa" }}>2</div>
+                  <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#a78bfa" }}>Slogan / Tagline</p>
+                </div>
+                <p style={{ margin: "0 0 8px", fontSize: "12px", color: "rgba(255,255,255,0.35)" }}>
+                  A short, punchy line that captures your brand&apos;s promise or energy. Aim for 3-7 words.
+                </p>
+                <input
+                  value={slogan}
+                  onChange={e => setSlogan(e.target.value)}
+                  placeholder="e.g., Building tomorrow's worlds today"
+                  style={{ width: "100%", padding: "14px 16px", borderRadius: "10px", border: "1px solid rgba(167,139,250,0.25)", background: "rgba(167,139,250,0.04)", color: "#fff", fontSize: "15px", fontWeight: 600, outline: "none", boxSizing: "border-box" }}
+                />
+              </div>
+
+              {/* Remaining steps info */}
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "16px", marginBottom: "8px" }}>
+                <p style={{ margin: "0 0 10px", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Complete these in Canva (links available in your dashboard)</p>
+                {[
+                  { num: "3", label: "Logo Design", sub: "Create in Canva — simple, scalable", color: "#f5c842" },
+                  { num: "4", label: "Color Palette", sub: "3-5 colors with hex codes", color: "#22c55e" },
+                  { num: "5", label: "Typography", sub: "One headline + one body font", color: "#06b6d4" },
+                  { num: "6", label: "Brand Board", sub: "Assemble everything on one Canva slide", color: "#ef4444" },
+                ].map(s => (
+                  <div key={s.num} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                    <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", border: `1px solid rgba(255,255,255,0.1)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: 900, color: s.color, flexShrink: 0 }}>{s.num}</div>
+                    <div>
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: s.color }}>{s.label}</span>
+                      <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginLeft: "6px" }}>{s.sub}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={handleBrandingComplete}
+              disabled={!brandName.trim()}
+              style={{ padding: "18px", borderRadius: "14px", border: "none", cursor: brandName.trim() ? "pointer" : "not-allowed", background: brandName.trim() ? "linear-gradient(90deg,#f472b6,#a78bfa)" : "rgba(255,255,255,0.06)", color: brandName.trim() ? "#fff" : "rgba(255,255,255,0.2)", fontSize: "15px", fontWeight: 900, letterSpacing: "0.06em" }}>
+              COMPLETE ONBOARDING &rarr;
+            </button>
+          </div>
+        )}
+
+        {/* ── WELCOME / COMPLETE ── */}
+        {step === "welcome" && studio && (
           <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
             <div style={{ textAlign: "center", marginBottom: "8px" }}>
-              <p style={{ margin: "0 0 8px", fontSize: "13px", fontWeight: 700, letterSpacing: "0.15em", color: "rgba(255,255,255,0.4)" }}>YOU HAVE BEEN PLACED IN</p>
-              <h2 style={{ margin: 0, fontSize: "13px", fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.3)" }}>WELCOME TO YOUR STUDIO</h2>
+              <div style={{ fontSize: "48px", marginBottom: "12px" }}>{"\uD83C\uDF89"}</div>
+              <h2 style={{ margin: "0 0 6px", fontSize: "28px", fontWeight: 900, background: "linear-gradient(90deg,#00d4ff,#a78bfa,#f472b6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Onboarding Complete!</h2>
+              <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>Welcome to the PFLX ecosystem, {brandName || user.brandName || user.name}</p>
             </div>
 
             {/* Studio card */}
             <div style={{
-              background: `rgba(${assignedStudio.colorRgb},0.08)`,
-              border: `2px solid rgba(${assignedStudio.colorRgb},0.4)`,
+              background: `rgba(${studio.colorRgb},0.08)`,
+              border: `2px solid rgba(${studio.colorRgb},0.4)`,
               borderRadius: "28px", padding: "40px 32px", textAlign: "center", position: "relative",
-              boxShadow: `0 0 40px rgba(${assignedStudio.colorRgb},0.15), inset 0 0 40px rgba(${assignedStudio.colorRgb},0.04)`,
+              boxShadow: `0 0 40px rgba(${studio.colorRgb},0.15), inset 0 0 40px rgba(${studio.colorRgb},0.04)`,
             }}>
-              <div style={{ position: "absolute", top: "10px", left: "10px", width: "18px", height: "18px", border: `2px solid rgba(${assignedStudio.colorRgb},0.5)`, borderRight: "none", borderBottom: "none", borderRadius: "2px" }} />
-              <div style={{ position: "absolute", top: "10px", right: "10px", width: "18px", height: "18px", border: `2px solid rgba(${assignedStudio.colorRgb},0.5)`, borderLeft: "none", borderBottom: "none", borderRadius: "2px" }} />
-              <div style={{ position: "absolute", bottom: "10px", left: "10px", width: "18px", height: "18px", border: `2px solid rgba(${assignedStudio.colorRgb},0.5)`, borderRight: "none", borderTop: "none", borderRadius: "2px" }} />
-              <div style={{ position: "absolute", bottom: "10px", right: "10px", width: "18px", height: "18px", border: `2px solid rgba(${assignedStudio.colorRgb},0.5)`, borderLeft: "none", borderTop: "none", borderRadius: "2px" }} />
+              <div style={{ position: "absolute", top: "10px", left: "10px", width: "18px", height: "18px", border: `2px solid rgba(${studio.colorRgb},0.5)`, borderRight: "none", borderBottom: "none", borderRadius: "2px" }} />
+              <div style={{ position: "absolute", top: "10px", right: "10px", width: "18px", height: "18px", border: `2px solid rgba(${studio.colorRgb},0.5)`, borderLeft: "none", borderBottom: "none", borderRadius: "2px" }} />
+              <div style={{ position: "absolute", bottom: "10px", left: "10px", width: "18px", height: "18px", border: `2px solid rgba(${studio.colorRgb},0.5)`, borderRight: "none", borderTop: "none", borderRadius: "2px" }} />
+              <div style={{ position: "absolute", bottom: "10px", right: "10px", width: "18px", height: "18px", border: `2px solid rgba(${studio.colorRgb},0.5)`, borderLeft: "none", borderTop: "none", borderRadius: "2px" }} />
 
-              <div style={{ width: "80px", height: "80px", borderRadius: "20px", background: `rgba(${assignedStudio.colorRgb},0.15)`, border: `2px solid rgba(${assignedStudio.colorRgb},0.4)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "40px", margin: "0 auto 20px" }}>
-                {assignedStudio.icon}
+              <div style={{ width: "80px", height: "80px", borderRadius: "20px", background: `rgba(${studio.colorRgb},0.15)`, border: `2px solid rgba(${studio.colorRgb},0.4)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "40px", margin: "0 auto 20px" }}>
+                {studio.icon}
               </div>
-              <p style={{ margin: "0 0 6px", fontSize: "12px", letterSpacing: "0.18em", color: `rgba(${assignedStudio.colorRgb},0.7)`, fontWeight: 700 }}>YOUR STARTUP STUDIO</p>
-              <h2 style={{ margin: "0 0 8px", fontSize: "32px", fontWeight: 900, color: assignedStudio.color }}>{assignedStudio.name}</h2>
-              <p style={{ margin: "0 0 20px", fontSize: "14px", fontStyle: "italic", color: "rgba(255,255,255,0.4)" }}>"{assignedStudio.tagline}"</p>
-              <p style={{ margin: "0 0 24px", fontSize: "13px", color: "rgba(255,255,255,0.55)", lineHeight: 1.7 }}>{assignedStudio.description}</p>
+              <p style={{ margin: "0 0 6px", fontSize: "12px", letterSpacing: "0.18em", color: `rgba(${studio.colorRgb},0.7)`, fontWeight: 700 }}>YOUR STARTUP STUDIO</p>
+              <h2 style={{ margin: "0 0 8px", fontSize: "32px", fontWeight: 900, color: studio.color }}>{studio.name}</h2>
+              <p style={{ margin: "0 0 20px", fontSize: "14px", fontStyle: "italic", color: "rgba(255,255,255,0.4)" }}>&quot;{studio.tagline}&quot;</p>
+              <p style={{ margin: "0 0 24px", fontSize: "13px", color: "rgba(255,255,255,0.55)", lineHeight: 1.7 }}>{studio.description}</p>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center", marginBottom: "24px" }}>
-                {assignedStudio.themes.map(t => (
-                  <span key={t} style={{ padding: "4px 12px", borderRadius: "100px", background: `rgba(${assignedStudio.colorRgb},0.12)`, border: `1px solid rgba(${assignedStudio.colorRgb},0.3)`, color: assignedStudio.color, fontSize: "11px", fontWeight: 700 }}>{t}</span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center" }}>
+                {studio.themes.map(t => (
+                  <span key={t} style={{ padding: "4px 12px", borderRadius: "100px", background: `rgba(${studio.colorRgb},0.12)`, border: `1px solid rgba(${studio.colorRgb},0.3)`, color: studio.color, fontSize: "11px", fontWeight: 700 }}>{t}</span>
                 ))}
-              </div>
-
-              <div style={{ background: "rgba(0,0,0,0.4)", borderRadius: "12px", padding: "14px 20px", textAlign: "left" }}>
-                <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Visual Aesthetic</p>
-                <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.5)", fontStyle: "italic" }}>{assignedStudio.visualAesthetic}</p>
               </div>
             </div>
 
@@ -543,10 +794,10 @@ export default function DiagnosticPage() {
             <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "18px", padding: "24px" }}>
               <p style={{ margin: "0 0 16px", fontSize: "13px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.1em" }}>What happens next</p>
               {[
-                { icon: "🏢", text: "Your Studio is your team — compete on the leaderboard and earn studio XC together" },
-                { icon: "💰", text: "Stake XC in your Studio pool and earn returns as the studio grows" },
-                { icon: "📈", text: "Higher Evo Ranks unlock bigger stake percentages and studio leadership abilities" },
-                { icon: "🏆", text: "Studios compete every season — corporate tax is deducted at the end of each season" },
+                { icon: "\uD83C\uDFE2", text: "Your Studio is your team \u2014 compete on the leaderboard and earn studio XC together" },
+                { icon: "\uD83D\uDCB0", text: "Stake XC in your Studio pool and earn returns as the studio grows" },
+                { icon: "\uD83D\uDCC8", text: "Higher Evo Ranks unlock bigger stake percentages and studio leadership abilities" },
+                { icon: "\uD83C\uDFC6", text: "Studios compete every season \u2014 corporate tax is deducted at the end of each season" },
               ].map((item, i) => (
                 <div key={i} style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
                   <span style={{ fontSize: "18px", flexShrink: 0 }}>{item.icon}</span>
@@ -557,8 +808,8 @@ export default function DiagnosticPage() {
 
             <button
               onClick={() => router.push("/player")}
-              style={{ padding: "20px", borderRadius: "14px", border: "none", cursor: "pointer", background: `linear-gradient(90deg, ${assignedStudio.color}, #a78bfa)`, color: "#fff", fontSize: "16px", fontWeight: 900, letterSpacing: "0.06em", boxShadow: `0 0 24px rgba(${assignedStudio.colorRgb},0.4)` }}>
-              ENTER THE ECOSYSTEM →
+              style={{ padding: "20px", borderRadius: "14px", border: "none", cursor: "pointer", background: `linear-gradient(90deg, ${studio.color}, #a78bfa)`, color: "#fff", fontSize: "16px", fontWeight: 900, letterSpacing: "0.06em", boxShadow: `0 0 24px rgba(${studio.colorRgb},0.4)` }}>
+              ENTER THE ECOSYSTEM &rarr;
             </button>
           </div>
         )}

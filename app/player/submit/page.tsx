@@ -41,8 +41,9 @@ export default function PlayerSubmit() {
     const stored = localStorage.getItem("pflx_user");
     if (!stored) { router.push("/"); return; }
     const userData = JSON.parse(stored) as User;
+    if (!userData.onboardingComplete) { router.push("/diagnostic"); return; }
     setUser(userData);
-    
+
     // Filter all activities for this player
     import("../../lib/data").then(data => {
       const subs = data.mockSubmissions.filter(s => s.playerId === userData.id).map(s => ({ ...s, type: 'coin', date: s.submittedAt }));

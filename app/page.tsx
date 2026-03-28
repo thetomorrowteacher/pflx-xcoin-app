@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { mockUsers, isHostUser } from "./lib/data";
 
-type Step = "select" | "pin";
+type Step = "select" | "pin" | "change-pin";
 
 export default function Home() {
   const router = useRouter();
@@ -19,6 +19,10 @@ export default function Home() {
   const [emailError, setEmailError] = useState("");
   const [pinError, setPinError] = useState("");
   const [btnHover, setBtnHover] = useState(false);
+  // Change-PIN state
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [changePinError, setChangePinError] = useState("");
 
   useEffect(() => {
     const saved = localStorage.getItem("pflx_remembered_email");
@@ -56,11 +60,18 @@ export default function Home() {
     const correctPin = selectedUser.pin ?? (selectedUser.role === "admin" ? "0000" : "1234");
     if (pin === correctPin) {
       if (rememberEmail && selectedUser.email) localStorage.setItem("pflx_remembered_email", selectedUser.email);
+
+      // If player hasn't changed PIN yet, go to change-pin step
+      if (selectedUser.role === "player" && !selectedUser.isHost && selectedUser.pinChanged === false) {
+        setStep("change-pin");
+        return;
+      }
+
       localStorage.setItem("pflx_user", JSON.stringify(selectedUser));
       if (keepSignedIn) localStorage.setItem("pflx_keep_signed_in", "true");
       if (isHostUser(selectedUser)) {
         router.push("/admin");
-      } else if (!selectedUser.diagnosticComplete) {
+      } else if (!selectedUser.onboardingComplete) {
         router.push("/diagnostic");
       } else {
         router.push("/player");
@@ -71,7 +82,32 @@ export default function Home() {
     }
   };
 
-  const goBack = () => { setStep("select"); setPin(""); setPinError(""); setSelectedId(null); };
+  const handleChangePin = () => {
+    setChangePinError("");
+    if (newPin.length < 4) { setChangePinError("PIN must be at least 4 digits"); return; }
+    if (newPin !== confirmPin) { setChangePinError("PINs do not match"); return; }
+    if (!selectedUser) return;
+
+    // Update in mockUsers
+    const idx = mockUsers.findIndex(u => u.id === selectedUser.id);
+    if (idx >= 0) {
+      mockUsers[idx].pin = newPin;
+      mockUsers[idx].pinChanged = true;
+    }
+
+    const updatedUser = { ...selectedUser, pin: newPin, pinChanged: true };
+    localStorage.setItem("pflx_user", JSON.stringify(updatedUser));
+    if (keepSignedIn) localStorage.setItem("pflx_keep_signed_in", "true");
+
+    // Now route based on onboarding status
+    if (!updatedUser.onboardingComplete) {
+      router.push("/diagnostic");
+    } else {
+      router.push("/player");
+    }
+  };
+
+  const goBack = () => { setStep("select"); setPin(""); setPinError(""); setSelectedId(null); setNewPin(""); setConfirmPin(""); setChangePinError(""); };
 
   // ── Design tokens ─────────────────────────────────────────────────────────
   const CYAN = "#00d4ff";
@@ -211,7 +247,7 @@ export default function Home() {
                     cursor: "pointer", transition: "all .15s",
                   }}
                 >
-                  {rememberEmail && <span style={{ color: CYAN, fontSize: "10px", fontWeight: 900 }}>✓</span>}
+                  {rememberEmail && <span style={{ color: CYAN, fontSize: "10px", fontWeight: 900 }}>&#x2713;</span>}
                 </div>
                 REMEMBER EMAIL ON THIS DEVICE
               </label>
@@ -260,23 +296,23 @@ export default function Home() {
                       color: "rgba(255,255,255,0.55)",
                     }}
                   >
-                    <option value="" disabled style={{ background: "#0a1218" }}>Select your brand name…</option>
+                    <option value="" disabled style={{ background: "#0a1218" }}>Select your brand name&hellip;</option>
                     <optgroup label="── Host ──" style={{ background: "#0a1218", color: CYAN_DIM }}>
                       {hosts.map(h => (
                         <option key={h.id} value={h.id} style={{ background: "#0a1218", color: "#fff" }}>
-                          🛡 {h.brandName ?? h.name}{h.isHost ? " (Co-Host)" : ""}
+                          &#x1F6E1; {h.brandName ?? h.name}{h.isHost ? " (Co-Host)" : ""}
                         </option>
                       ))}
                     </optgroup>
                     <optgroup label="── Players ──" style={{ background: "#0a1218", color: CYAN_DIM }}>
                       {players.map(p => (
                         <option key={p.id} value={p.id} style={{ background: "#0a1218", color: "#fff" }}>
-                          {p.brandName ?? p.name} — {p.name}
+                          {p.brandName ?? p.name} &mdash; {p.name}
                         </option>
                       ))}
                     </optgroup>
                   </select>
-                  <span style={{ position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: CYAN_DIM, fontSize: "11px" }}>▾</span>
+                  <span style={{ position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: CYAN_DIM, fontSize: "11px" }}>&#x25BE;</span>
                 </div>
               </div>
 
@@ -337,10 +373,10 @@ export default function Home() {
                   <input
                     type={showPin ? "text" : "password"}
                     value={pin}
-                    onChange={e => { setPin(e.target.value.slice(0, 4)); setPinError(""); }}
-                    onKeyDown={e => e.key === "Enter" && pin.length === 4 && handleSignIn()}
-                    placeholder="••••"
-                    maxLength={4}
+                    onChange={e => { setPin(e.target.value.slice(0, 6)); setPinError(""); }}
+                    onKeyDown={e => e.key === "Enter" && pin.length >= 4 && handleSignIn()}
+                    placeholder="&#x2022;&#x2022;&#x2022;&#x2022;"
+                    maxLength={6}
                     style={{
                       ...(pinError ? inputErr : inputStyle),
                       letterSpacing: showPin ? "0.2em" : "0.5em",
@@ -354,7 +390,7 @@ export default function Home() {
                     onClick={() => setShowPin(s => !s)}
                     style={{ position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: CYAN_DIM, fontSize: "16px" }}
                   >
-                    {showPin ? "🙈" : "👁"}
+                    {showPin ? "\uD83D\uDE48" : "\uD83D\uDC41"}
                   </button>
                 </div>
                 {pinError && <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#ff6b6b", letterSpacing: "0.02em" }}>{pinError}</p>}
@@ -373,7 +409,7 @@ export default function Home() {
                       cursor: "pointer", transition: "all .15s",
                     }}
                   >
-                    {keepSignedIn && <span style={{ color: CYAN, fontSize: "9px", fontWeight: 900 }}>✓</span>}
+                    {keepSignedIn && <span style={{ color: CYAN, fontSize: "9px", fontWeight: 900 }}>&#x2713;</span>}
                   </div>
                   KEEP ME SIGNED IN
                 </label>
@@ -393,17 +429,17 @@ export default function Home() {
                 style={{
                   width: "100%", padding: "14px",
                   borderRadius: "8px", border: "none",
-                  background: pin.length === 4
+                  background: pin.length >= 4
                     ? "linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%)"
                     : "rgba(255,255,255,0.06)",
-                  color: pin.length === 4 ? "#ffffff" : "rgba(255,255,255,0.2)",
+                  color: pin.length >= 4 ? "#ffffff" : "rgba(255,255,255,0.2)",
                   fontSize: "13px", fontWeight: 800,
                   letterSpacing: "0.12em", textTransform: "uppercase",
-                  cursor: pin.length === 4 ? "pointer" : "default",
+                  cursor: pin.length >= 4 ? "pointer" : "default",
                   marginBottom: "12px",
                   transition: "all .2s",
-                  boxShadow: pin.length === 4 && btnHover ? "0 0 24px rgba(0,212,255,0.3)" : "none",
-                  transform: pin.length === 4 && btnHover ? "translateY(-1px)" : "none",
+                  boxShadow: pin.length >= 4 && btnHover ? "0 0 24px rgba(0,212,255,0.3)" : "none",
+                  transform: pin.length >= 4 && btnHover ? "translateY(-1px)" : "none",
                 }}>
                 Initialize Session
               </button>
@@ -421,6 +457,88 @@ export default function Home() {
                   cursor: "pointer",
                 }}>
                 Claim Player Account
+              </button>
+            </>
+          )}
+
+          {/* ══ STEP 3: CHANGE PIN ══════════════════════════════════════ */}
+          {step === "change-pin" && selectedUser && (
+            <>
+              <div style={{
+                display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px",
+                background: "rgba(245,200,66,0.08)", border: "1px solid rgba(245,200,66,0.25)",
+                borderRadius: "10px", marginBottom: "20px",
+              }}>
+                <span style={{ fontSize: "18px" }}>&#x1F510;</span>
+                <div>
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#f5c842", letterSpacing: "0.05em" }}>CREATE YOUR PERSONAL PIN</div>
+                  <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>
+                    Replace your temporary PIN with one you&apos;ll remember
+                  </div>
+                </div>
+              </div>
+
+              {/* New PIN */}
+              <div style={{ marginBottom: "16px" }}>
+                <label style={labelStyle}>New PIN (4-6 digits)</label>
+                <input
+                  type="password"
+                  value={newPin}
+                  onChange={e => { setNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6)); setChangePinError(""); }}
+                  placeholder="Enter new PIN"
+                  maxLength={6}
+                  style={{
+                    ...inputStyle,
+                    letterSpacing: "0.3em",
+                    fontSize: "20px",
+                    textAlign: "center",
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              {/* Confirm PIN */}
+              <div style={{ marginBottom: "16px" }}>
+                <label style={labelStyle}>Confirm PIN</label>
+                <input
+                  type="password"
+                  value={confirmPin}
+                  onChange={e => { setConfirmPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6)); setChangePinError(""); }}
+                  onKeyDown={e => e.key === "Enter" && newPin.length >= 4 && confirmPin.length >= 4 && handleChangePin()}
+                  placeholder="Re-enter new PIN"
+                  maxLength={6}
+                  style={{
+                    ...inputStyle,
+                    letterSpacing: "0.3em",
+                    fontSize: "20px",
+                    textAlign: "center",
+                  }}
+                />
+              </div>
+
+              {changePinError && (
+                <p style={{ margin: "0 0 16px", fontSize: "12px", color: "#ff6b6b", textAlign: "center" }}>{changePinError}</p>
+              )}
+
+              <button
+                onClick={handleChangePin}
+                disabled={newPin.length < 4 || confirmPin.length < 4}
+                onMouseEnter={() => setBtnHover(true)}
+                onMouseLeave={() => setBtnHover(false)}
+                style={{
+                  width: "100%", padding: "14px",
+                  borderRadius: "8px", border: "none",
+                  background: newPin.length >= 4 && confirmPin.length >= 4
+                    ? "linear-gradient(135deg, #f5c842 0%, #f97316 100%)"
+                    : "rgba(255,255,255,0.06)",
+                  color: newPin.length >= 4 && confirmPin.length >= 4 ? "#000" : "rgba(255,255,255,0.2)",
+                  fontSize: "13px", fontWeight: 800,
+                  letterSpacing: "0.12em", textTransform: "uppercase",
+                  cursor: newPin.length >= 4 && confirmPin.length >= 4 ? "pointer" : "default",
+                  transition: "all .2s",
+                  boxShadow: newPin.length >= 4 && confirmPin.length >= 4 && btnHover ? "0 0 24px rgba(245,200,66,0.3)" : "none",
+                }}>
+                Set My PIN &amp; Continue
               </button>
             </>
           )}

@@ -16,6 +16,7 @@ export default function PlayerTasks() {
     if (!stored) { router.push("/"); return; }
     const u = JSON.parse(stored) as User;
     if (u.role !== "player") { router.push("/admin"); return; }
+    if (!u.onboardingComplete) { router.push("/diagnostic"); return; }
     setUser(u);
   }, [router]);
 

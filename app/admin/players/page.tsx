@@ -1272,21 +1272,30 @@ function EditPlayerForm({ player, onSave, onCancel }: {
           alignItems: "center",
           marginBottom: "12px",
         }}>
-          <div style={{
-            flex: 1,
-            padding: "10px 14px",
-            background: "rgba(6,9,13,0.8)",
-            border: "1px solid rgba(0,212,255,0.2)",
-            borderRadius: "8px",
-            color: "#00d4ff",
-            fontSize: "14px",
-            fontWeight: "700",
-            fontFamily: "monospace",
-            textShadow: "0 0 8px rgba(0,212,255,0.3)",
-            letterSpacing: "2px",
-          }}>
-            {showPin ? form.pin : "••••••"}
-          </div>
+          <input
+            type={showPin ? "text" : "password"}
+            value={form.pin ?? ""}
+            onChange={(e) => {
+              const v = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
+              setForm(f => ({ ...f, pin: v }));
+            }}
+            placeholder="Enter custom PIN"
+            maxLength={6}
+            style={{
+              flex: 1,
+              padding: "10px 14px",
+              background: "rgba(6,9,13,0.8)",
+              border: "1px solid rgba(0,212,255,0.2)",
+              borderRadius: "8px",
+              color: "#00d4ff",
+              fontSize: "14px",
+              fontWeight: "700",
+              fontFamily: "monospace",
+              textShadow: "0 0 8px rgba(0,212,255,0.3)",
+              letterSpacing: "2px",
+              outline: "none",
+            }}
+          />
           <button
             onClick={() => setShowPin(!showPin)}
             style={{
@@ -1363,9 +1372,12 @@ function EditPlayerForm({ player, onSave, onCancel }: {
               e.currentTarget.style.textShadow = "0 0 6px rgba(0,212,255,0.2)";
             }}
           >
-            Reset
+            Generate
           </button>
         </div>
+        <p style={{ margin: 0, fontSize: "10px", color: "rgba(255,255,255,0.25)", letterSpacing: "0.03em" }}>
+          Enter a custom PIN or click Generate for a random one. Players will use this to sign in.
+        </p>
       </div>
 
       <div style={{ borderTop: "1px solid rgba(0,212,255,0.1)", paddingTop: "16px" }}>

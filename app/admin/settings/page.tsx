@@ -12,7 +12,19 @@ import { compressImage, compressBannerImage } from "../../lib/imageUtils";
 export default function AdminSettings() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<"seasons" | "ranks" | "sound">("seasons");
+  const [activeTab, setActiveTab] = useState<"seasons" | "ranks" | "sound" | "onboarding">("seasons");
+  const [onboardingFineXC, setOnboardingFineXC] = useState(() => {
+    if (typeof window !== "undefined") {
+      return parseInt(localStorage.getItem("pflx_onboarding_fine") || "10");
+    }
+    return 10;
+  });
+  const [onboardingFineEnabled, setOnboardingFineEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("pflx_onboarding_fine_enabled") !== "false";
+    }
+    return true;
+  });
   const [soundSettings, setSoundSettings] = useState<SoundSettings>(getSoundSettings());
 
   const [ranks, setRanks] = useState<PFLXRank[]>(mockPflxRanks);
@@ -151,8 +163,8 @@ export default function AdminSettings() {
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: "8px", marginBottom: "32px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "16px" }}>
-          {(["seasons", "ranks", "sound"] as const).map(tab => {
-            const tabColors: Record<string, string> = { seasons: "#f5c842", ranks: "#4f8ef7", sound: "#22c55e" };
+          {(["seasons", "ranks", "sound", "onboarding"] as const).map(tab => {
+            const tabColors: Record<string, string> = { seasons: "#f5c842", ranks: "#4f8ef7", sound: "#22c55e", onboarding: "#f472b6" };
             const isActive = activeTab === tab;
             return (
               <button
@@ -166,7 +178,7 @@ export default function AdminSettings() {
                   borderBottom: isActive ? `2px solid ${tabColors[tab]}` : "2px solid transparent",
                 }}
               >
-                {tab === "seasons" ? "🗓️ Seasons" : tab === "ranks" ? "⚡ Evolution Rankings" : "🔊 Sound Settings"}
+                {tab === "seasons" ? "🗓️ Seasons" : tab === "ranks" ? "⚡ Evolution Rankings" : tab === "sound" ? "🔊 Sound Settings" : "🧬 Onboarding"}
               </button>
             );
           })}
@@ -683,6 +695,102 @@ export default function AdminSettings() {
             </div>
             <input type="file" ref={periodFileInputRef} onChange={handlePeriodImageUpload} accept="image/*" style={{ display: "none" }} />
           </div>
+        </div>
+      )}
+      {/* ── ONBOARDING TAB ── */}
+      {activeTab === "onboarding" && (
+        <div style={{ maxWidth: "640px" }}>
+          <div style={{ background: "rgba(244,114,182,0.04)", border: "1px solid rgba(244,114,182,0.2)", borderRadius: "18px", padding: "28px", marginBottom: "20px" }}>
+            <h3 style={{ margin: "0 0 16px", fontSize: "18px", fontWeight: 800, color: "#f472b6" }}>Onboarding Fine (Weekly Tax)</h3>
+            <p style={{ margin: "0 0 20px", fontSize: "13px", color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
+              Players who have not completed their onboarding (diagnostic + personal branding) will receive a weekly fine deducted from their XC balance. This encourages players to complete the onboarding process promptly.
+            </p>
+
+            {/* Enable/disable toggle */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", background: "rgba(255,255,255,0.03)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.08)", marginBottom: "16px" }}>
+              <div>
+                <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#f472b6" }}>Weekly Onboarding Fine</p>
+                <p style={{ margin: "2px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>Auto-deduct XC from incomplete players each week</p>
+              </div>
+              <button
+                onClick={() => {
+                  const next = !onboardingFineEnabled;
+                  setOnboardingFineEnabled(next);
+                  localStorage.setItem("pflx_onboarding_fine_enabled", String(next));
+                  playToggle && playToggle();
+                }}
+                style={{
+                  width: "48px", height: "26px", borderRadius: "13px", border: "none", cursor: "pointer",
+                  background: onboardingFineEnabled ? "#f472b6" : "rgba(255,255,255,0.1)",
+                  position: "relative", transition: "all 0.2s",
+                }}
+              >
+                <div style={{
+                  width: "20px", height: "20px", borderRadius: "50%", background: "#fff",
+                  position: "absolute", top: "3px", transition: "left 0.2s",
+                  left: onboardingFineEnabled ? "25px" : "3px",
+                }} />
+              </button>
+            </div>
+
+            {/* Fine amount */}
+            <div style={{ padding: "14px 18px", background: "rgba(255,255,255,0.03)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.08)", marginBottom: "16px" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#f472b6", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "8px" }}>Fine Amount (XC per week)</label>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  value={onboardingFineXC}
+                  onChange={e => {
+                    const val = parseInt(e.target.value);
+                    setOnboardingFineXC(val);
+                    localStorage.setItem("pflx_onboarding_fine", String(val));
+                  }}
+                  style={{ flex: 1, accentColor: "#f472b6" }}
+                />
+                <div style={{
+                  padding: "8px 16px", borderRadius: "8px",
+                  background: "rgba(244,114,182,0.1)", border: "1px solid rgba(244,114,182,0.3)",
+                  color: "#f472b6", fontWeight: 900, fontSize: "16px", fontFamily: "monospace",
+                  minWidth: "60px", textAlign: "center",
+                }}>
+                  {onboardingFineXC} XC
+                </div>
+              </div>
+              <p style={{ margin: "8px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>
+                Common values: 5 XC (gentle reminder), 25 XC (moderate), 50+ XC (aggressive)
+              </p>
+            </div>
+
+            {/* Incomplete players info */}
+            <div style={{ padding: "14px 18px", background: "rgba(255,255,255,0.02)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.1em" }}>How it works</p>
+              <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
+                <p style={{ margin: "0 0 6px" }}>1. Players who haven&apos;t completed onboarding are flagged</p>
+                <p style={{ margin: "0 0 6px" }}>2. Each week, {onboardingFineXC} XC is deducted from their balance</p>
+                <p style={{ margin: "0 0 6px" }}>3. A notification is shown on their dashboard reminding them</p>
+                <p style={{ margin: 0 }}>4. Once onboarding is complete, the fine stops and a completion badge is awarded</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Save button */}
+          <button
+            onClick={() => {
+              localStorage.setItem("pflx_onboarding_fine", String(onboardingFineXC));
+              localStorage.setItem("pflx_onboarding_fine_enabled", String(onboardingFineEnabled));
+              playSuccess && playSuccess();
+              showToast("Onboarding settings saved!", "success");
+            }}
+            style={{
+              width: "100%", padding: "14px", borderRadius: "12px", border: "none",
+              background: "linear-gradient(90deg, #f472b6, #a78bfa)", color: "#fff",
+              fontSize: "14px", fontWeight: 800, letterSpacing: "0.06em", cursor: "pointer",
+            }}
+          >
+            Save Onboarding Settings
+          </button>
         </div>
       )}
     </div>

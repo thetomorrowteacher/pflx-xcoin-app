@@ -61,6 +61,7 @@ export default function PlayerHome() {
     try {
       let u = JSON.parse(stored) as User;
       if (u.role !== "player") { router.push("/admin"); return; }
+      if (!u.onboardingComplete) { router.push("/diagnostic"); return; }
 
       // Merge with live mockUsers to pick up any admin changes this session
       const fresh = mockUsers.find(mu => mu.id === u.id);

@@ -4,8 +4,11 @@ import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
 import {
   User, mockUsers, DiagnosticResult, mockStartupStudios,
+  assignStudioFromVisionText,
 } from "../../lib/data";
 import { mergePlayerStats } from "../../lib/playerStats";
+import { saveUsers } from "../../lib/store";
+import { saveAndToast } from "../../lib/saveToast";
 
 const CYAN = "#00d4ff";
 
@@ -58,6 +61,11 @@ export default function PlayerOptions() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [activeSection, setActiveSection] = useState<"onboarding" | null>("onboarding");
+  const [editMode, setEditMode] = useState(false);
+  const [editBrandType, setEditBrandType] = useState("");
+  const [editPathways, setEditPathways] = useState<string[]>([]);
+  const [editVision, setEditVision] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
@@ -76,6 +84,49 @@ export default function PlayerOptions() {
 
   const dr = user.diagnosticResult;
   const studio = mockStartupStudios.find(s => s.id === user.studioId);
+
+  const startEdit = () => {
+    if (!dr) return;
+    setEditBrandType(dr.brandType);
+    setEditPathways([...dr.topPathways]);
+    const vs = dr.visionStatement;
+    setEditVision(vs ? [vs.create, vs.impact, vs.perspective, vs.future].filter(Boolean).join(". ") : "");
+    setEditMode(true);
+  };
+
+  const saveEdit = async () => {
+    if (!user || !dr) return;
+    setSaving(true);
+    const newBrandType = (editBrandType || dr.brandType) as DiagnosticResult["brandType"];
+    const newPathways = editPathways.length > 0 ? editPathways : dr.topPathways;
+    const studioId = assignStudioFromVisionText(editVision || "creative experiences");
+
+    const updatedResult: DiagnosticResult = {
+      ...dr,
+      brandType: newBrandType,
+      topPathways: newPathways,
+      visionStatement: { create: editVision, impact: "", perspective: "", future: "" },
+    };
+    const updatedUser: User = {
+      ...user,
+      diagnosticResult: updatedResult,
+      studioId,
+      pathway: pathwayLabels[newPathways[0]]?.name || user.pathway,
+    };
+    const idx = mockUsers.findIndex(u => u.id === user.id);
+    if (idx >= 0) {
+      mockUsers[idx] = updatedUser;
+      const sIdx = mockStartupStudios.findIndex(s => s.id === studioId);
+      if (sIdx >= 0 && !mockStartupStudios[sIdx].members.includes(user.id)) {
+        mockStartupStudios[sIdx].members.push(user.id);
+      }
+    }
+    localStorage.setItem("pflx_user", JSON.stringify(updatedUser));
+    await saveAndToast([saveUsers], "Onboarding results updated — saved to cloud ✓");
+    setUser(updatedUser);
+    setEditMode(false);
+    setSaving(false);
+  };
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#0a0a0f", fontFamily: "'Inter','Segoe UI',sans-serif" }}>
@@ -136,8 +187,76 @@ export default function PlayerOptions() {
                   You haven&apos;t completed the Player Onboarding assessment yet.
                 </p>
               </div>
+            ) : editMode ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                <div style={{ background: "rgba(245,200,66,0.05)", border: "1px solid rgba(245,200,66,0.2)", borderRadius: "18px", padding: "24px" }}>
+                  <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 800, color: "#f5c842" }}>Edit Onboarding Results</h3>
+                  <p style={{ margin: "0 0 20px", fontSize: "12px", color: "rgba(255,255,255,0.4)", lineHeight: 1.6 }}>
+                    Update your results below. The AI will re-analyze your vision to match you with the best Startup Studio.
+                  </p>
+
+                  {/* Brand Type */}
+                  <div style={{ marginBottom: "20px" }}>
+                    <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: CYAN, letterSpacing: "0.1em", textTransform: "uppercase" }}>Personality Brand Type</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                      {Object.entries(brandTypes).map(([key, bt]) => (
+                        <button key={key} onClick={() => setEditBrandType(key)}
+                          style={{ padding: "10px", borderRadius: "10px", border: `2px solid ${editBrandType === key ? CYAN : "rgba(255,255,255,0.08)"}`, background: editBrandType === key ? "rgba(0,212,255,0.08)" : "transparent", color: editBrandType === key ? CYAN : "rgba(255,255,255,0.5)", fontSize: "11px", fontWeight: 700, textAlign: "left", cursor: "pointer" }}>
+                          {bt.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Pathways */}
+                  <div style={{ marginBottom: "20px" }}>
+                    <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: CYAN, letterSpacing: "0.1em", textTransform: "uppercase" }}>Top Pathways (select up to 3)</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                      {Object.entries(pathwayLabels).map(([key, pw]) => (
+                        <button key={key} onClick={() => {
+                          setEditPathways(prev => prev.includes(key) ? prev.filter(p => p !== key) : prev.length < 3 ? [...prev, key] : prev);
+                        }}
+                          style={{ padding: "10px", borderRadius: "10px", border: `2px solid ${editPathways.includes(key) ? "#a78bfa" : "rgba(255,255,255,0.08)"}`, background: editPathways.includes(key) ? "rgba(167,139,250,0.08)" : "transparent", color: editPathways.includes(key) ? "#a78bfa" : "rgba(255,255,255,0.5)", fontSize: "11px", fontWeight: 700, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span>{pw.icon}</span> {pw.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Vision Text */}
+                  <div style={{ marginBottom: "16px" }}>
+                    <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: CYAN, letterSpacing: "0.1em", textTransform: "uppercase" }}>Vision Statement (AI will re-analyze)</p>
+                    <textarea
+                      value={editVision}
+                      onChange={e => setEditVision(e.target.value)}
+                      placeholder="Describe what you want to create, the impact you want to make..."
+                      rows={4}
+                      style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid rgba(0,212,255,0.2)", background: "rgba(0,212,255,0.04)", color: "#fff", fontSize: "13px", fontFamily: "inherit", resize: "vertical", outline: "none", boxSizing: "border-box", lineHeight: 1.6 }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <button onClick={() => setEditMode(false)}
+                    style={{ flex: 1, padding: "14px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "rgba(255,255,255,0.4)", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>
+                    Cancel
+                  </button>
+                  <button onClick={saveEdit} disabled={saving}
+                    style={{ flex: 2, padding: "14px", borderRadius: "12px", border: "none", background: "linear-gradient(90deg,#f5c842,#f97316)", color: "#000", fontSize: "13px", fontWeight: 900, letterSpacing: "0.06em", cursor: "pointer" }}>
+                    {saving ? "Saving..." : "Save & Re-Assign Studio"}
+                  </button>
+                </div>
+              </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+
+                {/* Edit button */}
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button onClick={startEdit}
+                    style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid rgba(0,212,255,0.25)", background: "rgba(0,212,255,0.06)", color: CYAN, fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+                    ✏️ Edit Results
+                  </button>
+                </div>
 
                 {/* Studio Assignment */}
                 {studio && (

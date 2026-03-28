@@ -17,6 +17,7 @@ export default function PlayerMarketplace() {
     if (!stored) { router.push("/"); return; }
     const u = JSON.parse(stored) as User;
     if (u.role !== "player") { router.push("/admin"); return; }
+    if (!u.onboardingComplete) { router.push("/diagnostic"); return; }
     setUser(u);
     setUpgrades(mockModifiers.filter(m => m.type === "upgrade"));
     setMyModifiers(mockPlayerModifiers.filter(m => m.playerId === u.id));

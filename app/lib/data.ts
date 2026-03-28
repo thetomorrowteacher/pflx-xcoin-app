@@ -26,6 +26,9 @@ export interface User {
   // Startup Studio fields
   studioId?: string;             // Which Startup Studio this player belongs to
   diagnosticComplete?: boolean;  // Whether the player has completed the onboarding diagnostic
+  pinChanged?: boolean;          // Whether the player has changed their temp PIN
+  brandingComplete?: boolean;    // Whether the player has completed personal branding
+  onboardingComplete?: boolean;  // Master flag: pin changed + diagnostic + branding all done
   studioStakeXC?: number;        // XC the player has staked in their studio
   studioStakePercent?: number;   // % stake they hold in studio pool
   diagnosticResult?: DiagnosticResult; // Stored diagnostic results
@@ -1221,6 +1224,48 @@ export function assignStudioFromDiagnostic(result: DiagnosticResult): string {
   }
 
   // Return studio with highest score
+  return Object.entries(studioScores).sort(([, a], [, b]) => b - a)[0][0];
+}
+
+// AI-powered studio assignment from vision statement text alone (for skip/manual-entry flow)
+export function assignStudioFromVisionText(visionText: string): string {
+  const text = visionText.toLowerCase();
+  const studioScores: Record<string, number> = {
+    "studio-mindforge": 0,
+    "studio-emagination": 0,
+    "studio-gentech": 0,
+    "studio-innov8": 0,
+  };
+
+  // MindForge: identity, culture, advocacy, community impact, diverse voices
+  const mindforgeKeywords = /divers|cultur|justic|equit|community|impact|voice|change|heritage|social|advo|empower|represent|inclus|amplif|underrepresent/;
+  // eMagination: fantasy, worlds, storytelling, immersive, wonder, narrative
+  const emaginationKeywords = /stor|world|imagin|immers|wonder|fantasy|character|narrat|creat|dream|inspir|emotion|joy|art|visual|design|experience/;
+  // GenTech: build, code, solve, execute, systems, apps, practical
+  const gentechKeywords = /build|code|program|app|system|solv|execut|practic|tool|develop|engin|web|software|implement|automat/;
+  // Innov8: future, innovate, AI, XR, cutting-edge, speculative, pioneer
+  const innov8Keywords = /futur|innovat|ai\b|xr\b|vr\b|ar\b|pioneer|cutting|boundar|technolog|possibl|speculat|frontier|robot|machine|next.gen/;
+
+  if (mindforgeKeywords.test(text)) studioScores["studio-mindforge"] += 5;
+  if (emaginationKeywords.test(text)) studioScores["studio-emagination"] += 5;
+  if (gentechKeywords.test(text)) studioScores["studio-gentech"] += 5;
+  if (innov8Keywords.test(text)) studioScores["studio-innov8"] += 5;
+
+  // Tiebreaker: score by word-count density of each keyword set
+  const mfCount = (text.match(mindforgeKeywords) || []).length;
+  const emCount = (text.match(emaginationKeywords) || []).length;
+  const gtCount = (text.match(gentechKeywords) || []).length;
+  const i8Count = (text.match(innov8Keywords) || []).length;
+  studioScores["studio-mindforge"] += mfCount;
+  studioScores["studio-emagination"] += emCount;
+  studioScores["studio-gentech"] += gtCount;
+  studioScores["studio-innov8"] += i8Count;
+
+  // Default fallback: eMagination (most general creative)
+  if (Object.values(studioScores).every(v => v === 0)) {
+    studioScores["studio-emagination"] = 1;
+  }
+
   return Object.entries(studioScores).sort(([, a], [, b]) => b - a)[0][0];
 }
 
