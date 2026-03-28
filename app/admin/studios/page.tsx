@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
 import {
@@ -11,11 +11,38 @@ import {
 import { saveStartupStudios } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
 import { playSuccess, playClick, playNav } from "../../lib/sounds";
-import { compressImage } from "../../lib/imageUtils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function avatarInitials(name: string) {
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+}
+
+function StudioLogo({ studioId, icon, color, colorRgb, size = 52 }: {
+  studioId: string; icon: string; color: string; colorRgb: string; size?: number;
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const slug = studioId.replace("studio-", "");
+  return (
+    <div style={{
+      width: `${size}px`, height: `${size}px`, borderRadius: `${Math.round(size * 0.22)}px`,
+      flexShrink: 0, overflow: "hidden",
+      background: `rgba(${colorRgb},0.85)`,
+      border: `1.5px solid rgba(${colorRgb},0.5)`,
+      boxShadow: `0 0 20px rgba(${colorRgb},0.35)`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      {imgFailed ? (
+        <span style={{ fontSize: `${Math.round(size * 0.46)}px` }}>{icon}</span>
+      ) : (
+        <img
+          src={`/studio-${slug}.png`}
+          alt={studioId}
+          onError={() => setImgFailed(true)}
+          style={{ width: "80%", height: "80%", objectFit: "contain", filter: "brightness(0) invert(1)" }}
+        />
+      )}
+    </div>
+  );
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -44,32 +71,6 @@ export default function StudiosPage() {
   const [hoveredStudio, setHoveredStudio] = useState<string | null>(null);
   const [hoveredBtn, setHoveredBtn] = useState<string | null>(null);
 
-  // Logo upload
-  const logoInputRef = useRef<HTMLInputElement>(null);
-  const [logoUploadStudioId, setLogoUploadStudioId] = useState<string | null>(null);
-
-  const handleLogoClick = (studioId: string) => {
-    setLogoUploadStudioId(studioId);
-    logoInputRef.current?.click();
-  };
-
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !logoUploadStudioId) return;
-    try {
-      const compressed = await compressImage(file, 200, 0.8);
-      const studio = mockStartupStudios.find(s => s.id === logoUploadStudioId);
-      if (studio) {
-        studio.image = compressed;
-        setStudios([...mockStartupStudios]);
-        await saveAndToast(() => saveStartupStudios());
-      }
-    } catch (err) {
-      console.error("Logo upload failed:", err);
-    }
-    if (logoInputRef.current) logoInputRef.current.value = "";
-    setLogoUploadStudioId(null);
-  };
 
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
@@ -162,9 +163,6 @@ export default function StudiosPage() {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: BG, fontFamily: "'Inter','Segoe UI',sans-serif" }}>
-      {/* Hidden logo upload input */}
-      <input type="file" hidden accept="image/*" ref={logoInputRef} onChange={handleLogoUpload} />
-
       <SideNav user={currentUser} />
 
       <main style={{ flex: 1, padding: "32px", overflowY: "auto", position: "relative" }}>
@@ -253,22 +251,7 @@ export default function StudiosPage() {
 
                   {/* Studio header */}
                   <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", marginBottom: "16px" }}>
-                    <div
-                      onClick={(e) => { e.stopPropagation(); playClick(); handleLogoClick(studio.id); }}
-                      title="Click to upload logo"
-                      style={{
-                        width: "52px", height: "52px", borderRadius: "14px", flexShrink: 0,
-                        background: `rgba(${studio.colorRgb},0.15)`,
-                        border: `1px solid rgba(${studio.colorRgb},0.35)`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: "24px", overflow: "hidden", cursor: "pointer",
-                        boxShadow: `0 0 12px rgba(${studio.colorRgb},0.2)`,
-                        position: "relative",
-                      }}>
-                      {studio.image
-                        ? <img src={studio.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        : studio.icon}
-                    </div>
+                    <StudioLogo studioId={studio.id} icon={studio.icon} color={studio.color} colorRgb={studio.colorRgb} size={52} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff", marginBottom: "2px" }}>
                         {studio.name}
@@ -461,9 +444,7 @@ export default function StudiosPage() {
               return (
                 <>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
-                    {studio.image
-                      ? <img src={studio.image} alt="" style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "cover" }} />
-                      : <span style={{ fontSize: "24px" }}>{studio.icon}</span>}
+                    <StudioLogo studioId={studio.id} icon={studio.icon} color={studio.color} colorRgb={studio.colorRgb} size={36} />
                     <div>
                       <div style={{ fontSize: "17px", fontWeight: 800, color: studio.color }}>{studio.name}</div>
                       <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>{members.length} member{members.length !== 1 ? "s" : ""}</div>
@@ -586,9 +567,7 @@ export default function StudiosPage() {
                             cursor: "pointer", textAlign: "left", transition: "all 0.15s",
                           }}
                         >
-                          {s.image
-                            ? <img src={s.image} alt="" style={{ width: "28px", height: "28px", borderRadius: "7px", objectFit: "cover" }} />
-                            : <span style={{ fontSize: "20px" }}>{s.icon}</span>}
+                          <StudioLogo studioId={s.id} icon={s.icon} color={s.color} colorRgb={s.colorRgb} size={28} />
                           <div>
                             <div style={{ fontSize: "13px", fontWeight: 700, color: reassignTargetStudioId === s.id ? s.color : "rgba(255,255,255,0.7)" }}>
                               {s.name}
@@ -643,9 +622,7 @@ export default function StudiosPage() {
               return (
                 <>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
-                    {studio.image
-                      ? <img src={studio.image} alt="" style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "cover" }} />
-                      : <span style={{ fontSize: "24px" }}>{studio.icon}</span>}
+                    <StudioLogo studioId={studio.id} icon={studio.icon} color={studio.color} colorRgb={studio.colorRgb} size={36} />
                     <div>
                       <div style={{ fontSize: "17px", fontWeight: 800, color: studio.color }}>{studio.name}</div>
                       <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>Set corporate tax rate for this studio</div>
