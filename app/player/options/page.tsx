@@ -1,0 +1,249 @@
+"use client";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import SideNav from "../../components/SideNav";
+import {
+  User, mockUsers, DiagnosticResult, mockStartupStudios,
+} from "../../lib/data";
+import { mergePlayerStats } from "../../lib/playerStats";
+
+const CYAN = "#00d4ff";
+
+const brandTypes: Record<string, { name: string; description: string; traits: string[] }> = {
+  "technical-builder": { name: "Technical Builder", description: "You excel at turning ideas into working systems through hands-on technical execution.", traits: ["Detail-oriented", "Problem-solver", "Systems thinker", "Implementation-focused"] },
+  "creative-director": { name: "Creative Director", description: "You thrive on big-picture thinking and guiding creative vision through compelling narratives.", traits: ["Visionary", "Strategic", "Story-driven", "Leadership-oriented"] },
+  "experience-designer": { name: "Experience Designer", description: "You bring ideas to life through hands-on creation of emotionally engaging experiences.", traits: ["Hands-on creator", "Empathetic", "User-focused", "Narrative-driven"] },
+  "digital-innovator": { name: "Digital Innovator", description: "You push boundaries by envisioning and architecting cutting-edge technical solutions.", traits: ["Forward-thinking", "Technical expert", "Innovation-focused", "System architect"] },
+};
+
+const pathwayLabels: Record<string, { name: string; icon: string }> = {
+  "content-creator": { name: "Content Creator", icon: "🎬" },
+  "3d-modeler": { name: "3D Modeler", icon: "🎮" },
+  "sound-designer": { name: "Sound Designer", icon: "🎵" },
+  "digital-artist": { name: "Digital Artist", icon: "🎨" },
+  "computer-programmer": { name: "Computer Programmer", icon: "💻" },
+  "game-designer": { name: "Game Designer", icon: "🎯" },
+};
+
+// ─── Studio logo helper ────────────────────────────────────────────────────
+function StudioLogo({ studioId, icon, color, colorRgb, size = 56 }: {
+  studioId: string; icon: string; color: string; colorRgb: string; size?: number;
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const slug = studioId.replace("studio-", "");
+  return (
+    <div style={{
+      width: `${size}px`, height: `${size}px`, borderRadius: `${Math.round(size * 0.22)}px`,
+      flexShrink: 0, overflow: "hidden",
+      background: `rgba(${colorRgb},0.85)`,
+      border: `1.5px solid rgba(${colorRgb},0.5)`,
+      boxShadow: `0 0 20px rgba(${colorRgb},0.35)`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      {imgFailed ? (
+        <span style={{ fontSize: `${Math.round(size * 0.46)}px` }}>{icon}</span>
+      ) : (
+        <img
+          src={`/studio-${slug}.png`}
+          alt={studioId}
+          onError={() => setImgFailed(true)}
+          style={{ width: "80%", height: "80%", objectFit: "contain", filter: "brightness(0) invert(1)" }}
+        />
+      )}
+    </div>
+  );
+}
+
+export default function PlayerOptions() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [activeSection, setActiveSection] = useState<"onboarding" | null>("onboarding");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("pflx_user");
+    if (!stored) { router.push("/"); return; }
+    let u = JSON.parse(stored) as User;
+    if (u.role !== "player") { router.push("/admin"); return; }
+    const fresh = mockUsers.find(mu => mu.id === u.id);
+    if (fresh) {
+      u = { ...u, ...fresh };
+    }
+    u = mergePlayerStats(u);
+    setUser(u);
+  }, [router]);
+
+  if (!user) return null;
+
+  const dr = user.diagnosticResult;
+  const studio = mockStartupStudios.find(s => s.id === user.studioId);
+
+  return (
+    <div style={{ display: "flex", minHeight: "100vh", background: "#0a0a0f", fontFamily: "'Inter','Segoe UI',sans-serif" }}>
+      <SideNav user={user} />
+      <main style={{ flex: 1, padding: "32px", overflow: "auto" }}>
+
+        {/* Header */}
+        <div style={{ marginBottom: "32px" }}>
+          <h1 style={{ fontSize: "28px", fontWeight: 900, margin: "0 0 4px", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>⚙️</span>
+            <span style={{
+              background: "linear-gradient(90deg, #00d4ff, #a78bfa, #00d4ff)",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+              filter: "drop-shadow(0 0 10px rgba(0,212,255,0.4))",
+            }}>OPTIONS</span>
+          </h1>
+          <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.1em" }}>
+            [ PLAYER SETTINGS & IDENTITY ]
+          </p>
+        </div>
+
+        {/* Section buttons */}
+        <div style={{ display: "flex", gap: "10px", marginBottom: "28px", flexWrap: "wrap" }}>
+          {[
+            { id: "onboarding" as const, label: "Player Onboarding Results", icon: "🧬" },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveSection(activeSection === tab.id ? null : tab.id)}
+              style={{
+                padding: "12px 20px", borderRadius: "12px", border: "none",
+                cursor: "pointer", fontWeight: 700, fontSize: "13px",
+                display: "flex", alignItems: "center", gap: "8px",
+                transition: "all 0.2s",
+                background: activeSection === tab.id ? "rgba(0,212,255,0.12)" : "rgba(255,255,255,0.04)",
+                color: activeSection === tab.id ? CYAN : "rgba(255,255,255,0.45)",
+                border: `1px solid ${activeSection === tab.id ? "rgba(0,212,255,0.3)" : "rgba(255,255,255,0.08)"}`,
+                boxShadow: activeSection === tab.id ? "0 0 16px rgba(0,212,255,0.1)" : "none",
+              }}
+            >
+              <span>{tab.icon}</span> {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Onboarding Results Section ─────────────────────────────────── */}
+        {activeSection === "onboarding" && (
+          <div style={{ maxWidth: "720px" }}>
+            {!dr ? (
+              <div style={{
+                background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: "16px", padding: "40px", textAlign: "center",
+              }}>
+                <p style={{ margin: "0 0 12px", fontSize: "40px" }}>🔒</p>
+                <p style={{ margin: "0 0 6px", fontSize: "16px", fontWeight: 700, color: CYAN }}>Onboarding Not Complete</p>
+                <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>
+                  You haven&apos;t completed the Player Onboarding assessment yet.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+
+                {/* Studio Assignment */}
+                {studio && (
+                  <div style={{
+                    background: `rgba(${studio.colorRgb},0.05)`,
+                    border: `1px solid rgba(${studio.colorRgb},0.25)`,
+                    borderRadius: "18px", padding: "24px",
+                    display: "flex", alignItems: "center", gap: "20px",
+                    position: "relative", overflow: "hidden",
+                  }}>
+                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, rgba(${studio.colorRgb},0.5), transparent)` }} />
+                    <StudioLogo studioId={studio.id} icon={studio.icon} color={studio.color} colorRgb={studio.colorRgb} size={64} />
+                    <div>
+                      <p style={{ margin: "0 0 2px", fontSize: "10px", letterSpacing: "0.15em", color: "rgba(255,255,255,0.3)", fontWeight: 700 }}>YOUR STARTUP STUDIO</p>
+                      <p style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: 900, color: studio.color }}>{studio.name}</p>
+                      <p style={{ margin: 0, fontSize: "12px", color: `rgba(${studio.colorRgb},0.7)`, fontStyle: "italic" }}>{studio.tagline}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Brand Type */}
+                <div style={{
+                  background: "rgba(0,212,255,0.04)", border: "2px solid rgba(0,212,255,0.2)",
+                  borderRadius: "18px", padding: "28px", textAlign: "center",
+                  position: "relative",
+                }}>
+                  <div style={{ position: "absolute", top: "10px", left: "10px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.35)", borderRight: "none", borderBottom: "none", borderRadius: "2px" }} />
+                  <div style={{ position: "absolute", top: "10px", right: "10px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.35)", borderLeft: "none", borderBottom: "none", borderRadius: "2px" }} />
+                  <div style={{ position: "absolute", bottom: "10px", left: "10px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.35)", borderRight: "none", borderTop: "none", borderRadius: "2px" }} />
+                  <div style={{ position: "absolute", bottom: "10px", right: "10px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.35)", borderLeft: "none", borderTop: "none", borderRadius: "2px" }} />
+
+                  <div style={{ fontSize: "40px", marginBottom: "10px" }}>✨</div>
+                  <p style={{ margin: "0 0 4px", fontSize: "11px", letterSpacing: "0.15em", color: "rgba(0,212,255,0.5)", fontWeight: 700 }}>YOUR PERSONALITY BRAND</p>
+                  <h2 style={{ margin: "0 0 12px", fontSize: "28px", fontWeight: 900, background: "linear-gradient(90deg,#00d4ff,#a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                    {brandTypes[dr.brandType]?.name ?? dr.brandType}
+                  </h2>
+                  <p style={{ margin: "0 0 18px", fontSize: "13px", color: "rgba(255,255,255,0.5)", lineHeight: 1.7 }}>
+                    {brandTypes[dr.brandType]?.description}
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                    {(brandTypes[dr.brandType]?.traits ?? []).map((t, i) => (
+                      <div key={i} style={{ background: "rgba(0,0,0,0.4)", borderRadius: "10px", padding: "10px 14px", border: "1px solid rgba(0,212,255,0.15)" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: CYAN }}>{t}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Dimension scores */}
+                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "18px", padding: "24px" }}>
+                  <p style={{ margin: "0 0 16px", fontSize: "13px", fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Creative Dimensions</p>
+                  {[
+                    { label: "Maker", val: dr.scores.maker, max: 6, color: "#f5c842" },
+                    { label: "Visionary", val: dr.scores.visionary, max: 6, color: "#a78bfa" },
+                    { label: "Storyteller", val: dr.scores.storyteller, max: 6, color: "#f472b6" },
+                    { label: "Technologist", val: dr.scores.technologist, max: 6, color: CYAN },
+                  ].map(d => (
+                    <div key={d.label} style={{ marginBottom: "12px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: d.color }}>{d.label}</span>
+                        <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.3)" }}>{d.val}/{d.max}</span>
+                      </div>
+                      <div style={{ height: "6px", background: "rgba(255,255,255,0.06)", borderRadius: "3px", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(d.val / d.max) * 100}%`, background: d.color, borderRadius: "3px", transition: "width 0.5s ease" }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Top pathways */}
+                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "18px", padding: "24px" }}>
+                  <p style={{ margin: "0 0 16px", fontSize: "13px", fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Your Top Pathways</p>
+                  {dr.topPathways.map((pid, i) => {
+                    const pw = pathwayLabels[pid] ?? { name: pid, icon: "📌" };
+                    return (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "12px 16px", background: "rgba(0,212,255,0.04)", borderRadius: "12px", border: "1px solid rgba(0,212,255,0.12)", marginBottom: "8px" }}>
+                        <span style={{ fontSize: "24px" }}>{pw.icon}</span>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: CYAN }}>{pw.name}</p>
+                        </div>
+                        <span style={{ fontSize: "18px", fontWeight: 900, color: "rgba(0,212,255,0.4)" }}>#{i + 1}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Vision Statement */}
+                {dr.visionStatement && (dr.visionStatement.create || dr.visionStatement.impact || dr.visionStatement.perspective || dr.visionStatement.future) && (
+                  <div style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.25)", borderRadius: "18px", padding: "24px" }}>
+                    <p style={{ margin: "0 0 12px", fontSize: "11px", fontWeight: 700, color: "rgba(167,139,250,0.7)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Your Vision Statement</p>
+                    <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.8)", lineHeight: 1.8, fontStyle: "italic" }}>
+                      &quot;I want to create <strong style={{ color: "#a78bfa" }}>{dr.visionStatement.create}</strong> that will <strong style={{ color: "#a78bfa" }}>{dr.visionStatement.impact}</strong>. My unique perspective is <strong style={{ color: "#a78bfa" }}>{dr.visionStatement.perspective}</strong>. In two years, I&apos;ll be known for <strong style={{ color: "#a78bfa" }}>{dr.visionStatement.future}</strong>.&quot;
+                    </p>
+                  </div>
+                )}
+
+                {/* Completed date */}
+                <div style={{ textAlign: "center", padding: "8px", color: "rgba(255,255,255,0.2)", fontSize: "11px" }}>
+                  Completed on {new Date(dr.completedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+      </main>
+    </div>
+  );
+}

@@ -57,6 +57,7 @@ const playerLinks = [
   { href: "/player/task-management", label: "Task Management", icon: "📋" },
   { href: "/player/marketplace", label: "Marketplace", icon: "🛒" },
   { href: "/player/wallet", label: "Wallet", icon: "🪙" },
+  { href: "/player/options", label: "Options", icon: "⚙️" },
 ];
 
 const CYAN = "#00d4ff";
