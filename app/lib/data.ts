@@ -117,6 +117,7 @@ export interface Task {
   roundId?: string; // which checkpoint this task belongs to
   investorStakes?: InvestorStake[]; // XP investments boosting this task's value
   assignedTo?: "all" | string[]; // "all" = everyone, string[] = player IDs or cohort names
+  link?: string; // Optional resource link (Google Doc, Canva, YouTube, etc.)
 }
 
 export interface Checkpoint {
@@ -131,6 +132,7 @@ export interface Checkpoint {
   seasonId?: string;    // links this round to a GamePeriod season
   bannerImage?: string; // base64 or URL — displayed as art on round/season cards
   projectIds?: string[]; // Projects included in this checkpoint (auto-pulls their tasks/jobs)
+  link?: string; // Optional resource link
 }
 
 export interface Job {
@@ -148,6 +150,7 @@ export interface Job {
   approved: string[];
   investorStakes?: InvestorStake[]; // XP investments boosting this job's value
   assignedTo?: "all" | string[]; // "all" = everyone, string[] = player IDs or cohort names
+  link?: string; // Optional resource link
 }
 
 // Helper: check if a task/job is visible to a given player
@@ -1029,6 +1032,7 @@ export interface Project {
   studioId?: string;         // If adopted by a studio
   xcRewardPool?: number;     // Total XC available if project fully completed
   image?: string;
+  link?: string; // Optional resource link
 }
 
 // ─── Mock Startup Studios ────────────────────────────────────────

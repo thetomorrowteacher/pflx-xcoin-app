@@ -758,6 +758,12 @@ export default function TaskManagement() {
                 </div>
               </Field>
 
+              {/* Resource Link */}
+              <Field label="Resource Link">
+                <input value={editingCP.link || ""} onChange={e => setEditingCP(p => ({ ...p, link: e.target.value }))}
+                  placeholder="https://docs.google.com/... or any URL" style={inputSx} />
+              </Field>
+
               {/* Task selection */}
               <Field label={`Assign Individual Tasks (${cpTaskIds.length} selected)`}>
                 <div style={{ maxHeight: "220px", overflowY: "auto", background: "rgba(255,255,255,0.03)",
@@ -872,6 +878,10 @@ export default function TaskManagement() {
                   </select>
                 </Field>
               </div>
+              <Field label="Resource Link">
+                <input value={editingTask.link || ""} onChange={e => setEditingTask(p => ({ ...p, link: e.target.value }))}
+                  placeholder="https://docs.google.com/... or any URL" style={inputSx} />
+              </Field>
             </div>
             <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "24px" }}>
               <button onClick={() => { playClick(); setTaskModal(false); }}
@@ -921,6 +931,12 @@ export default function TaskManagement() {
                     min={0} style={inputSx} />
                 </Field>
               </div>
+
+              {/* Resource Link */}
+              <Field label="Resource Link">
+                <input value={editingProject.link || ""} onChange={e => setEditingProject(p => ({ ...p, link: e.target.value }))}
+                  placeholder="https://docs.google.com/... or any URL" style={inputSx} />
+              </Field>
 
               {/* Task selection */}
               <Field label={`Assign Tasks (${projTaskIds.length} selected)`}>
@@ -1043,6 +1059,10 @@ export default function TaskManagement() {
                   </select>
                 </Field>
               </div>
+              <Field label="Resource Link">
+                <input value={editingJob.link || ""} onChange={e => setEditingJob(p => ({ ...p, link: e.target.value }))}
+                  placeholder="https://docs.google.com/... or any URL" style={inputSx} />
+              </Field>
             </div>
             <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "24px" }}>
               <button onClick={() => { playClick(); setJobModal(false); }}
