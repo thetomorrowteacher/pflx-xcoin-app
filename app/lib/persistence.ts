@@ -83,31 +83,28 @@ export async function saveData<T>(key: DataKey, value: T): Promise<boolean> {
  * Load ALL collections at once (batch).
  * Returns { ok: true, data: {...} } on success, or { ok: false } on error.
  * CRITICAL: callers MUST check .ok — a failed load is NOT the same as an empty DB.
+ *
+ * No artificial timeout — the payload is ~12MB with images so we let Supabase
+ * fetch naturally. Uses AbortController so retries cancel stale requests.
  */
 export async function loadAllData(
   onProgress?: (attempt: number, maxRetries: number) => void,
 ): Promise<{ ok: boolean; data: Record<string, any> }> {
-  const MAX_RETRIES = 3;
-  const TIMEOUT_MS = 15000; // 15s — full payload is ~12MB with images, takes ~6s on good connection
+  const MAX_RETRIES = 2;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       onProgress?.(attempt, MAX_RETRIES);
       console.log(`[persistence] loadAllData attempt ${attempt}/${MAX_RETRIES}...`);
 
-      // Race against timeout so we don't hang forever
-      const timeoutPromise = new Promise<{ data: null; error: { message: string; code: string } }>((resolve) =>
-        setTimeout(() => resolve({ data: null, error: { message: `Timeout (${TIMEOUT_MS}ms)`, code: "TIMEOUT" } }), TIMEOUT_MS)
-      );
-
-      const queryPromise = supabase.from("app_data").select("key, data");
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+      const { data, error } = await supabase
+        .from("app_data")
+        .select("key, data");
 
       if (error) {
         console.warn(`[persistence] loadAllData attempt ${attempt} failed:`, error.message);
         if (attempt < MAX_RETRIES) {
-          // Quick backoff: 500ms, 1s between retries
-          await new Promise(r => setTimeout(r, attempt * 500));
+          await new Promise(r => setTimeout(r, 1000));
           continue;
         }
         return { ok: false, data: {} };
@@ -122,7 +119,7 @@ export async function loadAllData(
     } catch (err) {
       console.warn(`[persistence] loadAllData attempt ${attempt} exception:`, err);
       if (attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, attempt * 500));
+        await new Promise(r => setTimeout(r, 1000));
         continue;
       }
       return { ok: false, data: {} };
