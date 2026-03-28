@@ -988,6 +988,7 @@ export interface StartupStudio {
   name: string;
   tagline: string;
   icon: string;
+  image?: string;          // Optional logo image (base64 or URL)
   color: string;           // Accent hex color e.g. "#ef4444"
   colorRgb: string;        // For rgba usage e.g. "239,68,68"
   description: string;
