@@ -28,15 +28,192 @@ function speak(text: string, enabled: boolean) {
   window.speechSynthesis.speak(u);
 }
 
+// ─── Smart Priority Advisor ──────────────────────────────────────────────────
+function buildPriorityAdvice(player: User): string {
+  const firstName = player.name.split(" ")[0];
+  const now = new Date();
+  const myTasks = mockTasks.filter(
+    t => isAssignedToPlayer(t.assignedTo, player.id, player.cohort) && t.status === "open"
+  );
+  const myJobs = mockJobs.filter(
+    j => isAssignedToPlayer(j.assignedTo, player.id, player.cohort) && j.status === "open"
+  );
+  const pendingSubs = mockTasks.filter(t => t.submittedBy === player.id && t.status === "submitted");
+
+  if (myTasks.length === 0 && myJobs.length === 0 && pendingSubs.length === 0) {
+    return `You're all caught up, ${firstName}! No tasks, jobs, or pending submissions right now. Check back soon or ask your host about upcoming opportunities.`;
+  }
+
+  // Score and rank each item by urgency + value
+  interface PriorityItem {
+    type: "task" | "job";
+    title: string;
+    xc: number;
+    dueDate?: string;
+    urgencyScore: number;
+    valueScore: number;
+    totalScore: number;
+    reason: string;
+  }
+
+  const items: PriorityItem[] = [];
+
+  for (const t of myTasks) {
+    let urgencyScore = 0;
+    let reason = "";
+    const daysLeft = t.dueDate ? Math.ceil((new Date(t.dueDate).getTime() - now.getTime()) / 86400000) : 999;
+
+    if (daysLeft < 0) { urgencyScore = 100; reason = "OVERDUE"; }
+    else if (daysLeft === 0) { urgencyScore = 90; reason = "Due today"; }
+    else if (daysLeft === 1) { urgencyScore = 80; reason = "Due tomorrow"; }
+    else if (daysLeft <= 3) { urgencyScore = 60; reason = `Due in ${daysLeft} days`; }
+    else if (daysLeft <= 7) { urgencyScore = 30; reason = `Due this week`; }
+    else { urgencyScore = 10; reason = t.dueDate ? `Due ${t.dueDate}` : "No deadline"; }
+
+    // Value = XC reward normalized (higher XC = higher priority)
+    const valueScore = Math.min(100, Math.round((t.xcReward / 500) * 100));
+
+    items.push({
+      type: "task", title: t.title, xc: t.xcReward,
+      dueDate: t.dueDate, urgencyScore, valueScore,
+      totalScore: urgencyScore * 0.6 + valueScore * 0.4,
+      reason,
+    });
+  }
+
+  for (const j of myJobs) {
+    const slotsLeft = j.slots - j.filledSlots;
+    const urgencyScore = slotsLeft <= 1 ? 70 : slotsLeft <= 3 ? 40 : 15;
+    const valueScore = Math.min(100, Math.round((j.xcReward / 500) * 100));
+    const reason = slotsLeft <= 1 ? "Only 1 slot left!" : `${slotsLeft} slots open`;
+
+    items.push({
+      type: "job", title: j.title, xc: j.xcReward,
+      urgencyScore, valueScore,
+      totalScore: urgencyScore * 0.6 + valueScore * 0.4,
+      reason,
+    });
+  }
+
+  // Sort by total score descending
+  items.sort((a, b) => b.totalScore - a.totalScore);
+
+  // Build advice
+  let advice = `Here's my recommended priority order for you, ${firstName}:\n\n`;
+
+  const top = items.slice(0, 5);
+  top.forEach((item, i) => {
+    const icon = item.type === "task" ? "📋" : "💼";
+    const urgencyTag = item.urgencyScore >= 80 ? " ⚠️" : item.urgencyScore >= 60 ? " 🔶" : "";
+    advice += `${i + 1}. ${icon} ${item.title}${urgencyTag}\n   ${item.reason} · ${item.xc} XC reward\n`;
+  });
+
+  if (items.length > 5) {
+    advice += `\n...plus ${items.length - 5} more. Focus on these first!\n`;
+  }
+
+  // Strategic tips based on player state
+  const overdue = items.filter(i => i.reason === "OVERDUE");
+  const highValue = items.filter(i => i.valueScore >= 60);
+  const level = getLevelFromXC(player.xcoin);
+  const progress = Math.round(getXCProgress(player.xcoin) * 100);
+
+  advice += "\n💡 Strategy tips:\n";
+
+  if (overdue.length > 0) {
+    advice += `• You have ${overdue.length} overdue item${overdue.length > 1 ? "s" : ""} — knock ${overdue.length === 1 ? "it" : "these"} out first to avoid fines.\n`;
+  }
+  if (progress >= 75) {
+    advice += `• You're ${progress}% to Level ${level + 1} — a couple completions could level you up!\n`;
+  }
+  if (highValue.length > 0 && overdue.length === 0) {
+    advice += `• "${highValue[0].title}" has the best XC payout (${highValue[0].xc} XC) — great target if you want to climb the leaderboard.\n`;
+  }
+  if (pendingSubs.length > 0) {
+    advice += `• ${pendingSubs.length} submission${pendingSubs.length > 1 ? "s are" : " is"} pending review — follow up with your host if it's been a while.\n`;
+  }
+
+  return advice.trim();
+}
+
+// ─── Contextual guidance for open-ended questions ────────────────────────────
+function buildGuidance(input: string, player: User): string | null {
+  const txt = input.toLowerCase().trim();
+  const firstName = player.name.split(" ")[0];
+
+  // How to earn / level up / get XC
+  if (/\b(how.*(earn|get|make).*(xc|xp|coins?|money|badge)|level.?up|rank.?up|grow|improve|get better)\b/.test(txt)) {
+    const level = getLevelFromXC(player.xcoin);
+    const openTasks = mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, player.id, player.cohort) && t.status === "open");
+    const openJobs = mockJobs.filter(j => isAssignedToPlayer(j.assignedTo, player.id, player.cohort) && j.status === "open");
+    const topTask = openTasks.sort((a, b) => b.xcReward - a.xcReward)[0];
+    const topJob = openJobs.sort((a, b) => b.xcReward - a.xcReward)[0];
+
+    let resp = `Here's how to level up faster, ${firstName} (currently Level ${level}):\n\n`;
+    resp += `1. Complete tasks — you have ${openTasks.length} open right now`;
+    if (topTask) resp += `. Best payout: "${topTask.title}" (${topTask.xcReward} XC)`;
+    resp += `\n2. Apply for jobs — ${openJobs.length} available`;
+    if (topJob) resp += `. Top: "${topJob.title}" (${topJob.xcReward} XC)`;
+    resp += `\n3. Submit early & with strong proof — quality submissions get approved faster`;
+    resp += `\n4. Avoid fines — missed deadlines cost XC. Check deadlines often.`;
+    resp += `\n5. Stay consistent — daily engagement keeps momentum going.\n`;
+    resp += `\nSay "prioritize" for a ranked action plan based on your current assignments!`;
+    return resp;
+  }
+
+  // What should I do / where to start / I'm stuck / confused
+  if (/\b(what should i|where.*(start|begin)|i'?m (stuck|lost|confused|new|unsure)|what.?next|next step|don'?t know what)\b/.test(txt)) {
+    return buildPriorityAdvice(player);
+  }
+
+  // How do I submit / turn in work
+  if (/\b(how.*(submit|turn in|send|upload)|where.*submit|submission process)\b/.test(txt)) {
+    return `To submit your work:\n\n1. Go to your Tasks page (say "go to tasks")\n2. Find the task you completed\n3. Click Submit and attach your proof — this can be a Google Doc link, Canva project, YouTube video, or file upload\n4. Add a note explaining what you did\n5. Hit Submit!\n\nTips for a strong submission:\n• Always include a link to your work\n• Write a clear explanation of what you accomplished\n• Submit before the deadline to avoid fines\n• The more evidence you provide, the faster approval goes`;
+  }
+
+  // What are badges / coins / how does XC work
+  if (/\b(what.*(badge|coin|xc|signature coin|digital badge)|how.*(xc|badge|coin|economy|system).*(work|function))\b/.test(txt)) {
+    const cats = COIN_CATEGORIES;
+    let resp = `Here's how the PFLX economy works:\n\n`;
+    resp += `⚡ XC (X-Coin) is the currency — you earn it by completing tasks and jobs.\n`;
+    resp += `🪙 Digital Badges are earned alongside XC and track your mastery.\n`;
+    resp += `📈 Your Level is based on your current XC balance.\n`;
+    resp += `🏆 Your Rank is based on lifetime XC earned (never decreases).\n\n`;
+    resp += `Badge categories:\n`;
+    cats.forEach(c => {
+      resp += `• ${c.name}: ${c.coins.length} badge${c.coins.length !== 1 ? "s" : ""}\n`;
+    });
+    resp += `\nEach badge has an XC reward attached. The harder the challenge, the bigger the payout!`;
+    return resp;
+  }
+
+  return null; // No guidance match — fall through to other handlers
+}
+
 // ─── Response builder (player-scoped) ────────────────────────────────────────
 function buildResponse(input: string, player: User, router: ReturnType<typeof useRouter>): string {
   const txt = input.toLowerCase().trim();
   const firstName = player.name.split(" ")[0];
 
+  // ── Priority / Advice (check first) ────────────────────────────────────
+  if (/\b(priorit|what should i|advice|recommend|suggest|plan|strateg|guide|coach|next step|what.?next|where.*(start|begin)|focus)\b/.test(txt)) {
+    return buildPriorityAdvice(player);
+  }
+
+  // ── Contextual guidance (how-to, explanations) ─────────────────────────
+  const guidance = buildGuidance(input, player);
+  if (guidance) return guidance;
+
   // ── Greetings ────────────────────────────────────────────────────────────
   if (/^(hi|hey|hello|sup|what'?s up|yo)\b/.test(txt)) {
     const level = getLevelFromXC(player.xcoin);
-    return `Hey ${firstName}! 👋 You're Level ${level} with ${player.xcoin.toLocaleString()} XC and ${player.digitalBadges} Digital Badges. What do you want to check on?`;
+    const openTasks = mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, player.id, player.cohort) && t.status === "open").length;
+    const overdue = mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, player.id, player.cohort) && t.status === "open" && t.dueDate && new Date(t.dueDate) < new Date()).length;
+    let greeting = `Hey ${firstName}! 👋 You're Level ${level} with ${player.xcoin.toLocaleString()} XC and ${player.digitalBadges} Digital Badges.`;
+    if (overdue > 0) greeting += ` ⚠️ Heads up — ${overdue} overdue task${overdue > 1 ? "s" : ""} need attention!`;
+    else if (openTasks > 0) greeting += ` You have ${openTasks} open task${openTasks > 1 ? "s" : ""} ready to work on.`;
+    greeting += ` Say "prioritize" for a recommended action plan, or ask me anything!`;
+    return greeting;
   }
 
   // ── Stats ─────────────────────────────────────────────────────────────────
@@ -178,11 +355,17 @@ function buildResponse(input: string, player: User, router: ReturnType<typeof us
 
   // ── Help ──────────────────────────────────────────────────────────────────
   if (/\b(help|commands?|what can you|what do you)\b/.test(txt)) {
-    return `🎮 Here's what I can help with:\n\n• "My stats" — XP, level, rank, position\n• "My tasks" — open tasks assigned to you\n• "Deadlines" — what's due soon or overdue\n• "My jobs" — active jobs\n• "Submissions" — pending approvals\n• "Leaderboard" — top players\n• "Wallet" — recent transactions\n• "Checkpoints" — current season info\n• "Motivate me" — a little boost 🔥\n• "Go to [tasks/wallet/leaderboard]" — navigate\n\nYou can also tap the mic and speak!`;
+    return `🎮 Here's what I can help with:\n\n📌 Guidance & Strategy:\n• "Prioritize" / "What should I do?" — smart priority ranking\n• "How do I level up?" — earning strategies\n• "How do I submit?" — submission walkthrough\n• "How does XC work?" — economy explained\n\n📊 Your Data:\n• "My stats" — XP, level, rank, position\n• "My tasks" — open tasks\n• "Deadlines" — due soon or overdue\n• "My jobs" — active jobs\n• "Submissions" — pending approvals\n• "Leaderboard" — top players\n• "Wallet" — transactions\n\n🎯 Actions:\n• "Motivate me" — a boost 🔥\n• "Go to [page]" — navigate\n\nYou can also tap the mic and speak!`;
   }
 
-  // ── Default ───────────────────────────────────────────────────────────────
-  return `Not sure about that one, ${firstName}. Try asking about your tasks, stats, deadlines, jobs, or say "help" for a full list of commands.`;
+  // ── Default — contextual rather than unhelpful ─────────────────────────
+  const defOpen = mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, player.id, player.cohort) && t.status === "open").length;
+  const defOverdue = mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, player.id, player.cohort) && t.status === "open" && t.dueDate && new Date(t.dueDate) < new Date()).length;
+  let fallback = `I'm not sure about that one, ${firstName}. But here's a snapshot: `;
+  if (defOverdue > 0) fallback += `⚠️ ${defOverdue} overdue task${defOverdue > 1 ? "s" : ""} need attention. `;
+  else if (defOpen > 0) fallback += `You have ${defOpen} open task${defOpen > 1 ? "s" : ""} to work on. `;
+  fallback += `Try "prioritize" for a full action plan, or "help" to see everything I can do.`;
+  return fallback;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -283,7 +466,7 @@ export default function PlayerAssistant() {
   const ACCENT = "#a855f7"; // purple
   const GOLD = "#f5c842";
 
-  const quickChips = ["My stats", "My tasks", "Deadlines", "Leaderboard", "Motivate me"];
+  const quickChips = ["Prioritize", "My tasks", "How to level up", "Deadlines", "Help"];
 
   return (
     <>

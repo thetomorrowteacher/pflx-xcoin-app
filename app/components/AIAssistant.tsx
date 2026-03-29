@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import {
   mockUsers, mockTasks, mockCheckpoints, mockGamePeriods,
   mockModifiers, mockTransactions, mockJobs, Task,
+  isAssignedToPlayer,
 } from "../lib/data";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -220,15 +221,89 @@ function buildTextResponse(input: string, router: ReturnType<typeof useRouter>):
     const issued = mockTransactions.filter(t=>t.type==="pflx_tax");
     return `${taxes.length} fine types configured. ${issued.length} fine${issued.length!==1?"s":""} issued total.`;
   }
+  // ── Player lookup ──────────────────────────────────────────────────────
+  const playerLookup = txt.match(/\b(how is|check on|look up|status of|about)\s+(.+)/);
+  if (playerLookup) {
+    const query = playerLookup[2].replace(/[?.!]/g, "").trim();
+    const match = players.find(u =>
+      u.name.toLowerCase().includes(query) ||
+      (u.brandName && u.brandName.toLowerCase().includes(query))
+    );
+    if (match) {
+      const pTasks = mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, match.id, match.cohort) && t.status === "open");
+      const pSubs = mockTasks.filter(t => t.submittedBy === match.id && t.status === "submitted");
+      const pOverdue = pTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date());
+      const rank = [...players].sort((a, b) => b.xcoin - a.xcoin).findIndex(u => u.id === match.id) + 1;
+      let resp = `${match.brandName || match.name}: ${match.xcoin.toLocaleString()} XC · Level ${match.level} · #${rank} on leaderboard · ${match.digitalBadges} badges.`;
+      if (pTasks.length > 0) resp += ` ${pTasks.length} open task${pTasks.length > 1 ? "s" : ""}.`;
+      if (pOverdue.length > 0) resp += ` ⚠️ ${pOverdue.length} overdue!`;
+      if (pSubs.length > 0) resp += ` ${pSubs.length} submission${pSubs.length > 1 ? "s" : ""} awaiting your review.`;
+      if (pTasks.length === 0 && pSubs.length === 0) resp += ` All caught up — no pending work.`;
+      return resp;
+    }
+  }
+
+  // ── At-risk / struggling players ──────────────────────────────────────
+  if (txt.match(/\b(at.?risk|struggling|behind|falling behind|inactive|low|need help|who needs)\b/)) {
+    const now = new Date();
+    const atRisk = players.map(p => {
+      const pTasks = mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, p.id, p.cohort) && t.status === "open");
+      const overdue = pTasks.filter(t => t.dueDate && new Date(t.dueDate) < now).length;
+      const completed = mockTasks.filter(t => t.submittedBy === p.id && (t.status === "approved" || t.status === "submitted")).length;
+      return { name: p.brandName || p.name, id: p.id, overdue, xc: p.xcoin, completed, riskScore: overdue * 30 + (completed === 0 ? 40 : 0) + (p.xcoin < 100 ? 20 : 0) };
+    }).filter(p => p.riskScore > 0).sort((a, b) => b.riskScore - a.riskScore);
+    if (atRisk.length === 0) return "All players look on track — no one flagged as at-risk right now!";
+    const top = atRisk.slice(0, 5);
+    return `Players who may need support:\n${top.map(p => {
+      const reasons: string[] = [];
+      if (p.overdue > 0) reasons.push(`${p.overdue} overdue`);
+      if (p.completed === 0) reasons.push("no completions yet");
+      if (p.xc < 100) reasons.push("low XC");
+      return `• ${p.name} — ${reasons.join(", ")}`;
+    }).join("\n")}\n\nConsider reaching out or adjusting deadlines for these players.`;
+  }
+
+  // ── Class / cohort insights ───────────────────────────────────────────
+  if (txt.match(/\b(class|cohort|group|engagement|participation|activity)\b/)) {
+    const totalXC = players.reduce((s, u) => s + u.xcoin, 0);
+    const avgXC = Math.round(totalXC / (players.length || 1));
+    const totalCompleted = mockTasks.filter(t => t.status === "approved").length;
+    const totalOpen = openTasks.length;
+    const overdueAll = mockTasks.filter(t => t.status === "open" && t.dueDate && new Date(t.dueDate) < new Date()).length;
+    return `Class insights:\n• ${players.length} active players, avg ${avgXC.toLocaleString()} XC\n• ${totalCompleted} tasks completed, ${totalOpen} still open\n• ${overdueAll} overdue across all players\n• ${pending.length} submissions awaiting your review\n\nSay "at-risk" to see which players need attention, or "top players" for the leaderboard.`;
+  }
+
+  // ── Advice on how to run the program ──────────────────────────────────
+  if (txt.match(/\b(tips|advice|best practice|how should i|recommend|suggest|strategy|coaching)\b/)) {
+    let tips = "Host coaching tips:\n\n";
+    if (pending.length > 3) tips += `• ⚠️ You have ${pending.length} pending reviews — try to review within 24-48hrs to keep players motivated.\n`;
+    if (pending.length === 0) tips += `• ✅ All submissions reviewed — great job staying on top of approvals!\n`;
+    const overdueTotal = mockTasks.filter(t => t.status === "open" && t.dueDate && new Date(t.dueDate) < new Date()).length;
+    if (overdueTotal > 3) tips += `• ${overdueTotal} tasks are overdue across players — consider extending deadlines or sending reminders.\n`;
+    tips += `• Review the leaderboard weekly to celebrate top performers.\n`;
+    tips += `• Use checkpoint milestones to create natural momentum.\n`;
+    tips += `• Balance high-XC tasks with quick wins to keep all players engaged.\n`;
+    tips += `• Check "at-risk" players regularly to intervene early.`;
+    return tips;
+  }
+
   if (txt.match(/\b(help|what can you do|commands?)\b/)) {
-    return `I can: check pending approvals, analyze submissions (say "analyze submissions"), approve all tasks, show leaderboard, look up any player, check season/checkpoints, show stats, navigate pages ("go to approvals"), issue or flag fines, and more. Try me!`;
+    return `I can help with:\n\n📋 Submissions: "analyze submissions", "pending approvals", "approve all"\n👥 Players: "check on [name]", "at-risk players", "top players"\n📊 Insights: "overview", "class insights", "economy"\n🎯 Management: "coaching tips", "open tasks", "checkpoints", "season"\n🧭 Navigate: "go to [approvals/players/tasks/settings]"\n\nI analyze submissions with AI scoring and can give approve/reject recommendations!`;
   }
   if (txt.match(/^(hi|hello|hey|good)\b/)) {
     const h=new Date().getHours();
     const g=h<12?"Good morning":h<17?"Good afternoon":"Good evening";
-    return `${g}! I'm your PFLX assistant. ${mockTasks.filter(t=>t.status==="submitted").length} submission${mockTasks.filter(t=>t.status==="submitted").length!==1?"s":""} waiting for review. Say "analyze submissions" to get AI recommendations, or ask me anything!`;
+    const overdueTotal = mockTasks.filter(t => t.status === "open" && t.dueDate && new Date(t.dueDate) < new Date()).length;
+    let greeting = `${g}! I'm your PFLX assistant. ${pending.length} submission${pending.length!==1?"s":""} waiting for review.`;
+    if (overdueTotal > 0) greeting += ` ⚠️ ${overdueTotal} tasks are overdue across your players.`;
+    greeting += ` Say "analyze submissions" for AI recommendations, "at-risk" to check struggling players, or "help" for all commands!`;
+    return greeting;
   }
-  return `Not sure about that. Try "analyze submissions", "pending approvals", "top players", or "help" to see what I can do.`;
+  // ── Default — contextual ──────────────────────────────────────────────
+  let fallback = `I'm not sure about that. `;
+  if (pending.length > 0) fallback += `You have ${pending.length} submission${pending.length > 1 ? "s" : ""} to review. `;
+  fallback += `Try "help" for a full list, "analyze submissions" for AI scoring, or "at-risk" to check on struggling players.`;
+  return fallback;
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -428,7 +503,7 @@ export default function AIAssistant() {
 
           {/* Quick chips */}
           <div style={{padding:"0 12px 8px",display:"flex",gap:"6px",flexWrap:"wrap"}}>
-            {["Analyze submissions","Pending approvals","Top players","Overview","Help"].map(cmd=>(
+            {["Analyze submissions","At-risk players","Coaching tips","Class insights","Help"].map(cmd=>(
               <button key={cmd} onClick={()=>processInput(cmd)} style={{padding:"4px 10px",borderRadius:"12px",border:"1px solid rgba(255,255,255,0.1)",background:"rgba(255,255,255,0.04)",color:"rgba(255,255,255,0.5)",fontSize:"11px",cursor:"pointer"}}>
                 {cmd}
               </button>
