@@ -84,6 +84,10 @@ export default function TaskManagement() {
   // Task modal
   const [taskModal, setTaskModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Partial<Task>>({});
+  const [taskBadges, setTaskBadges] = useState<{ name: string; xc: number }[]>([]);
+  const [taskLinks, setTaskLinks] = useState<string[]>([""]);
+  const [badgeDropdownOpen, setBadgeDropdownOpen] = useState(false);
+  const [badgeSearch, setBadgeSearch] = useState("");
 
   // Job modal
   const [jobModal, setJobModal]   = useState(false);
@@ -203,22 +207,56 @@ export default function TaskManagement() {
 
   const openNewTask = () => {
     playClick();
-    setEditingTask({ coinType: COIN_CATEGORIES[0]?.coins[0]?.name || "", xpValue: 100, cohort: "all" });
+    setEditingTask({ xpValue: 100, cohort: "all" });
+    setTaskBadges([]);
+    setTaskLinks([""]);
+    setBadgeSearch("");
+    setBadgeDropdownOpen(false);
+    setTaskModal(true);
+  };
+
+  const openEditTask = (task: Task) => {
+    playClick();
+    setEditingTask({ ...task });
+    // Parse existing badges from coinType (legacy single) or rewardCoins (multi)
+    if ((task as any).rewardBadges?.length) {
+      setTaskBadges((task as any).rewardBadges);
+    } else if (task.coinType) {
+      const coin = allCoinsFlat.find(c => c.name === task.coinType);
+      setTaskBadges([{ name: task.coinType, xc: coin?.xc || task.xpValue || 100 }]);
+    } else {
+      setTaskBadges([]);
+    }
+    // Parse links
+    if ((task as any).links?.length) {
+      setTaskLinks([...(task as any).links, ""]);
+    } else if (task.link) {
+      setTaskLinks([task.link, ""]);
+    } else {
+      setTaskLinks([""]);
+    }
+    setBadgeSearch("");
+    setBadgeDropdownOpen(false);
     setTaskModal(true);
   };
 
   const handleSaveTask = () => {
     if (!editingTask.title?.trim()) { playError(); return; }
     const isNew = !editingTask.id;
+    const cleanLinks = taskLinks.filter(l => l.trim());
+    const totalXC = taskBadges.reduce((sum, b) => sum + b.xc, 0) || (editingTask.xpValue || 100);
     const saved: Task = {
       id: editingTask.id || `task_${Date.now()}`,
       title: editingTask.title || "",
       description: editingTask.description || "",
-      coinType: editingTask.coinType || "",
-      xpValue: editingTask.xpValue || 100,
+      coinType: taskBadges[0]?.name || "",  // backward compat: first badge
+      xpValue: totalXC,
+      rewardBadges: taskBadges,  // multi-badge array
       cohort: editingTask.cohort || "all",
       status: (editingTask.status as Task["status"]) || "active",
       roundId: editingTask.roundId,
+      link: cleanLinks[0] || "",
+      links: cleanLinks,
     } as Task;
     if (isNew) { setTasks(prev => [...prev, saved]); mockTasks.push(saved); }
     else {
@@ -317,6 +355,7 @@ export default function TaskManagement() {
 
   const cohorts = getMockCohorts();
   const allCoins: RewardCoin[] = COIN_CATEGORIES.flatMap(c => c.coins);
+  const allCoinsFlat = COIN_CATEGORIES.flatMap(cat => cat.coins.map(c => ({ ...c, category: cat.name })));
 
   // ── Shared styles ─────────────────────────────────────────────────────────
 
@@ -485,7 +524,20 @@ export default function TaskManagement() {
                             <p style={{ margin: 0, fontWeight: 700, color: "white", fontSize: "14px" }}>{task.title}</p>
                             {task.description && <p style={{ margin: "2px 0 0", fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>{task.description}</p>}
                           </td>
-                          <td style={{ padding: "14px 18px", fontSize: "13px", color: "rgba(255,255,255,0.6)", fontWeight: 600 }}>{task.coinType || "—"}</td>
+                          <td style={{ padding: "14px 18px" }}>
+                            {(task as any).rewardBadges?.length > 0 ? (
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                                {(task as any).rewardBadges.map((b: any, bi: number) => (
+                                  <span key={bi} style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+                                    background: "rgba(79,142,247,0.1)", border: "1px solid rgba(79,142,247,0.2)", color: "#4f8ef7" }}>
+                                    {b.name}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", fontWeight: 600 }}>{task.coinType || "—"}</span>
+                            )}
+                          </td>
                           <td style={{ padding: "14px 18px" }}>
                             <span style={{ color: "#f5c842", fontWeight: 800, fontSize: "14px" }}>{task.xpValue} XC</span>
                           </td>
@@ -502,7 +554,7 @@ export default function TaskManagement() {
                             <span style={pill(task.status, sc)}>{task.status}</span>
                           </td>
                           <td style={{ padding: "14px 18px" }}>
-                            <button onClick={() => { playClick(); setEditingTask({ ...task }); setTaskModal(true); }}
+                            <button onClick={() => openEditTask(task as Task)}
                               style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
                                 borderRadius: "8px", color: "rgba(255,255,255,0.6)", padding: "6px 14px",
                                 cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>Edit</button>
@@ -791,7 +843,9 @@ export default function TaskManagement() {
                             {task.title}
                           </p>
                           <p style={{ margin: 0, fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>
-                            {task.coinType} · {task.xpValue} XC
+                            {(task as any).rewardBadges?.length > 0
+                              ? (task as any).rewardBadges.map((b: any) => b.name).join(", ")
+                              : task.coinType || "No badge"} · {task.xpValue} XC
                             {includedViaProject && <span style={{ color: "#a78bfa", marginLeft: "8px" }}>via project</span>}
                             {otherCp && <span style={{ color: "#f5c842", marginLeft: "8px" }}>⚠ in "{otherCp.name}"</span>}
                           </p>
@@ -828,7 +882,7 @@ export default function TaskManagement() {
       {/* ══════════════════ TASK MODAL ══════════════════ */}
       {taskModal && (
         <ModalBG onClose={() => { playClick(); setTaskModal(false); }}>
-          <div style={{ padding: "32px" }}>
+          <div style={{ padding: "32px" }} onClick={() => setBadgeDropdownOpen(false)}>
             <h2 style={{ margin: "0 0 24px", fontSize: "20px", fontWeight: 900, color: "#f0f0ff" }}>
               {editingTask.id ? "Edit Task" : "New Task"}
             </h2>
@@ -841,19 +895,86 @@ export default function TaskManagement() {
                 <textarea value={editingTask.description || ""} onChange={e => setEditingTask(p => ({ ...p, description: e.target.value }))}
                   placeholder="Describe what the player must do…" rows={2} style={{ ...inputSx, resize: "vertical" }} />
               </Field>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-                <Field label="Badge / Coin Type">
-                  <select value={editingTask.coinType || ""} onChange={e => setEditingTask(p => ({ ...p, coinType: e.target.value }))}
-                    style={{ ...inputSx, cursor: "pointer" }}>
-                    <option value="">— None —</option>
-                    {allCoins.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                  </select>
-                </Field>
-                <Field label="XC Value">
+              {/* Multi-badge selector */}
+              <Field label={`Digital Badges (${taskBadges.length} selected · ${taskBadges.reduce((s, b) => s + b.xc, 0)} XC total)`}>
+                {/* Selected badge chips */}
+                {taskBadges.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+                    {taskBadges.map((badge, i) => (
+                      <span key={i} style={{
+                        display: "inline-flex", alignItems: "center", gap: "6px",
+                        padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+                        background: "rgba(79,142,247,0.12)", border: "1px solid rgba(79,142,247,0.3)", color: "#4f8ef7",
+                      }}>
+                        {badge.name} <span style={{ color: "#f5c842", fontFamily: "monospace" }}>{badge.xc} XC</span>
+                        <span onClick={() => setTaskBadges(prev => prev.filter((_, j) => j !== i))}
+                          style={{ cursor: "pointer", color: "rgba(255,255,255,0.4)", marginLeft: "2px", fontSize: "14px" }}>×</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {/* Badge search + dropdown */}
+                <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
+                  <input
+                    value={badgeSearch}
+                    onChange={e => { setBadgeSearch(e.target.value); setBadgeDropdownOpen(true); }}
+                    onFocus={() => setBadgeDropdownOpen(true)}
+                    placeholder="Search and add badges…"
+                    style={inputSx}
+                  />
+                  {badgeDropdownOpen && (
+                    <div style={{
+                      position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100,
+                      maxHeight: "220px", overflowY: "auto", marginTop: "4px",
+                      background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px",
+                      boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                    }}>
+                      {COIN_CATEGORIES.map(cat => {
+                        const filtered = cat.coins.filter(c =>
+                          (!badgeSearch || c.name.toLowerCase().includes(badgeSearch.toLowerCase())) &&
+                          !taskBadges.some(b => b.name === c.name)
+                        );
+                        if (filtered.length === 0) return null;
+                        return (
+                          <div key={cat.name}>
+                            <div style={{ padding: "6px 12px", fontSize: "9px", fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                              {cat.name.toUpperCase()}
+                            </div>
+                            {filtered.map(coin => (
+                              <div key={coin.name}
+                                onClick={() => {
+                                  setTaskBadges(prev => [...prev, { name: coin.name, xc: coin.xc }]);
+                                  setBadgeSearch("");
+                                }}
+                                style={{
+                                  padding: "8px 14px", cursor: "pointer", fontSize: "13px", fontWeight: 600,
+                                  color: "rgba(255,255,255,0.7)", display: "flex", justifyContent: "space-between",
+                                  borderBottom: "1px solid rgba(255,255,255,0.03)",
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.background = "rgba(79,142,247,0.1)")}
+                                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                              >
+                                <span>{coin.name}</span>
+                                <span style={{ color: "#f5c842", fontSize: "11px", fontFamily: "monospace" }}>{coin.xc} XC</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                      {allCoinsFlat.filter(c => !badgeSearch || c.name.toLowerCase().includes(badgeSearch.toLowerCase())).filter(c => !taskBadges.some(b => b.name === c.name)).length === 0 && (
+                        <div style={{ padding: "12px", textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>No badges found</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </Field>
+              {/* Manual XC override if no badges selected */}
+              {taskBadges.length === 0 && (
+                <Field label="XC Value (manual)">
                   <input type="number" value={editingTask.xpValue || 100} onChange={e => setEditingTask(p => ({ ...p, xpValue: parseInt(e.target.value) || 0 }))}
                     min={0} style={inputSx} />
                 </Field>
-              </div>
+              )}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px" }}>
                 <Field label="Cohort">
                   <select value={editingTask.cohort || "all"} onChange={e => setEditingTask(p => ({ ...p, cohort: e.target.value }))}
@@ -878,9 +999,25 @@ export default function TaskManagement() {
                   </select>
                 </Field>
               </div>
-              <Field label="Resource Link">
-                <input value={editingTask.link || ""} onChange={e => setEditingTask(p => ({ ...p, link: e.target.value }))}
-                  placeholder="https://docs.google.com/... or any URL" style={inputSx} />
+              <Field label={`Resource Links (${taskLinks.filter(l => l.trim()).length})`}>
+                {taskLinks.map((link, i) => (
+                  <div key={i} style={{ display: "flex", gap: "8px", marginBottom: i < taskLinks.length - 1 ? "6px" : 0 }}>
+                    <input value={link}
+                      onChange={e => {
+                        const updated = [...taskLinks];
+                        updated[i] = e.target.value;
+                        // Auto-add new empty row when typing in the last one
+                        if (i === taskLinks.length - 1 && e.target.value.trim()) updated.push("");
+                        setTaskLinks(updated);
+                      }}
+                      placeholder="https://docs.google.com/... or any URL" style={{ ...inputSx, flex: 1 }} />
+                    {taskLinks.length > 1 && i < taskLinks.length - 1 && (
+                      <button onClick={() => setTaskLinks(prev => prev.filter((_, j) => j !== i))}
+                        style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)",
+                          borderRadius: "8px", color: "#ef4444", padding: "0 10px", cursor: "pointer", fontSize: "14px", fontWeight: 700 }}>×</button>
+                    )}
+                  </div>
+                ))}
               </Field>
             </div>
             <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "24px" }}>
@@ -954,7 +1091,7 @@ export default function TaskManagement() {
                           style={{ width: "16px", height: "16px", accentColor: "#4f8ef7", cursor: "pointer" }} />
                         <div style={{ flex: 1 }}>
                           <p style={{ margin: 0, fontSize: "13px", fontWeight: 700, color: checked ? "#f0f0ff" : "rgba(255,255,255,0.7)" }}>{task.title}</p>
-                          <p style={{ margin: 0, fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>{task.coinType} · {task.xpValue} XC</p>
+                          <p style={{ margin: 0, fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>{(task as any).rewardBadges?.length > 0 ? (task as any).rewardBadges.map((b: any) => b.name).join(", ") : task.coinType || "No badge"} · {task.xpValue} XC</p>
                         </div>
                         <span style={{ fontSize: "12px", fontWeight: 800, color: checked ? "#4f8ef7" : "rgba(255,255,255,0.2)" }}>{checked ? "✓" : "+"}</span>
                       </label>
