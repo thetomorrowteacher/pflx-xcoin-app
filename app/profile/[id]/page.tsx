@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
-import { User, mockUsers, mockSubmissions, COIN_CATEGORIES, getCurrentRank, getRankProgress, getXCProgress, mockStartupStudios } from "../../lib/data";
+import { User, mockUsers, mockSubmissions, COIN_CATEGORIES, getCurrentRank, getRankProgress, getRankRequirements, getXCProgress, mockStartupStudios, mockPflxRanks } from "../../lib/data";
 import { applyPlayerImages, savePlayerImage } from "../../lib/playerImages";
 
 export default function PlayerProfile({ params }: { params: { id: string } }) {
@@ -51,8 +51,12 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
     reader.readAsDataURL(file);
   };
 
-  const currentRank = getCurrentRank(profileUser.totalXcoin);
+  const currentRank = getCurrentRank(profileUser.totalXcoin, profileUser);
   const xpProgress = getXCProgress(profileUser.xcoin);
+
+  // Next rank requirements
+  const nextRankDef = mockPflxRanks.find(r => r.level === currentRank.level + 1);
+  const nextRankReqs = nextRankDef ? getRankRequirements(nextRankDef, profileUser) : null;
 
   // Group approved submissions by coinType
   const approvedSubs = mockSubmissions.filter(s => s.playerId === profileUser.id && s.status === "approved");
@@ -270,6 +274,68 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
               <p style={{ margin: 0, fontSize: "28px", fontWeight: 900, color: "white" }}>Lv. {profileUser.level}</p>
             </div>
           </div>
+
+          {/* ── Next Rank Requirements ──────────────────────────────── */}
+          {nextRankReqs && !nextRankReqs.allMet && (
+            <div className="cv-card" style={{
+              marginBottom: "32px", borderRadius: "16px", padding: "20px 24px",
+              background: "rgba(34,197,94,0.04)", border: "1px solid rgba(34,197,94,0.15)",
+              position: "relative", overflow: "hidden",
+            }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg, rgba(34,197,94,0.6), rgba(0,212,255,0.4), transparent)" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+                <span style={{ fontSize: "18px" }}>🎯</span>
+                <div>
+                  <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(34,197,94,0.5)" }}>NEXT RANK REQUIREMENTS</div>
+                  <div style={{ fontSize: "16px", fontWeight: 900, color: "#22c55e" }}>
+                    {nextRankReqs.rank.name} {nextRankReqs.rank.icon} <span style={{ fontSize: "12px", fontWeight: 600, color: "rgba(255,255,255,0.3)" }}>Rank {nextRankReqs.rank.level}</span>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {/* XC requirement */}
+                <div style={{
+                  padding: "8px 14px", borderRadius: "10px", fontSize: "11px", fontWeight: 700,
+                  background: nextRankReqs.xcMet ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.03)",
+                  border: `1px solid ${nextRankReqs.xcMet ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)"}`,
+                  color: nextRankReqs.xcMet ? "#22c55e" : "rgba(255,255,255,0.5)",
+                }}>
+                  {nextRankReqs.xcMet ? "✅" : "⬜"} {nextRankReqs.xcCurrent.toLocaleString()} / {nextRankReqs.rank.xcoinUnlock.toLocaleString()} XC
+                </div>
+                {/* Checkpoints */}
+                <div style={{
+                  padding: "8px 14px", borderRadius: "10px", fontSize: "11px", fontWeight: 700,
+                  background: nextRankReqs.checkpointsMet ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.03)",
+                  border: `1px solid ${nextRankReqs.checkpointsMet ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)"}`,
+                  color: nextRankReqs.checkpointsMet ? "#22c55e" : "rgba(255,255,255,0.5)",
+                }}>
+                  {nextRankReqs.checkpointsMet ? "✅" : "⬜"} {nextRankReqs.checkpointsCurrent} / {nextRankReqs.rank.checkpointsRequired} Checkpoints
+                </div>
+                {/* Badge types */}
+                {nextRankReqs.badgeTypesDetail.map(bt => (
+                  <div key={bt.type} style={{
+                    padding: "8px 14px", borderRadius: "10px", fontSize: "11px", fontWeight: 700,
+                    background: bt.met ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${bt.met ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)"}`,
+                    color: bt.met ? "#22c55e" : "rgba(255,255,255,0.5)",
+                  }}>
+                    {bt.met ? "✅" : "⬜"} {bt.type} Badge {bt.met ? `(${bt.count})` : "(0)"}
+                  </div>
+                ))}
+                {/* Specific badges */}
+                {nextRankReqs.specificBadgesDetail.map(sb => (
+                  <div key={sb.name} style={{
+                    padding: "8px 14px", borderRadius: "10px", fontSize: "11px", fontWeight: 700,
+                    background: sb.met ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${sb.met ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)"}`,
+                    color: sb.met ? "#22c55e" : "rgba(255,255,255,0.5)",
+                  }}>
+                    {sb.met ? "✅" : "⬜"} {sb.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <hr style={{ border: "none", borderTop: "2px dashed rgba(255,255,255,0.1)", margin: "0 0 32px" }} />
 

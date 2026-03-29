@@ -276,8 +276,8 @@ export default function AdminPlayers() {
     });
   } else if (sort.key === "rank") {
     filtered.sort((a, b) => {
-      const aRank = getCurrentRank(a.xcoin);
-      const bRank = getCurrentRank(b.xcoin);
+      const aRank = getCurrentRank(a.totalXcoin, a);
+      const bRank = getCurrentRank(b.totalXcoin, b);
       return sort.dir === "asc" ? aRank.name.localeCompare(bRank.name) : bRank.name.localeCompare(aRank.name);
     });
   } else {
@@ -710,7 +710,7 @@ export default function AdminPlayers() {
               <tbody>
                 {filteredPlayers.map((player, idx) => {
                   const level = getLevelFromXC(player.xcoin);
-                  const rank = getCurrentRank(player.xcoin);
+                  const rank = getCurrentRank(player.totalXcoin, player);
                   return (
                     <tr key={player.id}
                       style={{

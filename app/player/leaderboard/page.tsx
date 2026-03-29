@@ -128,7 +128,7 @@ export default function PlayerLeaderboard() {
 
   const filtered = allPlayers.filter((p) => {
     const b    = getBadgeBreakdown(p);
-    const rank = getCurrentRank(p.totalXcoin);
+    const rank = getCurrentRank(p.totalXcoin, p);
     const tier = RANK_TIERS.find((t) => t.levels.includes(rank.level));
     if (cohortFilter !== "all" && p.cohort !== cohortFilter) return false;
     if (tierFilter   !== "all" && tier?.key !== tierFilter)  return false;
@@ -551,7 +551,7 @@ export default function PlayerLeaderboard() {
             {sorted.map((p, i) => {
               const isMe  = p.id === user.id;
               const pos   = i + 1;
-              const rank  = getCurrentRank(p.totalXcoin);
+              const rank  = getCurrentRank(p.totalXcoin, p);
               const b     = getBadgeBreakdown(p);
               const score = getStatusScore(p);
               const total = b.signature + b.executive + b.premium + b.primary;

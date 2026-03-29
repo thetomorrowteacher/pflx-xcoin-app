@@ -220,8 +220,8 @@ function buildResponse(input: string, player: User, router: ReturnType<typeof us
   if (/\b(my stats|stats|xp|coins?|balance|level|rank|progress)\b/.test(txt)) {
     const level = getLevelFromXC(player.xcoin);
     const progress = Math.round(getXCProgress(player.xcoin) * 100);
-    const rank = getCurrentRank(player.totalXcoin);
-    const rankProgress = Math.round(getRankProgress(player.totalXcoin) * 100);
+    const rank = getCurrentRank(player.totalXcoin, player);
+    const rankProgress = Math.round(getRankProgress(player.totalXcoin, player) * 100);
     const leaderboard = [...mockUsers.filter(u => u.role === "player")].sort((a, b) => b.xcoin - a.xcoin);
     const position = leaderboard.findIndex(u => u.id === player.id) + 1;
     return `📊 Your stats, ${firstName}:\n\n⚡ XC: ${player.xcoin.toLocaleString()} (Level ${level} · ${progress}% to next)\n🏆 Rank: ${rank.name} (${rankProgress}% to next tier)\n🪙 Badges: ${player.digitalBadges}\n🏅 Leaderboard: #${position} of ${leaderboard.length} players\n\nKeep pushing — you're doing great!`;
@@ -383,8 +383,8 @@ function gatherPlayerContext(player: User) {
     totalXc: player.totalXcoin,
     level: getLevelFromXC(player.xcoin),
     levelProgress: Math.round(getXCProgress(player.xcoin) * 100) + "%",
-    rank: getCurrentRank(player.totalXcoin).name,
-    rankProgress: Math.round(getRankProgress(player.totalXcoin) * 100) + "%",
+    rank: getCurrentRank(player.totalXcoin, player).name,
+    rankProgress: Math.round(getRankProgress(player.totalXcoin, player) * 100) + "%",
     digitalBadges: player.digitalBadges,
     leaderboardPosition: `#${position} of ${leaderboard.length}`,
     cohort: player.cohort,

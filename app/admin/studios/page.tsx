@@ -454,7 +454,7 @@ export default function StudiosPage() {
                       </div>
                     )}
                     {members.map(m => {
-                      const rank = getCurrentRank(m.totalXcoin);
+                      const rank = getCurrentRank(m.totalXcoin, m);
                       const stakeInfo = mockStudioInvestments.find(i => i.playerId === m.id && i.studioId === studio.id && i.status === "active");
                       const maxStake = getStudioMaxStakePercent(m.rank);
                       return (

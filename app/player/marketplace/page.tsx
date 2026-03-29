@@ -20,7 +20,7 @@ export default function PlayerMarketplace() {
     if (!u.onboardingComplete) { router.push("/diagnostic"); return; }
     setUser(u);
     // Filter upgrades by availability restrictions
-    const playerRank = getCurrentRank(u.totalXcoin).level;
+    const playerRank = getCurrentRank(u.totalXcoin, u).level;
     const allUpgrades = mockModifiers.filter(m => m.type === "upgrade");
     const visibleUpgrades = allUpgrades.filter(m => {
       if (!m.availableTo || m.availableTo === "all") return true;

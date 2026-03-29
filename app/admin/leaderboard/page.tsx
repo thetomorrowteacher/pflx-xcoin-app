@@ -162,7 +162,7 @@ export default function AdminLeaderboard() {
     }
     if (tierFilter !== "all") {
       const tier = RANK_TIERS.find(t => t.key === tierFilter);
-      const rl   = getCurrentRank(p.totalXcoin).level;
+      const rl   = getCurrentRank(p.totalXcoin, p).level;
       if (!tier || !tier.levels.includes(rl)) return false;
     }
     return true;
@@ -489,7 +489,7 @@ export default function AdminLeaderboard() {
             </div>
           )}
           {players.map((p, i) => {
-            const evRank   = getCurrentRank(p.totalXcoin);
+            const evRank   = getCurrentRank(p.totalXcoin, p);
             const b        = getBadgeBreakdown(p);
             const score    = getStatusScore(p);
             const medalRgb = i === 0 ? "245,200,66" : i === 1 ? "148,163,184" : i === 2 ? "205,124,47" : null;

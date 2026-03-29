@@ -84,7 +84,7 @@ export default function PlayerHome() {
       setUser(u);
       setTransactions(mockTransactions.filter(t => t.userId === u.id).slice().reverse().slice(0, 8));
       setActiveSeason(mockGamePeriods.find(p => p.isActive) ?? mockGamePeriods[0] ?? null);
-      setCurrentRank(getCurrentRank(u.totalXcoin));
+      setCurrentRank(getCurrentRank(u.totalXcoin, u));
       setMyTasks(mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, u.id, u.cohort)).slice(0, 3));
       setMyJobs(mockJobs.filter(j => isAssignedToPlayer(j.assignedTo, u.id, u.cohort)).slice(0, 3));
     } catch {
@@ -200,7 +200,7 @@ export default function PlayerHome() {
           const studio = mockStartupStudios.find(s => s.id === user.studioId);
           if (!studio) return null;
           const activeStake = mockStudioInvestments.find(i => i.userId === user.id && i.studioId === studio.id && i.status === "active");
-          const maxStakePct = getStudioMaxStakePercent(getCurrentRank(user.totalXcoin).level);
+          const maxStakePct = getStudioMaxStakePercent(getCurrentRank(user.totalXcoin, user).level);
           return (
             <div style={{
               marginBottom: "28px", borderRadius: "18px", padding: "22px 24px",

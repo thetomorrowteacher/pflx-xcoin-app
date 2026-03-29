@@ -632,7 +632,7 @@ export function getBadgeBreakdown(user: User): BadgeBreakdown {
 // Composite Status Score — determines leaderboard position
 // Weights: Evolution Rank > Signature > Executive > Premium > Primary > XC (tiebreaker)
 export function getStatusScore(user: User): number {
-  const rankLevel = getCurrentRank(user.totalXcoin).level;
+  const rankLevel = getCurrentRank(user.totalXcoin, user).level;
   const b = getBadgeBreakdown(user);
   return (
     rankLevel     * 100000 +
@@ -926,18 +926,141 @@ export function getXCProgress(xcoin: number): number {
   return (xcInCurrentLevel / 1000) * 100;
 }
 
-export function getCurrentRank(totalXcoin: number): PFLXRank {
-  return [...mockPflxRanks].reverse().find(r => totalXcoin >= r.xcoinUnlock) || mockPflxRanks[0] || { level: 1, name: "Player", xcoinUnlock: 0, xcoinMaintain: 0, checkpointsRequired: 0, badgeTypeRequirements: [], icon: "👤" };
+// ── Rank eligibility: checks XC + checkpoints + badge types + specific badges ──
+
+/** Count how many checkpoints a player has completed (tasks approved in completed rounds) */
+export function getPlayerCheckpointsCompleted(playerId: string): number {
+  const completedRounds = mockCheckpoints.filter(cp => cp.status === "completed");
+  let count = 0;
+  for (const round of completedRounds) {
+    // A player "completed" a checkpoint if they have at least one approved task in that round
+    const hasTasks = mockTasks.some(
+      t => t.roundId === round.id && t.status === "approved" && (
+        t.assignedTo === "all" ||
+        (Array.isArray(t.assignedTo) && t.assignedTo.includes(playerId)) ||
+        t.submittedBy === playerId
+      )
+    );
+    if (hasTasks) count++;
+  }
+  return count;
 }
 
-export function getRankProgress(totalXcoin: number): number {
-  const current = getCurrentRank(totalXcoin);
+/** Get a player's earned badge names from approved submissions */
+export function getPlayerEarnedBadgeNames(playerId: string): string[] {
+  return mockSubmissions
+    .filter(s => s.playerId === playerId && s.status === "approved")
+    .map(s => s.coinType);
+}
+
+/** Check if a player has at least one badge from a given type category */
+function playerHasBadgeType(badgeCounts: BadgeBreakdown | undefined, typeName: string): boolean {
+  if (!badgeCounts) return false;
+  const map: Record<string, keyof BadgeBreakdown> = {
+    "Primary": "primary",
+    "Premium": "premium",
+    "Executive": "executive",
+    "Signature": "signature",
+  };
+  const key = map[typeName];
+  return key ? (badgeCounts[key] ?? 0) > 0 : false;
+}
+
+/** Full rank calculation — evaluates ALL requirements, not just XC */
+export function getCurrentRank(totalXcoin: number, user?: User): PFLXRank {
+  // If no user context provided, fall back to XC-only check (backward compat)
+  if (!user) {
+    return [...mockPflxRanks].reverse().find(r => totalXcoin >= r.xcoinUnlock) || mockPflxRanks[0];
+  }
+
+  const checkpointsCompleted = getPlayerCheckpointsCompleted(user.id);
+  const earnedBadgeNames = getPlayerEarnedBadgeNames(user.id);
+
+  // Walk ranks from highest to lowest, return the first one where ALL requirements are met
+  for (let i = mockPflxRanks.length - 1; i >= 0; i--) {
+    const rank = mockPflxRanks[i];
+
+    // 1. XC requirement
+    if (totalXcoin < rank.xcoinUnlock) continue;
+
+    // 2. Checkpoints requirement
+    if (checkpointsCompleted < rank.checkpointsRequired) continue;
+
+    // 3. Badge type requirements — must have at least 1 badge in each required type
+    const badgeTypeMet = rank.badgeTypeRequirements.every(
+      type => playerHasBadgeType(user.badgeCounts, type)
+    );
+    if (!badgeTypeMet) continue;
+
+    // 4. Specific badge requirements — must have each named badge
+    if (rank.specificBadgeRequirements && rank.specificBadgeRequirements.length > 0) {
+      const specificMet = rank.specificBadgeRequirements.every(
+        name => earnedBadgeNames.includes(name)
+      );
+      if (!specificMet) continue;
+    }
+
+    return rank;
+  }
+
+  // No rank requirements met — default to level 1
+  return mockPflxRanks[0];
+}
+
+/** Detailed breakdown of what requirements are met/unmet for a given rank */
+export interface RankRequirementStatus {
+  rank: PFLXRank;
+  xcMet: boolean;
+  xcCurrent: number;
+  checkpointsMet: boolean;
+  checkpointsCurrent: number;
+  badgeTypesMet: boolean;
+  badgeTypesDetail: { type: string; met: boolean; count: number }[];
+  specificBadgesMet: boolean;
+  specificBadgesDetail: { name: string; met: boolean }[];
+  allMet: boolean;
+}
+
+/** Get requirement status for a specific rank */
+export function getRankRequirements(rank: PFLXRank, user: User): RankRequirementStatus {
+  const checkpointsCurrent = getPlayerCheckpointsCompleted(user.id);
+  const earnedBadgeNames = getPlayerEarnedBadgeNames(user.id);
+
+  const xcMet = user.totalXcoin >= rank.xcoinUnlock;
+  const checkpointsMet = checkpointsCurrent >= rank.checkpointsRequired;
+
+  const badgeTypesDetail = rank.badgeTypeRequirements.map(type => {
+    const map: Record<string, keyof BadgeBreakdown> = { "Primary": "primary", "Premium": "premium", "Executive": "executive", "Signature": "signature" };
+    const key = map[type];
+    const count = key && user.badgeCounts ? (user.badgeCounts[key] ?? 0) : 0;
+    return { type, met: count > 0, count };
+  });
+  const badgeTypesMet = badgeTypesDetail.every(d => d.met);
+
+  const specificBadgesDetail = (rank.specificBadgeRequirements || []).map(name => ({
+    name,
+    met: earnedBadgeNames.includes(name),
+  }));
+  const specificBadgesMet = specificBadgesDetail.every(d => d.met);
+
+  return {
+    rank,
+    xcMet, xcCurrent: user.totalXcoin,
+    checkpointsMet, checkpointsCurrent,
+    badgeTypesMet, badgeTypesDetail,
+    specificBadgesMet, specificBadgesDetail,
+    allMet: xcMet && checkpointsMet && badgeTypesMet && specificBadgesMet,
+  };
+}
+
+export function getRankProgress(totalXcoin: number, user?: User): number {
+  const current = getCurrentRank(totalXcoin, user);
   const nextIdx = mockPflxRanks.findIndex(r => r.level === current.level) + 1;
   if (nextIdx >= mockPflxRanks.length) return 100;
   const next = mockPflxRanks[nextIdx];
   const range = next.xcoinUnlock - current.xcoinUnlock;
   const progress = totalXcoin - current.xcoinUnlock;
-  return (progress / range) * 100;
+  return Math.min(100, Math.max(0, (progress / range) * 100));
 }
 
 // Calculate how much XP the target player must pay to buy out a deal
