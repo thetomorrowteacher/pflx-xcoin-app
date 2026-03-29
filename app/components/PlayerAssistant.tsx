@@ -358,14 +358,49 @@ function buildResponse(input: string, player: User, router: ReturnType<typeof us
     return `🎮 Here's what I can help with:\n\n📌 Guidance & Strategy:\n• "Prioritize" / "What should I do?" — smart priority ranking\n• "How do I level up?" — earning strategies\n• "How do I submit?" — submission walkthrough\n• "How does XC work?" — economy explained\n\n📊 Your Data:\n• "My stats" — XP, level, rank, position\n• "My tasks" — open tasks\n• "Deadlines" — due soon or overdue\n• "My jobs" — active jobs\n• "Submissions" — pending approvals\n• "Leaderboard" — top players\n• "Wallet" — transactions\n\n🎯 Actions:\n• "Motivate me" — a boost 🔥\n• "Go to [page]" — navigate\n\nYou can also tap the mic and speak!`;
   }
 
-  // ── Default — contextual rather than unhelpful ─────────────────────────
-  const defOpen = mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, player.id, player.cohort) && t.status === "open").length;
-  const defOverdue = mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, player.id, player.cohort) && t.status === "open" && t.dueDate && new Date(t.dueDate) < new Date()).length;
-  let fallback = `I'm not sure about that one, ${firstName}. But here's a snapshot: `;
-  if (defOverdue > 0) fallback += `⚠️ ${defOverdue} overdue task${defOverdue > 1 ? "s" : ""} need attention. `;
-  else if (defOpen > 0) fallback += `You have ${defOpen} open task${defOpen > 1 ? "s" : ""} to work on. `;
-  fallback += `Try "prioritize" for a full action plan, or "help" to see everything I can do.`;
-  return fallback;
+  // ── Default — signal to call Gemini ─────────────────────────────────
+  return null; // null = no regex match, use Gemini AI
+}
+
+// ─── Gather player context for Gemini ────────────────────────────────────────
+function gatherPlayerContext(player: User) {
+  const myTasks = mockTasks.filter(
+    t => isAssignedToPlayer(t.assignedTo, player.id, player.cohort) && t.status === "open"
+  );
+  const myJobs = mockJobs.filter(
+    j => isAssignedToPlayer(j.assignedTo, player.id, player.cohort) && j.status === "open"
+  );
+  const pendingSubs = mockTasks.filter(t => t.submittedBy === player.id && t.status === "submitted");
+  const completedTasks = mockTasks.filter(t => t.submittedBy === player.id && t.status === "approved");
+  const overdueTasks = myTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date());
+  const leaderboard = [...mockUsers.filter(u => u.role === "player")].sort((a, b) => b.xcoin - a.xcoin);
+  const position = leaderboard.findIndex(u => u.id === player.id) + 1;
+
+  return {
+    playerName: player.name,
+    brandName: player.brandName || player.name,
+    xc: player.xcoin,
+    totalXc: player.totalXcoin,
+    level: getLevelFromXC(player.xcoin),
+    levelProgress: Math.round(getXCProgress(player.xcoin) * 100) + "%",
+    rank: getCurrentRank(player.totalXcoin).name,
+    rankProgress: Math.round(getRankProgress(player.totalXcoin) * 100) + "%",
+    digitalBadges: player.digitalBadges,
+    leaderboardPosition: `#${position} of ${leaderboard.length}`,
+    cohort: player.cohort,
+    openTasks: myTasks.slice(0, 8).map(t => ({
+      title: t.title, xc: t.xcReward, dueDate: t.dueDate || "none",
+      isOverdue: t.dueDate ? new Date(t.dueDate) < new Date() : false,
+    })),
+    openJobs: myJobs.slice(0, 5).map(j => ({
+      title: j.title, xc: j.xcReward, slotsLeft: j.slots - j.filledSlots,
+    })),
+    pendingSubmissions: pendingSubs.length,
+    completedTasks: completedTasks.length,
+    overdueTasks: overdueTasks.length,
+    activeSeason: mockGamePeriods.find(p => p.isActive)?.title || "none",
+    activeCheckpoint: mockCheckpoints.find(c => c.status === "active")?.name || "none",
+  };
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -423,11 +458,39 @@ export default function PlayerAssistant() {
     setInput("");
     addMsg("user", text);
     setThinking(true);
-    await new Promise(r => setTimeout(r, 400));
-    const reply = buildResponse(text, player, router);
+
+    // Try local regex handlers first (instant for navigation, actions, etc.)
+    const localReply = buildResponse(text, player, router);
+    if (localReply !== null) {
+      setThinking(false);
+      addMsg("assistant", localReply);
+      speak(localReply, voiceOn);
+      return;
+    }
+
+    // No local match — call Gemini AI
+    try {
+      const context = gatherPlayerContext(player);
+      const res = await fetch("/api/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, role: "player", context }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setThinking(false);
+        addMsg("assistant", data.reply);
+        speak(data.reply, voiceOn);
+        return;
+      }
+    } catch (err) {
+      console.error("[PlayerAssistant] Gemini call failed:", err);
+    }
+
+    // Fallback if Gemini fails
     setThinking(false);
-    addMsg("assistant", reply);
-    speak(reply, voiceOn);
+    const firstName = player.name.split(" ")[0];
+    addMsg("assistant", `Sorry ${firstName}, I'm having trouble connecting to AI right now. Try "prioritize", "my tasks", or "help" for quick answers!`);
   }, [input, player, router, voiceOn]);
 
   // Voice

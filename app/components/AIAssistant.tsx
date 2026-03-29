@@ -299,11 +299,43 @@ function buildTextResponse(input: string, router: ReturnType<typeof useRouter>):
     greeting += ` Say "analyze submissions" for AI recommendations, "at-risk" to check struggling players, or "help" for all commands!`;
     return greeting;
   }
-  // ── Default — contextual ──────────────────────────────────────────────
-  let fallback = `I'm not sure about that. `;
-  if (pending.length > 0) fallback += `You have ${pending.length} submission${pending.length > 1 ? "s" : ""} to review. `;
-  fallback += `Try "help" for a full list, "analyze submissions" for AI scoring, or "at-risk" to check on struggling players.`;
-  return fallback;
+  // ── Default — signal to call Gemini ──────────────────────────────────
+  return null; // null = no regex match, use Gemini AI
+}
+
+// ─── Gather host context for Gemini ──────────────────────────────────────────
+function gatherHostContext() {
+  const players = mockUsers.filter(u => u.role === "player");
+  const pending = mockTasks.filter(t => t.status === "submitted");
+  const openTasks = mockTasks.filter(t => t.status === "open");
+  const approvedTasks = mockTasks.filter(t => t.status === "approved");
+  const overdue = mockTasks.filter(t => t.status === "open" && t.dueDate && new Date(t.dueDate) < new Date());
+  const activeSeason = mockGamePeriods.find(g => g.isActive);
+  const activeCheckpoints = mockCheckpoints.filter(c => c.status === "active");
+  const totalXC = players.reduce((s, u) => s + u.xcoin, 0);
+  const topPlayers = [...players].sort((a, b) => b.xcoin - a.xcoin).slice(0, 5);
+
+  return {
+    totalPlayers: players.length,
+    totalXCInEconomy: totalXC,
+    avgXCPerPlayer: Math.round(totalXC / (players.length || 1)),
+    pendingSubmissions: pending.length,
+    pendingDetails: pending.slice(0, 5).map(t => {
+      const p = players.find(u => u.id === t.submittedBy);
+      return { task: t.title, player: p?.brandName || p?.name || "Unknown", submittedAt: t.submittedAt };
+    }),
+    openTasks: openTasks.length,
+    completedTasks: approvedTasks.length,
+    overdueAcrossPlayers: overdue.length,
+    topPlayers: topPlayers.map(p => ({ name: p.brandName || p.name, xc: p.xcoin, level: p.level, badges: p.digitalBadges })),
+    atRiskPlayers: players.filter(p => {
+      const pOverdue = mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, p.id, p.cohort) && t.status === "open" && t.dueDate && new Date(t.dueDate) < new Date()).length;
+      return pOverdue > 0 || p.xcoin < 100;
+    }).slice(0, 5).map(p => ({ name: p.brandName || p.name, xc: p.xcoin })),
+    activeSeason: activeSeason?.title || "none",
+    activeCheckpoints: activeCheckpoints.map(c => c.name),
+    openJobs: mockJobs ? mockJobs.filter(j => j.status === "open").length : 0,
+  };
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -405,13 +437,40 @@ export default function AIAssistant() {
       if(task){ await analyzeSubmission(task); return; }
     }
 
+    // Try local regex handlers first
+    const localResponse = buildTextResponse(text, router);
+    if (localResponse !== null) {
+      setIsTyping(true);
+      setTimeout(()=>{
+        setIsTyping(false);
+        addMessage({role:"assistant",text:localResponse});
+        if(voiceOn) speak(localResponse);
+      },400);
+      return;
+    }
+
+    // No local match — call Gemini AI
     setIsTyping(true);
-    setTimeout(()=>{
-      setIsTyping(false);
-      const response = buildTextResponse(text, router);
-      addMessage({role:"assistant",text:response});
-      if(voiceOn) speak(response);
-    },500);
+    try {
+      const context = gatherHostContext();
+      const res = await fetch("/api/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, role: "host", context }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIsTyping(false);
+        addMessage({role:"assistant",text:data.reply});
+        if(voiceOn) speak(data.reply);
+        return;
+      }
+    } catch (err) {
+      console.error("[AIAssistant] Gemini call failed:", err);
+    }
+    // Fallback
+    setIsTyping(false);
+    addMessage({role:"assistant",text:`Sorry, I'm having trouble connecting to AI right now. Try "analyze submissions", "at-risk", or "help" for quick answers!`});
   },[addMessage,analyzeSubmission,router,voiceOn]);
 
   // ── Voice recognition ────────────────────────────────────────────────────
