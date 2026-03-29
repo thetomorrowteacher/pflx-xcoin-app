@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../components/SideNav";
 import { mergePlayerStats } from "../lib/playerStats";
@@ -54,6 +54,10 @@ export default function PlayerHome() {
   const [currentRank, setCurrentRank] = useState<PFLXRank | null>(null);
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [myJobs, setMyJobs] = useState<Job[]>([]);
+  const [dailyReport, setDailyReport] = useState<string>("");
+  const [dailyChecklist, setDailyChecklist] = useState<{ item: string; done: boolean }[]>([]);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState("");
 
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
@@ -91,6 +95,74 @@ export default function PlayerHome() {
       router.push("/");
     }
   }, [router]);
+
+  // Fetch Gemini daily report
+  const fetchDailyReport = useCallback(async (u: User) => {
+    setReportLoading(true);
+    setReportError("");
+    try {
+      const playerTasks = mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, u.id, u.cohort));
+      const playerJobs = mockJobs.filter(j => isAssignedToPlayer(j.assignedTo, u.id, u.cohort));
+      const activeCP = mockCheckpoints.find(c => c.status === "active");
+      const mode = u.workEthicMode || "medium";
+
+      const taskSummary = playerTasks.slice(0, 10).map(t =>
+        `- "${t.title}" (${t.status}, ${t.xcReward}XC${t.dueDate ? `, due ${t.dueDate}` : ""})`
+      ).join("\n");
+      const jobSummary = playerJobs.slice(0, 5).map(j =>
+        `- "${j.title}" (${j.status}, ${j.xcReward}XC)`
+      ).join("\n");
+      const cpSummary = activeCP ? `Active Checkpoint: "${activeCP.name}" (ends ${activeCP.endDate})` : "No active checkpoint";
+
+      const prompt = `You are a PFLX game assistant. Generate a brief daily report for player "${u.brandName || u.name}".
+
+Work Ethic Mode: ${mode.toUpperCase()}
+${mode === "high" ? "Give detailed micro-tasks, aggressive action items, and tight deadlines. Be intense and motivating." : mode === "low" ? "Give high-level guidance, relaxed suggestions, focus on big picture. Be encouraging." : "Give balanced, actionable suggestions with weekly milestones."}
+
+Player Stats: ${u.totalXcoin} lifetime XC, ${u.xcoin} spendable XC, ${u.digitalBadges} badges, Rank ${u.rank}
+${cpSummary}
+
+Current Tasks:
+${taskSummary || "None assigned"}
+
+Current Jobs:
+${jobSummary || "None available"}
+
+Return ONLY valid JSON with this exact format (no markdown, no code blocks):
+{"report":"A 2-3 sentence daily briefing about their progress and priorities","checklist":["Action item 1","Action item 2","Action item 3","Action item 4","Action item 5"]}`;
+
+      const res = await fetch("/api/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: prompt }),
+      });
+      if (!res.ok) throw new Error("Gemini API error");
+      const data = await res.json();
+      const text = (data.response || data.reply || "").trim();
+      // Parse JSON from response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        setDailyReport(parsed.report || "");
+        setDailyChecklist((parsed.checklist || []).map((item: string) => ({ item, done: false })));
+      } else {
+        setDailyReport(text.slice(0, 300));
+        setDailyChecklist([]);
+      }
+    } catch (err: any) {
+      setReportError("Could not load daily report. Check back later.");
+      console.error("[gemini-report]", err);
+    } finally {
+      setReportLoading(false);
+    }
+  }, []);
+
+  // Auto-fetch daily report on mount
+  useEffect(() => {
+    if (user && !dailyReport && !reportLoading) {
+      fetchDailyReport(user);
+    }
+  }, [user, dailyReport, reportLoading, fetchDailyReport]);
 
   if (!user) return null;
 
@@ -194,6 +266,96 @@ export default function PlayerHome() {
             </div>
           </div>
         )}
+
+        {/* ── AI Daily Report & Checklist ── */}
+        <div style={{
+          marginBottom: "28px", borderRadius: "18px", overflow: "hidden",
+          background: "rgba(22,22,31,0.8)",
+          border: "1px solid rgba(167,139,250,0.25)",
+          boxShadow: "0 0 28px rgba(167,139,250,0.08)",
+          position: "relative",
+        }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg, #a78bfa, #4f8ef7, transparent)" }} />
+          <div style={{ padding: "20px 24px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "18px" }}>🤖</span>
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: 900, color: "#f0f0ff", letterSpacing: "0.04em" }}>DAILY BRIEFING</div>
+                  <div style={{ fontSize: "10px", color: "rgba(167,139,250,0.6)", letterSpacing: "0.08em" }}>
+                    POWERED BY GEMINI · {(user.workEthicMode || "medium").toUpperCase()} MODE
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => fetchDailyReport(user)} disabled={reportLoading}
+                style={{ padding: "6px 14px", borderRadius: "8px", cursor: reportLoading ? "default" : "pointer",
+                  background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.25)",
+                  color: "#a78bfa", fontSize: "11px", fontWeight: 700, opacity: reportLoading ? 0.5 : 1 }}>
+                {reportLoading ? "Loading…" : "🔄 Refresh"}
+              </button>
+            </div>
+
+            {/* Report text */}
+            {reportLoading ? (
+              <div style={{ padding: "20px", textAlign: "center" }}>
+                <div style={{ fontSize: "24px", marginBottom: "8px", animation: "pulse 1.5s infinite" }}>🤖</div>
+                <p style={{ margin: 0, fontSize: "12px", color: "rgba(167,139,250,0.5)" }}>Generating your daily report...</p>
+              </div>
+            ) : reportError ? (
+              <div style={{ padding: "14px", borderRadius: "10px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                <p style={{ margin: 0, fontSize: "12px", color: "#ef4444" }}>{reportError}</p>
+              </div>
+            ) : (
+              <>
+                {dailyReport && (
+                  <div style={{ padding: "14px 16px", borderRadius: "12px", background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.12)", marginBottom: "14px" }}>
+                    <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.75)", lineHeight: 1.7 }}>{dailyReport}</p>
+                  </div>
+                )}
+
+                {/* Checklist */}
+                {dailyChecklist.length > 0 && (
+                  <div>
+                    <p style={{ margin: "0 0 10px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Today's Action Items</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {dailyChecklist.map((item, i) => (
+                        <button key={i} onClick={() => {
+                          setDailyChecklist(prev => prev.map((c, j) => j === i ? { ...c, done: !c.done } : c));
+                        }} style={{
+                          display: "flex", alignItems: "center", gap: "10px",
+                          padding: "10px 14px", borderRadius: "10px", cursor: "pointer",
+                          background: item.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)",
+                          border: `1px solid ${item.done ? "rgba(34,197,94,0.2)" : "rgba(255,255,255,0.06)"}`,
+                          textAlign: "left", width: "100%",
+                          transition: "all 0.15s",
+                        }}>
+                          <span style={{
+                            width: "20px", height: "20px", borderRadius: "6px", flexShrink: 0,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            background: item.done ? "rgba(34,197,94,0.2)" : "rgba(255,255,255,0.06)",
+                            border: `1px solid ${item.done ? "#22c55e" : "rgba(255,255,255,0.12)"}`,
+                            fontSize: "12px", color: item.done ? "#22c55e" : "transparent",
+                          }}>✓</span>
+                          <span style={{
+                            fontSize: "12px", fontWeight: 600,
+                            color: item.done ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.7)",
+                            textDecoration: item.done ? "line-through" : "none",
+                            flex: 1,
+                          }}>{item.item}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: "10px", textAlign: "right" }}>
+                      <span style={{ fontSize: "11px", color: "rgba(167,139,250,0.5)", fontWeight: 700 }}>
+                        {dailyChecklist.filter(c => c.done).length}/{dailyChecklist.length} completed
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
 
         {/* Startup Studio Card */}
         {(() => {

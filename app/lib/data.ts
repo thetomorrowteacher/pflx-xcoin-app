@@ -32,6 +32,7 @@ export interface User {
   studioStakeXC?: number;        // XC the player has staked in their studio
   studioStakePercent?: number;   // % stake they hold in studio pool
   diagnosticResult?: DiagnosticResult; // Stored diagnostic results
+  workEthicMode?: "high" | "medium" | "low"; // Controls Gemini suggestion chunking
 }
 
 
@@ -138,6 +139,13 @@ export interface Checkpoint {
   link?: string; // Optional resource link
 }
 
+export interface JobMilestone {
+  id: string;
+  title: string;
+  dueDate: string;
+  completed: boolean;
+}
+
 export interface Job {
   id: string;
   title: string;
@@ -146,7 +154,7 @@ export interface Job {
   xcReward: number; // Base/Total XC reward from the job
   slots: number;
   filledSlots: number;
-  status: "open" | "closed";
+  status: "open" | "closed" | "filled" | "in_progress" | "completed";
   createdBy: string;
   createdAt: string;
   applicants: string[];
@@ -154,6 +162,14 @@ export interface Job {
   investorStakes?: InvestorStake[]; // XP investments boosting this job's value
   assignedTo?: "all" | string[]; // "all" = everyone, string[] = player IDs or cohort names
   link?: string; // Optional resource link
+  // Job hiring system
+  maxHires?: number;           // How many players can be hired for this job
+  hiredPlayers?: string[];     // Player IDs who have been hired
+  timeline?: { start: string; end: string }; // Job timeline
+  milestones?: JobMilestone[]; // Scheduled milestone intervals
+  transformedTaskIds?: string[]; // Task IDs created when job transforms into tasks
+  // Work ethic / scheduling
+  intervalType?: "daily" | "weekly" | "biweekly" | "monthly"; // How often tasks are prompted
 }
 
 // Helper: check if a task/job is visible to a given player

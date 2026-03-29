@@ -60,7 +60,7 @@ function StudioLogo({ studioId, icon, color, colorRgb, size = 56 }: {
 export default function PlayerOptions() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [activeSection, setActiveSection] = useState<"onboarding" | null>("onboarding");
+  const [activeSection, setActiveSection] = useState<"onboarding" | "workethic" | null>("onboarding");
   const [editMode, setEditMode] = useState(false);
   const [editBrandType, setEditBrandType] = useState("");
   const [editPathways, setEditPathways] = useState<string[]>([]);
@@ -153,6 +153,7 @@ export default function PlayerOptions() {
         <div style={{ display: "flex", gap: "10px", marginBottom: "28px", flexWrap: "wrap" }}>
           {[
             { id: "onboarding" as const, label: "Player Onboarding Results", icon: "🧬" },
+            { id: "workethic" as const, label: "Work Ethic Mode", icon: "⚡" },
           ].map(tab => (
             <button
               key={tab.id}
@@ -359,6 +360,58 @@ export default function PlayerOptions() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Work Ethic Mode Section ──────────────────────────────────── */}
+        {activeSection === "workethic" && (
+          <div style={{ maxWidth: "720px" }}>
+            <div style={{
+              borderRadius: "18px", overflow: "hidden",
+              background: "rgba(22,22,31,0.6)", border: "1px solid rgba(245,200,66,0.15)",
+              boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
+            }}>
+              <div style={{ padding: "24px 28px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <h2 style={{ margin: "0 0 6px", fontSize: "18px", fontWeight: 900, color: "#f0f0ff" }}>⚡ Work Ethic Mode</h2>
+                <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>
+                  Choose how intensely your AI assistant chunks out suggestions and task breakdowns. Higher modes mean more detailed daily plans and tighter deadlines.
+                </p>
+              </div>
+              <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: "14px" }}>
+                {([
+                  { mode: "high" as const, label: "HIGH", icon: "🔥", color: "#ef4444", desc: "Maximum output. Daily micro-tasks, aggressive deadlines, detailed step-by-step breakdowns. For players who want to move fast and ship constantly." },
+                  { mode: "medium" as const, label: "MEDIUM", icon: "⚡", color: "#f5c842", desc: "Balanced pace. Weekly milestone focus with actionable suggestions. Good for steady, consistent progress." },
+                  { mode: "low" as const, label: "LOW", icon: "🌿", color: "#22c55e", desc: "Relaxed pace. High-level guidance with flexible timelines. Focus on quality over quantity, bigger picture thinking." },
+                ]).map(opt => {
+                  const active = (user.workEthicMode || "medium") === opt.mode;
+                  return (
+                    <button key={opt.mode} onClick={async () => {
+                      const updated = { ...user, workEthicMode: opt.mode };
+                      const idx = mockUsers.findIndex(u => u.id === user.id);
+                      if (idx >= 0) mockUsers[idx] = updated;
+                      localStorage.setItem("pflx_user", JSON.stringify(updated));
+                      setUser(updated);
+                      await saveAndToast([saveUsers], `Work ethic set to ${opt.label} ✓`);
+                    }} style={{
+                      display: "flex", alignItems: "center", gap: "16px", padding: "18px 20px",
+                      borderRadius: "14px", cursor: "pointer", textAlign: "left",
+                      background: active ? `rgba(${opt.color === "#ef4444" ? "239,68,68" : opt.color === "#f5c842" ? "245,200,66" : "34,197,94"},0.1)` : "rgba(255,255,255,0.03)",
+                      border: active ? `2px solid ${opt.color}` : "2px solid rgba(255,255,255,0.06)",
+                      transition: "all 0.2s",
+                    }}>
+                      <span style={{ fontSize: "28px" }}>{opt.icon}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+                          <span style={{ fontSize: "14px", fontWeight: 900, color: active ? opt.color : "rgba(255,255,255,0.6)", letterSpacing: "0.08em" }}>{opt.label}</span>
+                          {active && <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "9px", fontWeight: 800, background: `${opt.color}22`, color: opt.color, letterSpacing: "0.1em" }}>ACTIVE</span>}
+                        </div>
+                        <p style={{ margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>{opt.desc}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
 

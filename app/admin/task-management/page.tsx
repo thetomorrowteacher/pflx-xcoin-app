@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
 import {
-  User, Task, Job, Checkpoint, Project,
+  User, Task, Job, JobMilestone, Checkpoint, Project,
   mockTasks, mockJobs, mockCheckpoints, mockUsers, mockProjects,
   COIN_CATEGORIES, RewardCoin, getMockCohorts,
   isHostUser,
@@ -288,6 +288,13 @@ export default function TaskManagement() {
       xpValue: editingJob.xpValue || 500,
       cohort: editingJob.cohort || "all",
       status: (editingJob.status as Job["status"]) || "open",
+      maxHires: editingJob.maxHires || 1,
+      hiredPlayers: editingJob.hiredPlayers || [],
+      timeline: editingJob.timeline,
+      milestones: (editingJob.milestones || []).filter((m: any) => m.title.trim()),
+      intervalType: editingJob.intervalType || "weekly",
+      applicants: editingJob.applicants || [],
+      approved: editingJob.approved || [],
     } as Job;
     if (isNew) { setJobs(prev => [...prev, saved]); mockJobs.push(saved); }
     else {
@@ -351,6 +358,56 @@ export default function TaskManagement() {
     const idx = mockProjects.findIndex(p => p.id === projId);
     if (idx >= 0) mockProjects.splice(idx, 1);
     saveAndToast([saveProjects], "Project deleted — saved to cloud ✓");
+  };
+
+  // ── Duplicate handlers ──────────────────────────────────────────────────
+
+  const duplicateCheckpoint = (cp: Checkpoint) => {
+    playClick();
+    const newId = `cp_${Date.now()}`;
+    const dup: Checkpoint = { ...cp, id: newId, name: `${cp.name} (Copy)`, status: "upcoming" as const };
+    setCheckpoints(prev => [...prev, dup]);
+    mockCheckpoints.push(dup);
+    // Duplicate task assignments too
+    const cpTasksCopy = tasks.filter(t => t.roundId === cp.id);
+    cpTasksCopy.forEach(t => {
+      const newTaskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const dupTask: Task = { ...t, id: newTaskId, roundId: newId, status: "open" as Task["status"] };
+      setTasks(prev => [...prev, dupTask]);
+      mockTasks.push(dupTask);
+    });
+    playSuccess();
+    saveAndToast([saveCheckpoints, saveTasks], "Checkpoint duplicated ✓");
+  };
+
+  const duplicateTask = (task: Task) => {
+    playClick();
+    const newId = `task_${Date.now()}`;
+    const dup: Task = { ...task, id: newId, title: `${task.title} (Copy)`, status: "open" as Task["status"] };
+    setTasks(prev => [...prev, dup]);
+    mockTasks.push(dup);
+    playSuccess();
+    saveAndToast([saveTasks], "Task duplicated ✓");
+  };
+
+  const duplicateJob = (job: Job) => {
+    playClick();
+    const newId = `job_${Date.now()}`;
+    const dup: Job = { ...job, id: newId, title: `${job.title} (Copy)`, status: "open" as Job["status"], applicants: [], approved: [], hiredPlayers: [], filledSlots: 0, transformedTaskIds: [] };
+    setJobs(prev => [...prev, dup]);
+    mockJobs.push(dup);
+    playSuccess();
+    saveAndToast([saveJobs], "Job duplicated ✓");
+  };
+
+  const duplicateProject = (proj: Project) => {
+    playClick();
+    const newId = `proj_${Date.now()}`;
+    const dup: Project = { ...proj, id: newId, title: `${proj.title} (Copy)`, status: "active" as Project["status"] };
+    setProjects(prev => [...prev, dup]);
+    mockProjects.push(dup);
+    playSuccess();
+    saveAndToast([saveProjects], "Project duplicated ✓");
   };
 
   const cohorts = getMockCohorts();
@@ -480,6 +537,14 @@ export default function TaskManagement() {
                             </span>
                           )}
                         </div>
+                        {/* Duplicate button */}
+                        <div style={{ marginTop: "12px", display: "flex", gap: "8px" }}>
+                          <button onClick={(e) => { e.stopPropagation(); duplicateCheckpoint(cp); }}
+                            style={{ padding: "5px 12px", background: "rgba(0,212,255,0.08)", border: "1px solid rgba(0,212,255,0.2)",
+                              borderRadius: "8px", color: "#00d4ff", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
+                            📋 Duplicate
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -554,10 +619,16 @@ export default function TaskManagement() {
                             <span style={pill(task.status, sc)}>{task.status}</span>
                           </td>
                           <td style={{ padding: "14px 18px" }}>
-                            <button onClick={() => openEditTask(task as Task)}
-                              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
-                                borderRadius: "8px", color: "rgba(255,255,255,0.6)", padding: "6px 14px",
-                                cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>Edit</button>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              <button onClick={() => openEditTask(task as Task)}
+                                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                  borderRadius: "8px", color: "rgba(255,255,255,0.6)", padding: "6px 14px",
+                                  cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>Edit</button>
+                              <button onClick={() => duplicateTask(task as Task)}
+                                style={{ background: "rgba(0,212,255,0.08)", border: "1px solid rgba(0,212,255,0.2)",
+                                  borderRadius: "8px", color: "#00d4ff", padding: "6px 10px",
+                                  cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>📋</button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -601,6 +672,19 @@ export default function TaskManagement() {
                         </span>
                         {job.coinType && <span style={{ background: "rgba(255,255,255,0.05)", padding: "4px 10px", borderRadius: "8px", color: "rgba(255,255,255,0.5)" }}>{job.coinType}</span>}
                         <span style={{ background: "rgba(255,255,255,0.05)", padding: "4px 10px", borderRadius: "8px", color: "rgba(255,255,255,0.4)" }}>{job.cohort || "All"}</span>
+                        {job.maxHires && (
+                          <span style={{ background: "rgba(34,197,94,0.1)", padding: "4px 10px", borderRadius: "8px", color: "#22c55e" }}>
+                            👤 {(job.hiredPlayers?.length || 0)}/{job.maxHires} hired
+                          </span>
+                        )}
+                      </div>
+                      {/* Duplicate button */}
+                      <div style={{ marginTop: "12px" }}>
+                        <button onClick={(e) => { e.stopPropagation(); duplicateJob(job); }}
+                          style={{ padding: "5px 12px", background: "rgba(0,212,255,0.08)", border: "1px solid rgba(0,212,255,0.2)",
+                            borderRadius: "8px", color: "#00d4ff", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
+                          📋 Duplicate
+                        </button>
                       </div>
                     </div>
                   );
@@ -663,7 +747,7 @@ export default function TaskManagement() {
                         )}
                       </div>
                       {inCPs.length > 0 && (
-                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
                           {inCPs.map(cp => (
                             <span key={cp.id} style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", padding: "2px 8px", borderRadius: "6px", fontSize: "10px", color: "#22c55e", fontWeight: 700 }}>
                               📌 {cp.name}
@@ -671,6 +755,12 @@ export default function TaskManagement() {
                           ))}
                         </div>
                       )}
+                      {/* Duplicate button */}
+                      <button onClick={(e) => { e.stopPropagation(); duplicateProject(proj); }}
+                        style={{ padding: "5px 12px", background: "rgba(0,212,255,0.08)", border: "1px solid rgba(0,212,255,0.2)",
+                          borderRadius: "8px", color: "#00d4ff", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
+                        📋 Duplicate
+                      </button>
                     </div>
                   );
                 })}
@@ -1192,10 +1282,89 @@ export default function TaskManagement() {
                     style={{ ...inputSx, cursor: "pointer" }}>
                     <option value="open">Open</option>
                     <option value="filled">Filled</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
                     <option value="closed">Closed</option>
                   </select>
                 </Field>
               </div>
+
+              {/* ── Hiring System ── */}
+              <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.15)" }}>
+                <p style={{ margin: "0 0 12px", fontSize: "11px", fontWeight: 700, color: "#22c55e", letterSpacing: "0.08em", textTransform: "uppercase" }}>👤 HIRING SETTINGS</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <Field label="Max Hires">
+                    <input type="number" value={editingJob.maxHires ?? 1} onChange={e => setEditingJob(p => ({ ...p, maxHires: parseInt(e.target.value) || 1 }))}
+                      min={1} style={inputSx} />
+                  </Field>
+                  <Field label="Task Interval">
+                    <select value={editingJob.intervalType || "weekly"} onChange={e => setEditingJob(p => ({ ...p, intervalType: e.target.value as Job["intervalType"] }))}
+                      style={{ ...inputSx, cursor: "pointer" }}>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="biweekly">Bi-Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </Field>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginTop: "14px" }}>
+                  <Field label="Timeline Start">
+                    <input type="date" value={editingJob.timeline?.start || ""} onChange={e => setEditingJob(p => ({ ...p, timeline: { start: e.target.value, end: p.timeline?.end || "" } }))} style={inputSx} />
+                  </Field>
+                  <Field label="Timeline End">
+                    <input type="date" value={editingJob.timeline?.end || ""} onChange={e => setEditingJob(p => ({ ...p, timeline: { start: p.timeline?.start || "", end: e.target.value } }))} style={inputSx} />
+                  </Field>
+                </div>
+                {/* Hired players display */}
+                {editingJob.hiredPlayers && editingJob.hiredPlayers.length > 0 && (
+                  <div style={{ marginTop: "14px" }}>
+                    <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "1px", textTransform: "uppercase" }}>Hired Players</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                      {editingJob.hiredPlayers.map(pid => {
+                        const p = mockUsers.find(u => u.id === pid);
+                        return (
+                          <span key={pid} style={{ padding: "4px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+                            background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", color: "#22c55e" }}>
+                            {p?.brandName || p?.name || pid}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Milestones ── */}
+              <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(167,139,250,0.05)", border: "1px solid rgba(167,139,250,0.15)" }}>
+                <p style={{ margin: "0 0 12px", fontSize: "11px", fontWeight: 700, color: "#a78bfa", letterSpacing: "0.08em", textTransform: "uppercase" }}>📌 MILESTONES</p>
+                {(editingJob.milestones || []).map((ms: JobMilestone, i: number) => (
+                  <div key={ms.id || i} style={{ display: "grid", gridTemplateColumns: "1fr 120px 32px", gap: "8px", marginBottom: "8px", alignItems: "center" }}>
+                    <input value={ms.title} onChange={e => {
+                      const updated = [...(editingJob.milestones || [])];
+                      updated[i] = { ...ms, title: e.target.value };
+                      setEditingJob(p => ({ ...p, milestones: updated }));
+                    }} placeholder="Milestone title" style={{ ...inputSx, fontSize: "12px", padding: "8px 10px" }} />
+                    <input type="date" value={ms.dueDate} onChange={e => {
+                      const updated = [...(editingJob.milestones || [])];
+                      updated[i] = { ...ms, dueDate: e.target.value };
+                      setEditingJob(p => ({ ...p, milestones: updated }));
+                    }} style={{ ...inputSx, fontSize: "11px", padding: "8px 6px" }} />
+                    <button onClick={() => {
+                      const updated = (editingJob.milestones || []).filter((_: any, j: number) => j !== i);
+                      setEditingJob(p => ({ ...p, milestones: updated }));
+                    }} style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)",
+                      borderRadius: "6px", color: "#ef4444", cursor: "pointer", fontSize: "12px", padding: "6px" }}>×</button>
+                  </div>
+                ))}
+                <button onClick={() => {
+                  const ms: JobMilestone = { id: `ms_${Date.now()}`, title: "", dueDate: "", completed: false };
+                  setEditingJob(p => ({ ...p, milestones: [...(p.milestones || []), ms] }));
+                }} style={{ padding: "6px 14px", background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)",
+                  borderRadius: "8px", color: "#a78bfa", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
+                  + Add Milestone
+                </button>
+              </div>
+
               <Field label="Resource Link">
                 <input value={editingJob.link || ""} onChange={e => setEditingJob(p => ({ ...p, link: e.target.value }))}
                   placeholder="https://docs.google.com/... or any URL" style={inputSx} />
