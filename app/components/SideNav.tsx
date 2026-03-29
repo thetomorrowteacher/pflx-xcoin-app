@@ -30,6 +30,13 @@ function PflxBadge() {
           filter: "drop-shadow(0 0 8px rgba(0,212,255,0.4))",
         }}>PFLX</div>
       )}
+      <span style={{
+        fontSize: "9px", fontWeight: 800, letterSpacing: "0.1em",
+        color: "#f5c842", background: "rgba(245,200,66,0.12)",
+        border: "1px solid rgba(245,200,66,0.3)",
+        borderRadius: "4px", padding: "2px 6px",
+        textTransform: "uppercase",
+      }}>BETA</span>
     </div>
   );
 }

@@ -610,7 +610,7 @@ export default function Home() {
           fontSize: "10px", color: "rgba(0,212,255,0.25)",
           letterSpacing: "0.12em", fontFamily: "monospace",
         }}>
-          SYSTEM VERSION 1.0.0 // SECURE CONNECTION
+          SYSTEM VERSION 1.0.0 // BETA // SECURE CONNECTION
         </p>
       </div>
     </div>
