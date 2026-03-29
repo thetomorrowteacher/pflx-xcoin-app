@@ -1,11 +1,21 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
 import { User, Task, mockTasks, mockUsers, CoinSubmission, mockSubmissions, mockModifiers, mockTransactions } from "../../lib/data";
 import { playSuccess, playError } from "../../lib/sounds";
 import { saveUsers, saveTransactions, saveSubmissions, saveTasks, saveTrades, saveInvestments } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
+
+/* ── AI Analysis types ─────────────────────────────────────────────── */
+interface AIAnalysis {
+  score: number;
+  recommendation: "approve" | "review" | "reject";
+  signals: string[];
+  flags: string[];
+  summary: string;
+  source: "claude" | "heuristic";
+}
 
 export default function AdminApprovals() {
   const router = useRouter();
@@ -15,11 +25,17 @@ export default function AdminApprovals() {
   const [trades, setTrades] = useState<any[]>([]);
   const [investments, setInvestments] = useState<any[]>([]);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
-  
+
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("");
   const [selectedTaxId, setSelectedTaxId] = useState<string>("");
   const availableTaxes = mockModifiers.filter(m => m.type === "tax");
   const [_tick, setTick] = useState(0);
+
+  /* ── AI Analysis state ───────────────────────────────────────────── */
+  const [analyses, setAnalyses] = useState<Record<string, AIAnalysis>>({});
+  const [analyzing, setAnalyzing] = useState<Record<string, boolean>>({});
+  const [bulkAnalyzing, setBulkAnalyzing] = useState(false);
+  const [showQuickClear, setShowQuickClear] = useState(false);
 
   useEffect(() => {
     // Load mock data
@@ -118,6 +134,80 @@ export default function AdminApprovals() {
     setSelectedTaxId("");
   };
 
+  /* ── AI Analysis helpers ─────────────────────────────────────────── */
+  const analyzeTask = useCallback(async (task: Task) => {
+    setAnalyzing(prev => ({ ...prev, [task.id]: true }));
+    try {
+      const player = mockUsers.find(u => u.id === task.submittedBy);
+      const taskHistory = mockTasks
+        .filter(t => t.submittedBy === task.submittedBy && (t.status === "approved" || t.status === "rejected"))
+        .map(t => ({ status: t.status }));
+      const res = await fetch("/api/analyze-submission", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task: {
+            title: task.title,
+            description: task.description,
+            category: task.category,
+            dueDate: task.dueDate,
+            submittedAt: task.submittedAt,
+            submissionProof: task.submissionProof,
+          },
+          player: { name: player?.name, brandName: player?.brandName, cohort: player?.cohort },
+          taskHistory,
+        }),
+      });
+      const data: AIAnalysis = await res.json();
+      setAnalyses(prev => ({ ...prev, [task.id]: data }));
+    } catch {
+      setAnalyses(prev => ({
+        ...prev,
+        [task.id]: { score: 0, recommendation: "review", signals: [], flags: ["Analysis failed"], summary: "Could not analyze — please review manually.", source: "heuristic" },
+      }));
+    } finally {
+      setAnalyzing(prev => ({ ...prev, [task.id]: false }));
+    }
+  }, []);
+
+  const analyzeAll = useCallback(async () => {
+    const pending = mockTasks.filter(t => t.status === "submitted");
+    setBulkAnalyzing(true);
+    await Promise.all(pending.map(t => analyzeTask(t)));
+    setBulkAnalyzing(false);
+    setShowQuickClear(true);
+  }, [analyzeTask]);
+
+  const quickClearApprovals = () => {
+    const pending = tasks.filter(t => t.status === "submitted");
+    let cleared = 0;
+    pending.forEach(t => {
+      const a = analyses[t.id];
+      if (a && a.score >= 70 && a.recommendation === "approve") {
+        handleApproveTask(t.id);
+        cleared++;
+      }
+    });
+    if (cleared > 0) {
+      showToast(`AI Quick Clear: ${cleared} submission${cleared > 1 ? "s" : ""} auto-approved!`, "success");
+    } else {
+      showToast("No submissions met the auto-approve threshold (score >= 70).", "error");
+    }
+    setShowQuickClear(false);
+  };
+
+  const scoreColor = (score: number) => {
+    if (score >= 70) return "#22c55e";
+    if (score >= 45) return "#f5c842";
+    return "#ef4444";
+  };
+
+  const recBadge = (rec: string) => {
+    if (rec === "approve") return { color: "#22c55e", bg: "rgba(34,197,94,0.12)", border: "rgba(34,197,94,0.25)", icon: "✅", label: "APPROVE" };
+    if (rec === "reject") return { color: "#ef4444", bg: "rgba(239,68,68,0.12)", border: "rgba(239,68,68,0.25)", icon: "❌", label: "REJECT" };
+    return { color: "#f5c842", bg: "rgba(245,200,66,0.12)", border: "rgba(245,200,66,0.25)", icon: "👁", label: "REVIEW" };
+  };
+
   if (!user) return null;
 
   const pendingTasks = tasks.filter((t) => t.status === "submitted");
@@ -137,6 +227,7 @@ export default function AdminApprovals() {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#0a0a0f" }}>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       <SideNav user={user} />
       <main style={{ flex: 1, padding: "32px", overflow: "auto" }}>
         {/* Toast */}
@@ -241,9 +332,9 @@ export default function AdminApprovals() {
           )}
         </div>
 
-        {/* Section: Task Submissions */}
+        {/* Section: Task Submissions — AI-Enhanced */}
         <div style={{ marginBottom: "40px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", flexWrap: "wrap" }}>
             <h2 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#8b5cf6" }}>✅ Task Submissions</h2>
             {pendingTasks.length > 0 && (
               <span style={{
@@ -251,6 +342,39 @@ export default function AdminApprovals() {
                 background: "rgba(139,92,246,0.15)", color: "#8b5cf6",
                 border: "1px solid rgba(139,92,246,0.25)"
               }}>{pendingTasks.length}</span>
+            )}
+            {/* AI Bulk Actions */}
+            {pendingTasks.length > 0 && (
+              <div style={{ marginLeft: "auto", display: "flex", gap: "8px", alignItems: "center" }}>
+                <button
+                  onClick={analyzeAll}
+                  disabled={bulkAnalyzing}
+                  style={{
+                    padding: "6px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+                    background: bulkAnalyzing ? "rgba(167,139,250,0.1)" : "rgba(167,139,250,0.15)",
+                    border: "1px solid rgba(167,139,250,0.3)", color: "#a78bfa",
+                    cursor: bulkAnalyzing ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: "6px"
+                  }}
+                >
+                  {bulkAnalyzing ? (
+                    <><span style={{ display: "inline-block", animation: "spin 1s linear infinite", fontSize: "13px" }}>⟳</span> Analyzing...</>
+                  ) : (
+                    <>🤖 Analyze All</>
+                  )}
+                </button>
+                {showQuickClear && Object.keys(analyses).length > 0 && (
+                  <button
+                    onClick={quickClearApprovals}
+                    style={{
+                      padding: "6px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+                      background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.3)",
+                      color: "#22c55e", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px"
+                    }}
+                  >
+                    ⚡ Quick Clear ({pendingTasks.filter(t => analyses[t.id]?.score >= 70 && analyses[t.id]?.recommendation === "approve").length})
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -264,32 +388,111 @@ export default function AdminApprovals() {
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {pendingTasks.map((t) => {
                 const player = players.find((s) => s.id === t.submittedBy);
+                const ai = analyses[t.id];
+                const isAnalyzing = analyzing[t.id];
                 return (
                   <div key={t.id} style={{
-                    background: "rgba(22,22,31,0.9)", border: "1px solid rgba(139,92,246,0.15)",
-                    borderRadius: "16px", padding: "20px", display: "flex", alignItems: "center", gap: "16px"
+                    background: "rgba(22,22,31,0.9)",
+                    border: ai ? `1px solid ${recBadge(ai.recommendation).border}` : "1px solid rgba(139,92,246,0.15)",
+                    borderRadius: "16px", padding: "20px",
                   }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                        <span style={{
-                          padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 600,
-                          background: "rgba(139,92,246,0.12)", color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.2)"
-                        }}>{t.category}</span>
-                        <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>submitted {t.submittedAt}</span>
+                    {/* Top row: task info + actions */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                          <span style={{
+                            padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 600,
+                            background: "rgba(139,92,246,0.12)", color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.2)"
+                          }}>{t.category}</span>
+                          <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>submitted {t.submittedAt}</span>
+                          {/* Submission proof indicators */}
+                          {t.submissionProof?.linkUrl && (
+                            <a href={t.submissionProof.linkUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", color: "#4f8ef7", textDecoration: "none" }}>🔗 Link</a>
+                          )}
+                          {t.submissionProof?.fileUrl && <span style={{ fontSize: "11px", color: "#22c55e" }}>📎 File</span>}
+                        </div>
+                        <p style={{ margin: "0 0 4px", fontSize: "15px", fontWeight: 700, color: "#f0f0ff" }}>{t.title}</p>
+                        <p style={{ margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.3)" }}>
+                          Player: <span style={{ color: "#f0f0ff", fontWeight: 600 }}>{player?.name}</span> · {player?.cohort}
+                        </p>
+                        {t.submissionProof?.note && (
+                          <p style={{ margin: "4px 0 0", fontSize: "12px", color: "rgba(255,255,255,0.4)", fontStyle: "italic" }}>
+                            &quot;{t.submissionProof.note.slice(0, 120)}{t.submissionProof.note.length > 120 ? "..." : ""}&quot;
+                          </p>
+                        )}
                       </div>
-                      <p style={{ margin: "0 0 4px", fontSize: "15px", fontWeight: 700, color: "#f0f0ff" }}>{t.title}</p>
-                      <p style={{ margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.3)" }}>
-                        Player: <span style={{ color: "#f0f0ff", fontWeight: 600 }}>{player?.name}</span> · {player?.cohort}
-                      </p>
-                    </div>
-                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                      <div style={{ textAlign: "right", marginRight: "8px" }}>
-                        <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#f5c842" }}>🪙 +{t.rewardCoins.reduce((sum, rc) => sum + rc.amount, 0)}</p>
-                        <p style={{ margin: 0, fontSize: "12px", color: "#4f8ef7" }}>⚡ +{t.xcReward}</p>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <div style={{ textAlign: "right", marginRight: "8px" }}>
+                          <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#f5c842" }}>🪙 +{t.rewardCoins.reduce((sum, rc) => sum + rc.amount, 0)}</p>
+                          <p style={{ margin: 0, fontSize: "12px", color: "#4f8ef7" }}>⚡ +{t.xcReward}</p>
+                        </div>
+                        {/* Analyze button */}
+                        <button
+                          onClick={() => analyzeTask(t)}
+                          disabled={isAnalyzing}
+                          style={{
+                            padding: "8px 12px", borderRadius: "8px",
+                            background: isAnalyzing ? "rgba(167,139,250,0.08)" : "rgba(167,139,250,0.12)",
+                            border: "1px solid rgba(167,139,250,0.2)", color: "#a78bfa",
+                            fontSize: "12px", fontWeight: 600, cursor: isAnalyzing ? "not-allowed" : "pointer",
+                            display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap"
+                          }}
+                        >
+                          {isAnalyzing ? "⟳" : "🤖"} {isAnalyzing ? "..." : "Analyze"}
+                        </button>
+                        <button onClick={() => handleRejectTask(t.id)} style={{ padding: "8px 16px", borderRadius: "8px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>✕</button>
+                        <button onClick={() => handleApproveTask(t.id)} style={{ padding: "8px 16px", borderRadius: "8px", background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)", color: "#8b5cf6", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>Approve</button>
                       </div>
-                      <button onClick={() => handleRejectTask(t.id)} style={{ padding: "8px 16px", borderRadius: "8px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>✕</button>
-                      <button onClick={() => handleApproveTask(t.id)} style={{ padding: "8px 16px", borderRadius: "8px", background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)", color: "#8b5cf6", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>Approve</button>
                     </div>
+
+                    {/* AI Analysis Results (shown after analysis) */}
+                    {ai && (
+                      <div style={{
+                        marginTop: "14px", padding: "14px 16px", borderRadius: "12px",
+                        background: "rgba(0,0,0,0.3)", border: `1px solid ${recBadge(ai.recommendation).border}`,
+                      }}>
+                        {/* Score bar + recommendation */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>AI Score</span>
+                            <span style={{ fontSize: "20px", fontWeight: 900, color: scoreColor(ai.score) }}>{ai.score}</span>
+                          </div>
+                          {/* Score bar */}
+                          <div style={{ flex: 1, height: "6px", borderRadius: "3px", background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                            <div style={{ width: `${ai.score}%`, height: "100%", borderRadius: "3px", background: scoreColor(ai.score), transition: "width 0.5s" }} />
+                          </div>
+                          {/* Recommendation badge */}
+                          <span style={{
+                            padding: "3px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+                            background: recBadge(ai.recommendation).bg,
+                            border: `1px solid ${recBadge(ai.recommendation).border}`,
+                            color: recBadge(ai.recommendation).color
+                          }}>{recBadge(ai.recommendation).icon} {recBadge(ai.recommendation).label}</span>
+                          <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", fontStyle: "italic" }}>via {ai.source}</span>
+                        </div>
+                        {/* Summary */}
+                        <p style={{ margin: "0 0 8px", fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: 1.4 }}>{ai.summary}</p>
+                        {/* Signals & Flags */}
+                        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+                          {ai.signals.length > 0 && (
+                            <div style={{ flex: 1, minWidth: "180px" }}>
+                              <p style={{ margin: "0 0 4px", fontSize: "11px", fontWeight: 600, color: "#22c55e" }}>Positive Signals</p>
+                              {ai.signals.map((s, i) => (
+                                <p key={i} style={{ margin: "2px 0", fontSize: "12px", color: "rgba(34,197,94,0.7)" }}>+ {s}</p>
+                              ))}
+                            </div>
+                          )}
+                          {ai.flags.length > 0 && (
+                            <div style={{ flex: 1, minWidth: "180px" }}>
+                              <p style={{ margin: "0 0 4px", fontSize: "11px", fontWeight: 600, color: "#ef4444" }}>Flags / Concerns</p>
+                              {ai.flags.map((f, i) => (
+                                <p key={i} style={{ margin: "2px 0", fontSize: "12px", color: "rgba(239,68,68,0.7)" }}>! {f}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

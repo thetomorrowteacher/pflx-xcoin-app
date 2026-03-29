@@ -92,6 +92,9 @@ export default function TaskManagement() {
   // Job modal
   const [jobModal, setJobModal]   = useState(false);
   const [editingJob, setEditingJob] = useState<Partial<Job>>({});
+  const [jobBadges, setJobBadges] = useState<{ name: string; xc: number }[]>([]);
+  const [jobBadgeDropdown, setJobBadgeDropdown] = useState(false);
+  const [jobBadgeSearch, setJobBadgeSearch] = useState("");
 
   // Project state
   const [projects, setProjects]   = useState<Project[]>([...mockProjects]);
@@ -99,6 +102,14 @@ export default function TaskManagement() {
   const [editingProject, setEditingProject] = useState<Partial<Project>>({});
   const [projTaskIds, setProjTaskIds] = useState<string[]>([]);
   const [projJobIds, setProjJobIds] = useState<string[]>([]);
+  const [projBadges, setProjBadges] = useState<{ name: string; xc: number }[]>([]);
+  const [projBadgeDropdown, setProjBadgeDropdown] = useState(false);
+  const [projBadgeSearch, setProjBadgeSearch] = useState("");
+
+  // Checkpoint state
+  const [cpBadges, setCpBadges] = useState<{ name: string; xc: number }[]>([]);
+  const [cpBadgeDropdown, setCpBadgeDropdown] = useState(false);
+  const [cpBadgeSearch, setCpBadgeSearch] = useState("");
 
   // Checkpoint project selection
   const [cpProjectIds, setCpProjectIds] = useState<string[]>([]);
@@ -120,6 +131,9 @@ export default function TaskManagement() {
     setEditingCP({ status: "upcoming", startDate: "", endDate: "", assignTo: "all" });
     setCpTaskIds([]);
     setCpProjectIds([]);
+    setCpBadges([]);
+    setCpBadgeSearch("");
+    setCpBadgeDropdown(false);
     setCpModal(true);
   };
 
@@ -128,6 +142,9 @@ export default function TaskManagement() {
     setEditingCP({ ...cp });
     setCpTaskIds(tasks.filter(t => t.roundId === cp.id).map(t => t.id));
     setCpProjectIds((cp as any).projectIds ?? []);
+    setCpBadges((cp as any).rewardBadges ?? []);
+    setCpBadgeSearch("");
+    setCpBadgeDropdown(false);
     setCpModal(true);
   };
 
@@ -170,6 +187,7 @@ export default function TaskManagement() {
       assignTo: editingCP.assignTo || "all",
       bannerImage: editingCP.bannerImage,
       projectIds: cpProjectIds,
+      rewardBadges: cpBadges,
     } as Checkpoint;
 
     if (isNew) {
@@ -273,8 +291,62 @@ export default function TaskManagement() {
 
   const openNewJob = () => {
     playClick();
-    setEditingJob({ coinType: "", xpValue: 500, cohort: "all" });
+    setEditingJob({ coinType: "", xpValue: 500, cohort: "all", maxHires: 1, intervalType: "weekly" });
+    setJobBadges([]);
+    setJobBadgeSearch("");
+    setJobBadgeDropdown(false);
     setJobModal(true);
+  };
+
+  const openEditJob = (job: Job) => {
+    playClick();
+    setEditingJob({ ...job });
+    setJobBadges((job as any).rewardBadges ?? []);
+    setJobBadgeSearch("");
+    setJobBadgeDropdown(false);
+    setJobModal(true);
+  };
+
+  // Hire a player for a job and transform into a task
+  const hirePlayerForJob = (jobId: string, playerId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    const hiredPlayers = [...(job.hiredPlayers || []), playerId];
+    const isFull = hiredPlayers.length >= (job.maxHires || 1);
+
+    // Create a task from this job for the hired player
+    const newTaskId = `task_job_${jobId}_${playerId}_${Date.now()}`;
+    const newTask: Task = {
+      id: newTaskId,
+      title: `[JOB] ${job.title}`,
+      description: `Hired for job: ${job.description}`,
+      coinType: job.coinType || "",
+      xpValue: job.xpValue || 500,
+      rewardBadges: (job as any).rewardBadges || [],
+      cohort: "all",
+      status: "open" as Task["status"],
+      roundId: undefined,
+      link: job.link,
+      links: [],
+      assignedTo: [playerId],
+    } as Task;
+    setTasks(prev => [...prev, newTask]);
+    mockTasks.push(newTask);
+
+    // Update the job
+    const updatedJob = {
+      ...job,
+      hiredPlayers,
+      filledSlots: hiredPlayers.length,
+      status: isFull ? "filled" as Job["status"] : job.status,
+      transformedTaskIds: [...(job.transformedTaskIds || []), newTaskId],
+    };
+    setJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
+    const idx = mockJobs.findIndex(j => j.id === jobId);
+    if (idx >= 0) mockJobs[idx] = updatedJob;
+
+    playSuccess();
+    saveAndToast([saveJobs, saveTasks], `${mockUsers.find(u => u.id === playerId)?.brandName || "Player"} hired — task created ✓`);
   };
 
   const handleSaveJob = () => {
@@ -295,6 +367,7 @@ export default function TaskManagement() {
       intervalType: editingJob.intervalType || "weekly",
       applicants: editingJob.applicants || [],
       approved: editingJob.approved || [],
+      rewardBadges: jobBadges,
     } as Job;
     if (isNew) { setJobs(prev => [...prev, saved]); mockJobs.push(saved); }
     else {
@@ -311,9 +384,12 @@ export default function TaskManagement() {
 
   const openNewProject = () => {
     playClick();
-    setEditingProject({ status: "active", assignedTo: "all", xcRewardPool: 0 });
+    setEditingProject({ status: "active", assignedTo: "all", xcRewardPool: 0, accessMode: "open", repeatable: false });
     setProjTaskIds([]);
     setProjJobIds([]);
+    setProjBadges([]);
+    setProjBadgeSearch("");
+    setProjBadgeDropdown(false);
     setProjectModal(true);
   };
 
@@ -322,6 +398,9 @@ export default function TaskManagement() {
     setEditingProject({ ...p });
     setProjTaskIds([...p.taskIds]);
     setProjJobIds([...p.jobIds]);
+    setProjBadges((p as any).rewardBadges ?? []);
+    setProjBadgeSearch("");
+    setProjBadgeDropdown(false);
     setProjectModal(true);
   };
 
@@ -340,6 +419,10 @@ export default function TaskManagement() {
       dueDate: editingProject.dueDate,
       assignedTo: editingProject.assignedTo || "all",
       xcRewardPool: editingProject.xcRewardPool || 0,
+      rewardBadges: projBadges,
+      accessMode: editingProject.accessMode || "open",
+      closedPlayerIds: editingProject.closedPlayerIds || [],
+      repeatable: editingProject.repeatable || false,
     };
     if (isNew) { setProjects(prev => [...prev, saved]); mockProjects.push(saved); }
     else {
@@ -660,7 +743,7 @@ export default function TaskManagement() {
                   const sc = statusColor(job.status === "open" ? "active" : "inactive");
                   return (
                     <div key={job.id} style={{ ...cardSx, padding: "22px", cursor: "pointer" }}
-                      onClick={() => { playClick(); setEditingJob({ ...job }); setJobModal(true); }}>
+                      onClick={() => openEditJob(job)}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
                         <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#f0f0ff", flex: 1, paddingRight: "10px" }}>{job.title}</h3>
                         <span style={pill(job.status, sc)}>{job.status}</span>
@@ -678,6 +761,30 @@ export default function TaskManagement() {
                           </span>
                         )}
                       </div>
+                      {/* Job → Task completion status bar (shown when job has transformed tasks) */}
+                      {(job.transformedTaskIds?.length ?? 0) > 0 && (() => {
+                        const total = job.transformedTaskIds!.length;
+                        const completed = job.transformedTaskIds!.filter(tid => {
+                          const t = tasks.find(tk => tk.id === tid);
+                          return t && t.status === "approved";
+                        }).length;
+                        const pct = Math.round((completed / total) * 100);
+                        return (
+                          <div style={{ marginTop: "12px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>Task Progress</span>
+                              <span style={{ fontSize: "11px", color: pct === 100 ? "#22c55e" : "#a78bfa", fontWeight: 700 }}>{completed}/{total} done ({pct}%)</span>
+                            </div>
+                            <div style={{ height: "6px", borderRadius: "3px", background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                              <div style={{
+                                width: `${pct}%`, height: "100%", borderRadius: "3px",
+                                background: pct === 100 ? "#22c55e" : "linear-gradient(90deg, #8b5cf6, #a78bfa)",
+                                transition: "width 0.4s"
+                              }} />
+                            </div>
+                          </div>
+                        );
+                      })()}
                       {/* Duplicate button */}
                       <div style={{ marginTop: "12px" }}>
                         <button onClick={(e) => { e.stopPropagation(); duplicateJob(job); }}
@@ -897,6 +1004,35 @@ export default function TaskManagement() {
                       </label>
                     );
                   })}
+                </div>
+              </Field>
+
+              {/* Multi-badge selector for checkpoint */}
+              <Field label={`Completion Badges (${cpBadges.length} · ${cpBadges.reduce((s, b) => s + b.xc, 0)} XC)`}>
+                {cpBadges.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+                    {cpBadges.map((badge, i) => (
+                      <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, background: "rgba(79,142,247,0.12)", border: "1px solid rgba(79,142,247,0.3)", color: "#4f8ef7" }}>
+                        {badge.name} <span style={{ color: "#f5c842", fontFamily: "monospace" }}>{badge.xc} XC</span>
+                        <span onClick={() => setCpBadges(prev => prev.filter((_, j) => j !== i))} style={{ cursor: "pointer", color: "rgba(255,255,255,0.4)", marginLeft: "2px", fontSize: "14px" }}>×</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
+                  <input value={cpBadgeSearch} onChange={e => { setCpBadgeSearch(e.target.value); setCpBadgeDropdown(true); }} onFocus={() => setCpBadgeDropdown(true)} placeholder="Search and add badges…" style={inputSx} />
+                  {cpBadgeDropdown && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100, maxHeight: "180px", overflowY: "auto", marginTop: "4px", background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+                      {COIN_CATEGORIES.map(cat => {
+                        const filtered = cat.coins.filter(c => (!cpBadgeSearch || c.name.toLowerCase().includes(cpBadgeSearch.toLowerCase())) && !cpBadges.some(b => b.name === c.name));
+                        if (filtered.length === 0) return null;
+                        return (<div key={cat.name}>
+                          <div style={{ padding: "6px 12px", fontSize: "9px", fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>{cat.name.toUpperCase()}</div>
+                          {filtered.map(coin => (<div key={coin.name} onClick={() => { setCpBadges(prev => [...prev, { name: coin.name, xc: coin.xc }]); setCpBadgeSearch(""); }} style={{ padding: "8px 14px", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "rgba(255,255,255,0.7)", display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.03)" }} onMouseEnter={e => (e.currentTarget.style.background = "rgba(79,142,247,0.1)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}><span>{coin.name}</span><span style={{ color: "#f5c842", fontSize: "11px", fontFamily: "monospace" }}>{coin.xc} XC</span></div>))}
+                        </div>);
+                      })}
+                    </div>
+                  )}
                 </div>
               </Field>
 
@@ -1159,6 +1295,86 @@ export default function TaskManagement() {
                 </Field>
               </div>
 
+              {/* Access Control */}
+              <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(0,212,255,0.04)", border: "1px solid rgba(0,212,255,0.15)" }}>
+                <p style={{ margin: "0 0 12px", fontSize: "11px", fontWeight: 700, color: "#00d4ff", letterSpacing: "0.08em", textTransform: "uppercase" }}>🔒 ACCESS CONTROL</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px" }}>
+                  <Field label="Access Mode">
+                    <select value={editingProject.accessMode || "open"} onChange={e => setEditingProject(p => ({ ...p, accessMode: e.target.value as "open" | "closed" }))}
+                      style={{ ...inputSx, cursor: "pointer" }}>
+                      <option value="open">Open (anyone, anytime)</option>
+                      <option value="closed">Closed (selected only)</option>
+                    </select>
+                  </Field>
+                  <Field label="Cohort Visibility">
+                    <select value={editingProject.assignedTo === "all" ? "all" : (Array.isArray(editingProject.assignedTo) ? editingProject.assignedTo[0] : "all")}
+                      onChange={e => setEditingProject(p => ({ ...p, assignedTo: e.target.value === "all" ? "all" : [e.target.value] }))}
+                      style={{ ...inputSx, cursor: "pointer" }}>
+                      <option value="all">All Cohorts</option>
+                      {cohorts.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Repeatable?">
+                    <select value={editingProject.repeatable ? "yes" : "no"} onChange={e => setEditingProject(p => ({ ...p, repeatable: e.target.value === "yes" }))}
+                      style={{ ...inputSx, cursor: "pointer" }}>
+                      <option value="no">No — one completion</option>
+                      <option value="yes">Yes — unlimited</option>
+                    </select>
+                  </Field>
+                </div>
+                {editingProject.accessMode === "closed" && (
+                  <div style={{ marginTop: "12px" }}>
+                    <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "1px", textTransform: "uppercase" }}>Select Players (closed access)</p>
+                    <div style={{ maxHeight: "140px", overflowY: "auto", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "6px" }}>
+                      {mockUsers.filter(u => u.role === "player").map(p => {
+                        const checked = (editingProject.closedPlayerIds || []).includes(p.id);
+                        return (
+                          <label key={p.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "6px 10px", borderRadius: "6px", cursor: "pointer", background: checked ? "rgba(0,212,255,0.08)" : "transparent" }}>
+                            <input type="checkbox" checked={checked}
+                              onChange={() => setEditingProject(prev => {
+                                const ids = prev.closedPlayerIds || [];
+                                return { ...prev, closedPlayerIds: checked ? ids.filter(id => id !== p.id) : [...ids, p.id] };
+                              })}
+                              style={{ width: "14px", height: "14px", accentColor: "#00d4ff", cursor: "pointer" }} />
+                            <span style={{ fontSize: "12px", fontWeight: 700, color: checked ? "#f0f0ff" : "rgba(255,255,255,0.5)" }}>{p.brandName || p.name}</span>
+                            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)", marginLeft: "auto" }}>{p.cohort}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Multi-badge selector for project */}
+              <Field label={`Completion Badges (${projBadges.length} · ${projBadges.reduce((s, b) => s + b.xc, 0)} XC)`}>
+                {projBadges.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+                    {projBadges.map((badge, i) => (
+                      <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)", color: "#a78bfa" }}>
+                        {badge.name} <span style={{ color: "#f5c842", fontFamily: "monospace" }}>{badge.xc} XC</span>
+                        <span onClick={() => setProjBadges(prev => prev.filter((_, j) => j !== i))} style={{ cursor: "pointer", color: "rgba(255,255,255,0.4)", marginLeft: "2px", fontSize: "14px" }}>×</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
+                  <input value={projBadgeSearch} onChange={e => { setProjBadgeSearch(e.target.value); setProjBadgeDropdown(true); }} onFocus={() => setProjBadgeDropdown(true)} placeholder="Search and add badges…" style={inputSx} />
+                  {projBadgeDropdown && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100, maxHeight: "180px", overflowY: "auto", marginTop: "4px", background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+                      {COIN_CATEGORIES.map(cat => {
+                        const filtered = cat.coins.filter(c => (!projBadgeSearch || c.name.toLowerCase().includes(projBadgeSearch.toLowerCase())) && !projBadges.some(b => b.name === c.name));
+                        if (filtered.length === 0) return null;
+                        return (<div key={cat.name}>
+                          <div style={{ padding: "6px 12px", fontSize: "9px", fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>{cat.name.toUpperCase()}</div>
+                          {filtered.map(coin => (<div key={coin.name} onClick={() => { setProjBadges(prev => [...prev, { name: coin.name, xc: coin.xc }]); setProjBadgeSearch(""); }} style={{ padding: "8px 14px", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "rgba(255,255,255,0.7)", display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.03)" }} onMouseEnter={e => (e.currentTarget.style.background = "rgba(167,139,250,0.1)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}><span>{coin.name}</span><span style={{ color: "#f5c842", fontSize: "11px", fontFamily: "monospace" }}>{coin.xc} XC</span></div>))}
+                        </div>);
+                      })}
+                    </div>
+                  )}
+                </div>
+              </Field>
+
               {/* Resource Link */}
               <Field label="Resource Link">
                 <input value={editingProject.link || ""} onChange={e => setEditingProject(p => ({ ...p, link: e.target.value }))}
@@ -1289,6 +1505,35 @@ export default function TaskManagement() {
                 </Field>
               </div>
 
+              {/* Multi-badge selector for job */}
+              <Field label={`Digital Badges (${jobBadges.length} · ${jobBadges.reduce((s, b) => s + b.xc, 0)} XC)`}>
+                {jobBadges.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+                    {jobBadges.map((badge, i) => (
+                      <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, background: "rgba(79,142,247,0.12)", border: "1px solid rgba(79,142,247,0.3)", color: "#4f8ef7" }}>
+                        {badge.name} <span style={{ color: "#f5c842", fontFamily: "monospace" }}>{badge.xc} XC</span>
+                        <span onClick={() => setJobBadges(prev => prev.filter((_, j) => j !== i))} style={{ cursor: "pointer", color: "rgba(255,255,255,0.4)", marginLeft: "2px", fontSize: "14px" }}>×</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
+                  <input value={jobBadgeSearch} onChange={e => { setJobBadgeSearch(e.target.value); setJobBadgeDropdown(true); }} onFocus={() => setJobBadgeDropdown(true)} placeholder="Search and add badges…" style={inputSx} />
+                  {jobBadgeDropdown && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100, maxHeight: "180px", overflowY: "auto", marginTop: "4px", background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+                      {COIN_CATEGORIES.map(cat => {
+                        const filtered = cat.coins.filter(c => (!jobBadgeSearch || c.name.toLowerCase().includes(jobBadgeSearch.toLowerCase())) && !jobBadges.some(b => b.name === c.name));
+                        if (filtered.length === 0) return null;
+                        return (<div key={cat.name}>
+                          <div style={{ padding: "6px 12px", fontSize: "9px", fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>{cat.name.toUpperCase()}</div>
+                          {filtered.map(coin => (<div key={coin.name} onClick={() => { setJobBadges(prev => [...prev, { name: coin.name, xc: coin.xc }]); setJobBadgeSearch(""); }} style={{ padding: "8px 14px", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "rgba(255,255,255,0.7)", display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.03)" }} onMouseEnter={e => (e.currentTarget.style.background = "rgba(79,142,247,0.1)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}><span>{coin.name}</span><span style={{ color: "#f5c842", fontSize: "11px", fontFamily: "monospace" }}>{coin.xc} XC</span></div>))}
+                        </div>);
+                      })}
+                    </div>
+                  )}
+                </div>
+              </Field>
+
               {/* ── Hiring System ── */}
               <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.15)" }}>
                 <p style={{ margin: "0 0 12px", fontSize: "11px", fontWeight: 700, color: "#22c55e", letterSpacing: "0.08em", textTransform: "uppercase" }}>👤 HIRING SETTINGS</p>
@@ -1315,12 +1560,14 @@ export default function TaskManagement() {
                     <input type="date" value={editingJob.timeline?.end || ""} onChange={e => setEditingJob(p => ({ ...p, timeline: { start: p.timeline?.start || "", end: e.target.value } }))} style={inputSx} />
                   </Field>
                 </div>
-                {/* Hired players display */}
-                {editingJob.hiredPlayers && editingJob.hiredPlayers.length > 0 && (
-                  <div style={{ marginTop: "14px" }}>
-                    <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "1px", textTransform: "uppercase" }}>Hired Players</p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                      {editingJob.hiredPlayers.map(pid => {
+                {/* Hire players section */}
+                <div style={{ marginTop: "14px" }}>
+                  <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "1px", textTransform: "uppercase" }}>
+                    Hired Players ({(editingJob.hiredPlayers || []).length}/{editingJob.maxHires || 1})
+                  </p>
+                  {(editingJob.hiredPlayers || []).length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+                      {(editingJob.hiredPlayers || []).map(pid => {
                         const p = mockUsers.find(u => u.id === pid);
                         return (
                           <span key={pid} style={{ padding: "4px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
@@ -1330,7 +1577,20 @@ export default function TaskManagement() {
                         );
                       })}
                     </div>
-                  </div>
+                  )}
+                  {/* Hire button — only if job saved and not full */}
+                  {editingJob.id && (editingJob.hiredPlayers || []).length < (editingJob.maxHires || 1) && (
+                    <div style={{ maxHeight: "120px", overflowY: "auto", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "4px" }}>
+                      {mockUsers.filter(u => u.role === "player" && !(editingJob.hiredPlayers || []).includes(u.id)).map(p => (
+                        <button key={p.id} onClick={() => { hirePlayerForJob(editingJob.id!, p.id); setEditingJob(prev => ({ ...prev, hiredPlayers: [...(prev.hiredPlayers || []), p.id] })); }}
+                          style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "6px 10px", borderRadius: "6px", cursor: "pointer", background: "transparent", border: "none", textAlign: "left", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontWeight: 600 }}
+                          onMouseEnter={e => (e.currentTarget.style.background = "rgba(34,197,94,0.1)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                          <span style={{ color: "#22c55e" }}>+</span> {p.brandName || p.name} <span style={{ marginLeft: "auto", fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>{p.cohort}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 )}
               </div>
 

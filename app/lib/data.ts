@@ -137,6 +137,7 @@ export interface Checkpoint {
   bannerImage?: string; // base64 or URL — displayed as art on round/season cards
   projectIds?: string[]; // Projects included in this checkpoint (auto-pulls their tasks/jobs)
   link?: string; // Optional resource link
+  rewardBadges?: { name: string; xc: number }[]; // Multi-badge rewards for checkpoint completion
 }
 
 export interface JobMilestone {
@@ -162,6 +163,7 @@ export interface Job {
   investorStakes?: InvestorStake[]; // XP investments boosting this job's value
   assignedTo?: "all" | string[]; // "all" = everyone, string[] = player IDs or cohort names
   link?: string; // Optional resource link
+  rewardBadges?: { name: string; xc: number }[]; // Multi-badge rewards
   // Job hiring system
   maxHires?: number;           // How many players can be hired for this job
   hiredPlayers?: string[];     // Player IDs who have been hired
@@ -1188,6 +1190,11 @@ export interface Project {
   xcRewardPool?: number;     // Total XC available if project fully completed
   image?: string;
   link?: string; // Optional resource link
+  rewardBadges?: { name: string; xc: number }[]; // Multi-badge rewards for project completion
+  // Access control
+  accessMode?: "open" | "closed"; // open = anyone can complete anytime, repeatable; closed = selected players only
+  closedPlayerIds?: string[];     // Player IDs restricted to (when closed)
+  repeatable?: boolean;           // Can players complete this project multiple times?
 }
 
 // ─── Mock Startup Studios ────────────────────────────────────────
