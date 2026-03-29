@@ -73,11 +73,37 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
   const allCoins = COIN_CATEGORIES.flatMap(cat => cat.coins);
   const sponsoredCoins = allCoins.filter(c => c.sponsorId === profileUser.id);
   const totalResidualEarned = sponsoredCoins.reduce((sum, coin) => {
-    // Count how many times ANY player earned this coin, then multiply by residual %
     const timesEarned = mockSubmissions.filter(s => s.coinType === coin.name && s.status === "approved").reduce((a, s) => a + s.amount, 0);
     const pct = (coin.residualPercent ?? 10) / 100;
     return sum + Math.floor(timesEarned * coin.xc * pct);
   }, 0);
+
+  // ── Rank-based Studio Equity System ──────────────────────────────
+  // Higher ranks = higher ownership stake, more revenue, studio leadership
+  const rankEquityTiers: Record<number, { title: string; equity: number; revenueMultiplier: number; recruitBonus: number; perks: string[] }> = {
+    1:  { title: "Member",              equity: 1,   revenueMultiplier: 1.0, recruitBonus: 0,   perks: ["Studio access"] },
+    2:  { title: "Contributor",         equity: 2,   revenueMultiplier: 1.1, recruitBonus: 25,  perks: ["Studio access", "Vote on projects"] },
+    3:  { title: "Stakeholder",         equity: 4,   revenueMultiplier: 1.25, recruitBonus: 50, perks: ["Vote on projects", "Propose initiatives"] },
+    4:  { title: "Lead Stakeholder",    equity: 7,   revenueMultiplier: 1.5, recruitBonus: 100, perks: ["Lead projects", "Recruit players"] },
+    5:  { title: "Studio Director",     equity: 12,  revenueMultiplier: 2.0, recruitBonus: 200, perks: ["Lead projects", "Recruit players", "Revenue share"] },
+    6:  { title: "Executive Partner",   equity: 18,  revenueMultiplier: 2.5, recruitBonus: 350, perks: ["Revenue share", "Mentor recruits", "Brand spotlight"] },
+    7:  { title: "Senior Partner",      equity: 25,  revenueMultiplier: 3.0, recruitBonus: 500, perks: ["Revenue share", "Mentor recruits", "Studio strategy"] },
+    8:  { title: "Managing Partner",    equity: 33,  revenueMultiplier: 4.0, recruitBonus: 750, perks: ["Studio strategy", "Set tax rates", "Brand spotlight"] },
+    9:  { title: "Chief Partner",       equity: 42,  revenueMultiplier: 5.0, recruitBonus: 1000, perks: ["Full governance", "Revenue share", "Brand spotlight"] },
+    10: { title: "Founding Partner",    equity: 51,  revenueMultiplier: 6.0, recruitBonus: 1500, perks: ["Full governance", "Max revenue", "Legacy status"] },
+  };
+  const rankLevel = currentRank.level;
+  const equityTier = rankEquityTiers[rankLevel] || rankEquityTiers[1];
+
+  // Count recruits — players in same studio who joined after this player
+  const studioMembers = mockUsers.filter(u => u.studioId === profileUser.studioId && u.role === "player");
+  const recruits = studioMembers.filter(u => u.id !== profileUser.id && u.joinedAt && profileUser.joinedAt && u.joinedAt > profileUser.joinedAt);
+
+  // Calculate studio revenue from pool growth (equity % × pool × multiplier)
+  const studioObj = mockStartupStudios.find(s => s.id === profileUser.studioId);
+  const studioPoolShare = studioObj ? Math.floor((equityTier.equity / 100) * studioObj.xcPool * equityTier.revenueMultiplier) : 0;
+  const recruitRevenue = recruits.length * equityTier.recruitBonus;
+  const totalStudioRevenue = studioPoolShare + recruitRevenue + totalResidualEarned;
 
   // Studio + diagnostic
   const studio = mockStartupStudios.find(s => s.id === profileUser.studioId);
@@ -292,48 +318,105 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
             </div>
           )}
 
-          {/* ── Ownership Stake / Investor Card ────────────────────────── */}
-          {sponsoredCoins.length > 0 && (
+          {/* ── Studio Ownership & Equity Card ─────────────────────────── */}
+          {studioObj && (
             <div className="cv-card" style={{
-              marginBottom: "32px", borderRadius: "16px", padding: "22px 24px",
-              background: "rgba(245,200,66,0.06)", border: "1px solid rgba(245,200,66,0.25)",
+              marginBottom: "32px", borderRadius: "16px", padding: "24px",
+              background: "rgba(245,200,66,0.05)", border: "1px solid rgba(245,200,66,0.2)",
               position: "relative", overflow: "hidden",
             }}>
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg, rgba(245,200,66,0.7), rgba(249,115,22,0.5), transparent)" }} />
-              <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "16px" }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: `linear-gradient(90deg, rgba(245,200,66,0.8), rgba(${studioObj.colorRgb},0.6), transparent)` }} />
+
+              {/* Header row: title + total revenue */}
+              <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "20px", flexWrap: "wrap" }}>
                 <div style={{
-                  width: "42px", height: "42px", borderRadius: "12px",
-                  background: "linear-gradient(135deg, rgba(245,200,66,0.2), rgba(249,115,22,0.15))",
-                  border: "1px solid rgba(245,200,66,0.3)",
-                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px",
-                }}>💰</div>
-                <div>
-                  <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(245,200,66,0.5)" }}>OWNERSHIP STAKE</div>
-                  <div style={{ fontSize: "16px", fontWeight: 900, color: "#f5c842" }}>Course & Project Investor</div>
+                  width: "48px", height: "48px", borderRadius: "14px",
+                  background: "linear-gradient(135deg, rgba(245,200,66,0.25), rgba(249,115,22,0.15))",
+                  border: "1px solid rgba(245,200,66,0.35)",
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px",
+                }}>👑</div>
+                <div style={{ flex: 1, minWidth: "180px" }}>
+                  <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(245,200,66,0.5)" }}>STUDIO OWNERSHIP — {studioObj.name.toUpperCase()}</div>
+                  <div style={{ fontSize: "20px", fontWeight: 900, color: "#f5c842" }}>{equityTier.title}</div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>Rank {rankLevel} · {currentRank.name} {currentRank.icon}</div>
                 </div>
-                <div style={{ marginLeft: "auto", textAlign: "right" }}>
-                  <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(34,197,94,0.5)", marginBottom: "2px" }}>REVENUE EARNED</div>
-                  <div style={{ fontSize: "24px", fontWeight: 900, color: "#22c55e", fontFamily: "monospace" }}>{totalResidualEarned.toLocaleString()} XC</div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(34,197,94,0.5)", marginBottom: "2px" }}>TOTAL REVENUE</div>
+                  <div style={{ fontSize: "28px", fontWeight: 900, color: "#22c55e", fontFamily: "monospace", lineHeight: 1 }}>{totalStudioRevenue.toLocaleString()} XC</div>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {sponsoredCoins.map(coin => {
-                  const pct = coin.residualPercent ?? 10;
-                  return (
-                    <div key={coin.name} style={{
-                      padding: "8px 14px", borderRadius: "10px",
-                      background: "rgba(245,200,66,0.08)", border: "1px solid rgba(245,200,66,0.15)",
-                      display: "flex", alignItems: "center", gap: "8px",
-                    }}>
-                      {coin.image && <span style={{ fontSize: "16px" }}>{coin.image}</span>}
-                      <div>
-                        <div style={{ fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.8)" }}>{coin.name}</div>
-                        <div style={{ fontSize: "10px", fontWeight: 700, color: "rgba(245,200,66,0.7)", fontFamily: "monospace" }}>{pct}% residual · {coin.xc} XC</div>
+
+              {/* Equity stats row */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px", marginBottom: "18px" }}>
+                {[
+                  { label: "EQUITY STAKE", value: `${equityTier.equity}%`, color: "#f5c842", icon: "📊" },
+                  { label: "POOL SHARE", value: `${studioPoolShare.toLocaleString()} XC`, color: studioObj.color, icon: "⚡" },
+                  { label: "REVENUE MULT", value: `×${equityTier.revenueMultiplier}`, color: "#22c55e", icon: "📈" },
+                  { label: "RECRUITS", value: `${recruits.length} player${recruits.length !== 1 ? "s" : ""}`, color: "#8b5cf6", icon: "🤝" },
+                ].map(stat => (
+                  <div key={stat.label} style={{
+                    background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+                    borderRadius: "12px", padding: "12px", textAlign: "center",
+                  }}>
+                    <div style={{ fontSize: "14px", marginBottom: "4px" }}>{stat.icon}</div>
+                    <div style={{ fontSize: "16px", fontWeight: 900, color: stat.color, fontFamily: "monospace" }}>{stat.value}</div>
+                    <div style={{ fontSize: "8px", fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", marginTop: "4px" }}>{stat.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Revenue breakdown */}
+              <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
+                {totalResidualEarned > 0 && (
+                  <div style={{ padding: "6px 12px", borderRadius: "8px", background: "rgba(245,200,66,0.08)", border: "1px solid rgba(245,200,66,0.15)", fontSize: "11px", fontWeight: 700 }}>
+                    <span style={{ color: "rgba(245,200,66,0.7)" }}>Course Residuals:</span> <span style={{ color: "#f5c842", fontFamily: "monospace" }}>{totalResidualEarned.toLocaleString()} XC</span>
+                  </div>
+                )}
+                {recruitRevenue > 0 && (
+                  <div style={{ padding: "6px 12px", borderRadius: "8px", background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.15)", fontSize: "11px", fontWeight: 700 }}>
+                    <span style={{ color: "rgba(139,92,246,0.7)" }}>Recruit Bonus:</span> <span style={{ color: "#8b5cf6", fontFamily: "monospace" }}>{recruitRevenue.toLocaleString()} XC</span>
+                    <span style={{ color: "rgba(255,255,255,0.3)" }}> ({equityTier.recruitBonus} XC/recruit)</span>
+                  </div>
+                )}
+                {studioPoolShare > 0 && (
+                  <div style={{ padding: "6px 12px", borderRadius: "8px", background: `rgba(${studioObj.colorRgb},0.08)`, border: `1px solid rgba(${studioObj.colorRgb},0.15)`, fontSize: "11px", fontWeight: 700 }}>
+                    <span style={{ color: `rgba(${studioObj.colorRgb},0.7)` }}>Pool Revenue:</span> <span style={{ color: studioObj.color, fontFamily: "monospace" }}>{studioPoolShare.toLocaleString()} XC</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Perks / Leadership capabilities */}
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                {equityTier.perks.map(perk => (
+                  <span key={perk} style={{
+                    padding: "4px 10px", borderRadius: "6px", fontSize: "10px", fontWeight: 700,
+                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                    color: "rgba(255,255,255,0.5)", letterSpacing: "0.02em",
+                  }}>✦ {perk}</span>
+                ))}
+              </div>
+
+              {/* Sponsored courses sub-section */}
+              {sponsoredCoins.length > 0 && (
+                <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px solid rgba(245,200,66,0.1)" }}>
+                  <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(245,200,66,0.4)", marginBottom: "10px" }}>SPONSORED COURSES & PROJECTS</div>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    {sponsoredCoins.map(coin => (
+                      <div key={coin.name} style={{
+                        padding: "8px 14px", borderRadius: "10px",
+                        background: "rgba(245,200,66,0.08)", border: "1px solid rgba(245,200,66,0.15)",
+                        display: "flex", alignItems: "center", gap: "8px",
+                      }}>
+                        {coin.image && <span style={{ fontSize: "16px" }}>{coin.image}</span>}
+                        <div>
+                          <div style={{ fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.8)" }}>{coin.name}</div>
+                          <div style={{ fontSize: "10px", fontWeight: 700, color: "rgba(245,200,66,0.7)", fontFamily: "monospace" }}>{coin.residualPercent ?? 10}% residual · {coin.xc} XC</div>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
