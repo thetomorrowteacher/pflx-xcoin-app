@@ -163,6 +163,53 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
             </div>
           </div>
 
+          {/* ── Designer Identity + Vision (top of profile) ──────────── */}
+          {(designerLabel || majorPathway || visionParts.length > 0) && (
+            <div className="cv-card" style={{
+              marginBottom: "28px", borderRadius: "16px", padding: "22px 24px",
+              background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.2)",
+            }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "24px", flexWrap: "wrap", marginBottom: visionParts.length > 0 ? "18px" : 0 }}>
+                {/* Designer type */}
+                {designerLabel && (
+                  <div>
+                    <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(167,139,250,0.5)", marginBottom: "4px" }}>DESIGNER TYPE</div>
+                    <div style={{
+                      display: "inline-block", padding: "6px 16px", borderRadius: "20px",
+                      background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.35)",
+                      fontSize: "15px", fontWeight: 800, color: "#a78bfa",
+                    }}>{designerLabel}</div>
+                  </div>
+                )}
+                {/* Major + Minor pathway */}
+                {majorPathway && (
+                  <div>
+                    <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(0,212,255,0.5)", marginBottom: "4px" }}>PATHWAYS</div>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <span style={{ padding: "5px 14px", borderRadius: "20px", background: "rgba(0,212,255,0.12)", border: "1px solid rgba(0,212,255,0.3)", fontSize: "12px", fontWeight: 700, color: "#00d4ff" }}>
+                        ⭐ Major: {majorPathway}
+                      </span>
+                      {minorPathway && (
+                        <span style={{ padding: "5px 14px", borderRadius: "20px", background: "rgba(0,212,255,0.06)", border: "1px solid rgba(0,212,255,0.15)", fontSize: "12px", fontWeight: 700, color: "rgba(0,212,255,0.65)" }}>
+                          Minor: {minorPathway}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Vision Statement */}
+              {visionParts.length > 0 && (
+                <div style={{ borderTop: "1px solid rgba(167,139,250,0.1)", paddingTop: "16px" }}>
+                  <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(167,139,250,0.5)", marginBottom: "10px" }}>VISION STATEMENT</div>
+                  <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.75)", lineHeight: 1.7, fontStyle: "italic" }}>
+                    "{visionParts.join(" ")}"
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Stats Bar */}
           <div className="cv-card" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px", padding: "24px", marginBottom: "40px" }}>
             <div>
@@ -227,53 +274,6 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* ── Designer Identity + Vision ─────────────────────────────── */}
-          {(designerLabel || majorPathway || visionParts.length > 0) && (
-            <div className="cv-card" style={{
-              marginBottom: "32px", borderRadius: "16px", padding: "22px 24px",
-              background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.2)",
-            }}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "24px", flexWrap: "wrap", marginBottom: visionParts.length > 0 ? "18px" : 0 }}>
-                {/* Designer type */}
-                {designerLabel && (
-                  <div>
-                    <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(167,139,250,0.5)", marginBottom: "4px" }}>DESIGNER TYPE</div>
-                    <div style={{
-                      display: "inline-block", padding: "6px 16px", borderRadius: "20px",
-                      background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.35)",
-                      fontSize: "15px", fontWeight: 800, color: "#a78bfa",
-                    }}>{designerLabel}</div>
-                  </div>
-                )}
-                {/* Major + Minor pathway */}
-                {majorPathway && (
-                  <div>
-                    <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(0,212,255,0.5)", marginBottom: "4px" }}>PATHWAYS</div>
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                      <span style={{ padding: "5px 14px", borderRadius: "20px", background: "rgba(0,212,255,0.12)", border: "1px solid rgba(0,212,255,0.3)", fontSize: "12px", fontWeight: 700, color: "#00d4ff" }}>
-                        ⭐ Major: {majorPathway}
-                      </span>
-                      {minorPathway && (
-                        <span style={{ padding: "5px 14px", borderRadius: "20px", background: "rgba(0,212,255,0.06)", border: "1px solid rgba(0,212,255,0.15)", fontSize: "12px", fontWeight: 700, color: "rgba(0,212,255,0.65)" }}>
-                          Minor: {minorPathway}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              {/* Vision Statement */}
-              {visionParts.length > 0 && (
-                <div style={{ borderTop: "1px solid rgba(167,139,250,0.1)", paddingTop: "16px" }}>
-                  <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(167,139,250,0.5)", marginBottom: "10px" }}>VISION STATEMENT</div>
-                  <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.75)", lineHeight: 1.7, fontStyle: "italic" }}>
-                    "{visionParts.join(" ")}"
-                  </p>
-                </div>
-              )}
             </div>
           )}
 
