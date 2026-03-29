@@ -218,6 +218,7 @@ export default function AdminPlayers() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importCSV, setImportCSV] = useState("");
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const [viewMode, setViewMode] = useState<"table" | "cards" | "expanded">("table");
 
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
@@ -579,6 +580,22 @@ export default function AdminPlayers() {
               ]}
             />
             <div style={{ flex: 1 }} />
+            {/* View mode toggle */}
+            <div style={{ display: "flex", gap: "2px", background: "rgba(255,255,255,0.03)", borderRadius: "7px", border: "1px solid rgba(0,212,255,0.1)", padding: "2px" }}>
+              {([
+                { key: "table" as const, icon: "☰", tip: "Table" },
+                { key: "cards" as const, icon: "▦", tip: "Cards" },
+                { key: "expanded" as const, icon: "▣", tip: "Expanded" },
+              ]).map(v => (
+                <button key={v.key} onClick={() => setViewMode(v.key)} title={v.tip}
+                  style={{
+                    padding: "3px 8px", borderRadius: "5px", border: "none", fontSize: "13px",
+                    background: viewMode === v.key ? "rgba(0,212,255,0.15)" : "transparent",
+                    color: viewMode === v.key ? "#00d4ff" : "rgba(255,255,255,0.3)",
+                    cursor: "pointer", fontWeight: 700, lineHeight: 1,
+                  }}>{v.icon}</button>
+              ))}
+            </div>
             <span style={{ fontSize: "11px", fontWeight: 700, color: hasFilters ? "#00d4ff" : "rgba(0,212,255,0.3)", letterSpacing: "0.06em" }}>
               {filtered.length} PLAYER{filtered.length !== 1 ? "S" : ""}
               {hasFilters && (
@@ -593,6 +610,168 @@ export default function AdminPlayers() {
           </div>
 
           <div style={{ overflowX: "auto" }}>
+
+            {/* ═══════════ CARD VIEWS ═══════════ */}
+            {(viewMode === "cards" || viewMode === "expanded") && (
+              <div style={{ padding: "16px" }}>
+                {filtered.length === 0 ? (
+                  <div style={{ padding: "40px 20px", textAlign: "center", color: "rgba(0,212,255,0.5)", fontSize: "14px" }}>
+                    No players match your filters.
+                  </div>
+                ) : (
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: viewMode === "cards"
+                      ? "repeat(auto-fill, minmax(200px, 1fr))"
+                      : "repeat(auto-fill, minmax(320px, 1fr))",
+                    gap: viewMode === "cards" ? "12px" : "16px",
+                  }}>
+                    {filtered.map(player => {
+                      const level = getLevelFromXC(player.xcoin);
+                      const rank = getCurrentRank(player.totalXcoin, player);
+                      const studio = mockStartupStudios.find(s => s.id === player.studioId);
+                      const isHost = isHostUser(player);
+
+                      if (viewMode === "cards") {
+                        /* ── Small card ── */
+                        return (
+                          <div key={player.id}
+                            onClick={() => router.push(`/profile/${player.id}`)}
+                            style={{
+                              background: isHost ? "rgba(245,200,66,0.04)" : "rgba(0,212,255,0.02)",
+                              border: `1px solid ${isHost ? "rgba(245,200,66,0.15)" : "rgba(0,212,255,0.1)"}`,
+                              borderRadius: "12px", padding: "16px", cursor: "pointer",
+                              transition: "all .15s", position: "relative",
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = isHost ? "rgba(245,200,66,0.4)" : "rgba(0,212,255,0.3)"; e.currentTarget.style.boxShadow = `0 0 20px ${isHost ? "rgba(245,200,66,0.1)" : "rgba(0,212,255,0.1)"}`; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = isHost ? "rgba(245,200,66,0.15)" : "rgba(0,212,255,0.1)"; e.currentTarget.style.boxShadow = "none"; }}
+                          >
+                            {/* 3-dot menu */}
+                            <div style={{ position: "absolute", top: "8px", right: "4px" }} onClick={e => e.stopPropagation()}>
+                              <ActionsMenu player={player} onEdit={() => handleEditPlayer(player)} onDelete={() => handleDeletePlayer(player)} onToggleHost={() => handleToggleHost(player)} />
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+                              <div style={{ width: "48px", height: "48px", borderRadius: "50%", overflow: "hidden", flexShrink: 0,
+                                background: player.image ? "transparent" : `linear-gradient(135deg, ${avatarColor(player.id)[0]}, ${avatarColor(player.id)[1]})`,
+                                border: `2px solid ${isHost ? "rgba(245,200,66,0.4)" : "rgba(0,212,255,0.3)"}`,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontWeight: 700, fontSize: "18px", color: "#fff",
+                              }}>
+                                {player.image
+                                  ? <img src={player.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                  : player.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div style={{ textAlign: "center" }}>
+                                <p style={{ margin: 0, fontSize: "13px", fontWeight: 700, color: isHost ? "#f5c842" : "#00d4ff" }}>{player.name}</p>
+                                <p style={{ margin: "2px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>{player.brandName}</p>
+                              </div>
+                              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", justifyContent: "center" }}>
+                                <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px",
+                                  background: "rgba(0,212,255,0.08)", color: "#00d4ff" }}>Lv.{level}</span>
+                                <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px",
+                                  background: "rgba(245,200,66,0.08)", color: "#f5c842" }}>{player.xcoin.toLocaleString()} XC</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      /* ── Expanded card ── */
+                      return (
+                        <div key={player.id}
+                          style={{
+                            background: isHost ? "rgba(245,200,66,0.03)" : "rgba(0,212,255,0.02)",
+                            border: `1px solid ${isHost ? "rgba(245,200,66,0.12)" : "rgba(0,212,255,0.1)"}`,
+                            borderRadius: "14px", padding: "20px", position: "relative",
+                            transition: "all .15s",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = isHost ? "rgba(245,200,66,0.35)" : "rgba(0,212,255,0.25)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = isHost ? "rgba(245,200,66,0.12)" : "rgba(0,212,255,0.1)"; }}
+                        >
+                          {/* Actions menu */}
+                          <div style={{ position: "absolute", top: "12px", right: "8px" }}>
+                            <ActionsMenu player={player} onEdit={() => handleEditPlayer(player)} onDelete={() => handleDeletePlayer(player)} onToggleHost={() => handleToggleHost(player)} />
+                          </div>
+
+                          {/* Header: avatar + name */}
+                          <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "14px" }}>
+                            <div style={{
+                              width: "56px", height: "56px", borderRadius: "50%", overflow: "hidden", flexShrink: 0,
+                              background: player.image ? "transparent" : `linear-gradient(135deg, ${avatarColor(player.id)[0]}, ${avatarColor(player.id)[1]})`,
+                              border: `2px solid ${isHost ? "rgba(245,200,66,0.4)" : "rgba(0,212,255,0.3)"}`,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontWeight: 700, fontSize: "22px", color: "#fff",
+                              boxShadow: `0 0 15px ${isHost ? "rgba(245,200,66,0.2)" : "rgba(0,212,255,0.2)"}`,
+                            }}>
+                              {player.image
+                                ? <img src={player.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                : player.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: isHost ? "#f5c842" : "#00d4ff",
+                                cursor: "pointer", textDecoration: "underline", textDecorationColor: "transparent" }}
+                                onClick={() => router.push(`/profile/${player.id}`)}
+                                onMouseEnter={e => { e.currentTarget.style.textDecorationColor = isHost ? "#f5c842" : "#00d4ff"; }}
+                                onMouseLeave={e => { e.currentTarget.style.textDecorationColor = "transparent"; }}
+                              >{player.name}</p>
+                              <p style={{ margin: "2px 0 0", fontSize: "13px", color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>{player.brandName}</p>
+                              {isHost && <span style={{ fontSize: "10px", fontWeight: 800, color: "rgba(245,200,66,0.7)", letterSpacing: "0.08em" }}>{player.isHost ? "CO-HOST" : "HOST"}</span>}
+                            </div>
+                          </div>
+
+                          {/* Stats grid */}
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px" }}>
+                            <div style={{ background: "rgba(0,212,255,0.05)", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
+                              <p style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#00d4ff" }}>{level}</p>
+                              <p style={{ margin: 0, fontSize: "10px", color: "rgba(0,212,255,0.4)", fontWeight: 700 }}>LEVEL</p>
+                            </div>
+                            <div style={{ background: "rgba(245,200,66,0.05)", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
+                              <p style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#f5c842" }}>{player.xcoin.toLocaleString()}</p>
+                              <p style={{ margin: 0, fontSize: "10px", color: "rgba(245,200,66,0.4)", fontWeight: 700 }}>XC</p>
+                            </div>
+                            <div style={{ background: "rgba(79,142,247,0.05)", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
+                              <p style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#4f8ef7" }}>{player.digitalBadges}</p>
+                              <p style={{ margin: 0, fontSize: "10px", color: "rgba(79,142,247,0.4)", fontWeight: 700 }}>BADGES</p>
+                            </div>
+                          </div>
+
+                          {/* Details */}
+                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", fontSize: "11px", fontWeight: 700 }}>
+                            <span style={{ padding: "3px 8px", borderRadius: "6px", background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.15)", color: "#a78bfa" }}>
+                              {rank.name}
+                            </span>
+                            <span style={{ padding: "3px 8px", borderRadius: "6px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }}>
+                              {player.cohort || "No cohort"}
+                            </span>
+                            {studio && (
+                              <span style={{ padding: "3px 8px", borderRadius: "6px", background: `${studio.color}12`, border: `1px solid ${studio.color}30`, color: studio.color }}>
+                                {studio.name.replace(" Studios", "")}
+                              </span>
+                            )}
+                            {player.email && (
+                              <span style={{ padding: "3px 8px", borderRadius: "6px", background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.3)", fontWeight: 500, fontFamily: "monospace", fontSize: "10px" }}>
+                                {player.email}
+                              </span>
+                            )}
+                          </div>
+                          {player.pathway && (
+                            <p style={{ margin: "8px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.25)" }}>
+                              Pathway: <span style={{ color: "rgba(167,139,250,0.6)", fontWeight: 600 }}>{player.pathway}</span>
+                            </p>
+                          )}
+                          <p style={{ margin: "6px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.2)" }}>
+                            Joined {new Date(player.joinedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ═══════════ TABLE VIEW ═══════════ */}
+            {viewMode === "table" && <>
 
             {/* ── HOSTS table ─────────────────────────────────────── */}
             {filteredHosts.length > 0 && (
@@ -807,6 +986,8 @@ export default function AdminPlayers() {
                 No players match your filters.
               </div>
             )}
+
+            </>}{/* end table view */}
           </div>{/* end overflowX scroll wrapper */}
         </div>
 
