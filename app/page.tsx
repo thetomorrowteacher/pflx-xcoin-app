@@ -10,13 +10,13 @@ export default function Home() {
   const router = useRouter();
 
   const [step, setStep] = useState<Step>("select");
-  const [email, setEmail] = useState("");
-  const [rememberEmail, setRememberEmail] = useState(false);
+  const [playerName, setPlayerName] = useState("");
+  const [rememberName, setRememberName] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pin, setPin] = useState("");
   const [showPin, setShowPin] = useState(false);
   const [keepSignedIn, setKeepSignedIn] = useState(false);
-  const [emailError, setEmailError] = useState("");
+  const [nameError, setNameError] = useState("");
   const [pinError, setPinError] = useState("");
   const [btnHover, setBtnHover] = useState(false);
   // Change-PIN state
@@ -25,32 +25,34 @@ export default function Home() {
   const [changePinError, setChangePinError] = useState("");
 
   useEffect(() => {
-    const saved = localStorage.getItem("pflx_remembered_email");
-    if (saved) { setEmail(saved); setRememberEmail(true); }
+    const saved = localStorage.getItem("pflx_remembered_name");
+    if (saved) { setPlayerName(saved); setRememberName(true); }
   }, []);
 
   const players = mockUsers.filter(u => u.role === "player" && !u.isHost);
   const hosts = mockUsers.filter(u => isHostUser(u));
   const selectedUser = mockUsers.find(u => u.id === selectedId) ?? null;
 
-  const handleEmailSubmit = () => {
-    setEmailError("");
-    if (!email.trim()) { setEmailError("Email address is required"); return; }
-    const match = mockUsers.find(u => u.email?.toLowerCase() === email.toLowerCase().trim());
+  const handleNameSubmit = () => {
+    setNameError("");
+    if (!playerName.trim()) { setNameError("Player name is required"); return; }
+    const q = playerName.toLowerCase().trim();
+    const match = mockUsers.find(u =>
+      u.name?.toLowerCase() === q ||
+      u.brandName?.toLowerCase() === q
+    );
     if (match) {
       setSelectedId(match.id);
-      if (rememberEmail) localStorage.setItem("pflx_remembered_email", email.trim());
-      else localStorage.removeItem("pflx_remembered_email");
+      if (rememberName) localStorage.setItem("pflx_remembered_name", playerName.trim());
+      else localStorage.removeItem("pflx_remembered_name");
       setStep("pin");
     } else {
-      setEmailError("No account found. Contact your instructor.");
+      setNameError("No account found. Contact your instructor.");
     }
   };
 
   const handleBrandSelect = (id: string) => {
     setSelectedId(id);
-    const user = mockUsers.find(u => u.id === id);
-    if (user?.email) setEmail(user.email);
     setStep("pin");
   };
 
@@ -59,7 +61,7 @@ export default function Home() {
     setPinError("");
     const correctPin = selectedUser.pin ?? (selectedUser.role === "admin" ? "0000" : "1234");
     if (pin === correctPin) {
-      if (rememberEmail && selectedUser.email) localStorage.setItem("pflx_remembered_email", selectedUser.email);
+      if (rememberName && selectedUser.name) localStorage.setItem("pflx_remembered_name", selectedUser.name);
 
       // If player hasn't changed PIN yet, go to change-pin step
       if (selectedUser.role === "player" && !selectedUser.isHost && selectedUser.pinChanged === false) {
@@ -107,7 +109,7 @@ export default function Home() {
     }
   };
 
-  const goBack = () => { setStep("select"); setPin(""); setPinError(""); setSelectedId(null); setNewPin(""); setConfirmPin(""); setChangePinError(""); };
+  const goBack = () => { setStep("select"); setPin(""); setPinError(""); setSelectedId(null); setNewPin(""); setConfirmPin(""); setChangePinError(""); setPlayerName(""); };
 
   // ── Design tokens ─────────────────────────────────────────────────────────
   const CYAN = "#00d4ff";
@@ -214,64 +216,64 @@ export default function Home() {
           {/* ══ STEP 1 ══════════════════════════════════════════════════ */}
           {step === "select" && (
             <>
-              {/* Email field */}
+              {/* Player name field */}
               <div style={{ marginBottom: "20px" }}>
-                <label style={labelStyle}>Email Address</label>
+                <label style={labelStyle}>Player Name</label>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={e => { setEmail(e.target.value); setEmailError(""); }}
-                  onKeyDown={e => e.key === "Enter" && handleEmailSubmit()}
-                  placeholder="your@email.com"
-                  style={emailError ? inputErr : inputStyle}
+                  type="text"
+                  value={playerName}
+                  onChange={e => { setPlayerName(e.target.value); setNameError(""); }}
+                  onKeyDown={e => e.key === "Enter" && handleNameSubmit()}
+                  placeholder="Enter your name..."
+                  style={nameError ? inputErr : inputStyle}
                   autoFocus
                 />
-                {emailError && (
-                  <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#ff6b6b", letterSpacing: "0.02em" }}>{emailError}</p>
+                {nameError && (
+                  <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#ff6b6b", letterSpacing: "0.02em" }}>{nameError}</p>
                 )}
               </div>
 
-              {/* Remember email */}
+              {/* Remember me */}
               <label style={{
                 display: "flex", alignItems: "center", gap: "10px",
                 cursor: "pointer", fontSize: "12px", color: "rgba(255,255,255,0.4)",
                 letterSpacing: "0.03em", marginBottom: "20px",
               }}>
                 <div
-                  onClick={() => setRememberEmail(r => !r)}
+                  onClick={() => setRememberName(r => !r)}
                   style={{
                     width: "16px", height: "16px", borderRadius: "3px", flexShrink: 0,
-                    border: `1.5px solid ${rememberEmail ? CYAN : "rgba(255,255,255,0.2)"}`,
-                    background: rememberEmail ? "rgba(0,212,255,0.2)" : "transparent",
+                    border: `1.5px solid ${rememberName ? CYAN : "rgba(255,255,255,0.2)"}`,
+                    background: rememberName ? "rgba(0,212,255,0.2)" : "transparent",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     cursor: "pointer", transition: "all .15s",
                   }}
                 >
-                  {rememberEmail && <span style={{ color: CYAN, fontSize: "10px", fontWeight: 900 }}>&#x2713;</span>}
+                  {rememberName && <span style={{ color: CYAN, fontSize: "10px", fontWeight: 900 }}>&#x2713;</span>}
                 </div>
-                REMEMBER EMAIL ON THIS DEVICE
+                REMEMBER ME ON THIS DEVICE
               </label>
 
               {/* Initialize Session button */}
               <button
-                onClick={handleEmailSubmit}
-                disabled={!email.trim()}
+                onClick={handleNameSubmit}
+                disabled={!playerName.trim()}
                 onMouseEnter={() => setBtnHover(true)}
                 onMouseLeave={() => setBtnHover(false)}
                 style={{
                   width: "100%", padding: "14px",
                   borderRadius: "8px", border: "none",
-                  background: email.trim()
+                  background: playerName.trim()
                     ? `linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%)`
                     : "rgba(255,255,255,0.06)",
-                  color: email.trim() ? "#ffffff" : "rgba(255,255,255,0.2)",
+                  color: playerName.trim() ? "#ffffff" : "rgba(255,255,255,0.2)",
                   fontSize: "13px", fontWeight: 800,
                   letterSpacing: "0.12em", textTransform: "uppercase",
-                  cursor: email.trim() ? "pointer" : "default",
+                  cursor: playerName.trim() ? "pointer" : "default",
                   marginBottom: "20px",
                   transition: "all .2s",
-                  boxShadow: email.trim() && btnHover ? `0 0 24px rgba(0,212,255,0.3)` : "none",
-                  transform: email.trim() && btnHover ? "translateY(-1px)" : "none",
+                  boxShadow: playerName.trim() && btnHover ? `0 0 24px rgba(0,212,255,0.3)` : "none",
+                  transform: playerName.trim() && btnHover ? "translateY(-1px)" : "none",
                 }}>
                 Initialize Session
               </button>
@@ -359,7 +361,7 @@ export default function Home() {
                 </div>
                 <div style={{ flex: 1, overflow: "hidden" }}>
                   <div style={{ fontWeight: 700, fontSize: "14px", color: "#ffffff", letterSpacing: "0.02em" }}>{selectedUser.brandName ?? selectedUser.name}</div>
-                  <div style={{ fontSize: "11px", color: CYAN_DIM, letterSpacing: "0.05em" }}>{selectedUser.email ?? selectedUser.cohort}</div>
+                  <div style={{ fontSize: "11px", color: CYAN_DIM, letterSpacing: "0.05em" }}>{selectedUser.name}</div>
                 </div>
                 <button onClick={goBack} style={{ background: "none", border: "none", color: CYAN_DIM, cursor: "pointer", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                   Change
