@@ -124,6 +124,8 @@ export interface Task {
   link?: string; // Optional resource link (Google Doc, Canva, YouTube, etc.)
   rejectionFeedback?: string; // AI-generated or host-written feedback when rejected
   rejectedAt?: string; // ISO date when rejection happened
+  completionMode?: "one-time" | "unlimited"; // one-time = once per player, unlimited = repeatable
+  fromJobId?: string; // If this task was created from a job posting
 }
 
 export interface Checkpoint {

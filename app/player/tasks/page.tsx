@@ -37,7 +37,7 @@ export default function PlayerTasks() {
     setTasks((prev) => prev.map((t) =>
       t.id === taskId ? { ...t, status: "submitted" as const, submittedBy: user.id, submittedAt: new Date().toISOString().split("T")[0] } : t
     ));
-    showToast("Task submitted! Waiting for teacher approval. 📤", "success");
+    showToast("Task submitted! Waiting for coach approval. 📤", "success");
   };
 
   /* Open resubmit modal — pre-fill with existing proof */
@@ -78,7 +78,7 @@ export default function PlayerTasks() {
     }
     setTasks(prev => prev.map(updater));
     saveAndToast([saveTasks], "Resubmitted — saved to cloud ✓");
-    showToast("Task resubmitted! Your teacher will review it soon. 📤", "success");
+    showToast("Task resubmitted! Your coach will review it soon. 📤", "success");
     setResubmitModal(null);
   };
 
@@ -219,7 +219,7 @@ export default function PlayerTasks() {
                             background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)",
                             marginBottom: "10px"
                           }}>
-                            <p style={{ margin: "0 0 4px", fontSize: "11px", fontWeight: 700, color: "#ef4444", textTransform: "uppercase", letterSpacing: "0.05em" }}>Teacher Feedback</p>
+                            <p style={{ margin: "0 0 4px", fontSize: "11px", fontWeight: 700, color: "#ef4444", textTransform: "uppercase", letterSpacing: "0.05em" }}>Coach Feedback</p>
                             <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: 1.5 }}>{t.rejectionFeedback}</p>
                             {t.rejectedAt && <p style={{ margin: "6px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.2)" }}>Rejected on {t.rejectedAt}</p>}
                           </div>

@@ -275,6 +275,8 @@ export default function TaskManagement() {
       roundId: editingTask.roundId,
       link: cleanLinks[0] || "",
       links: cleanLinks,
+      completionMode: (editingTask as any).completionMode || "unlimited",
+      fromJobId: (editingTask as any).fromJobId,
     } as Task;
     if (isNew) { setTasks(prev => [...prev, saved]); mockTasks.push(saved); }
     else {
@@ -329,6 +331,8 @@ export default function TaskManagement() {
       link: job.link,
       links: [],
       assignedTo: [playerId],
+      completionMode: "one-time",
+      fromJobId: jobId,
     } as Task;
     setTasks(prev => [...prev, newTask]);
     mockTasks.push(newTask);
@@ -545,7 +549,7 @@ export default function TaskManagement() {
           border: "1px solid rgba(255,255,255,0.06)", padding: "4px", width: "fit-content" }}>
           {(["checkpoints", "tasks", "jobs", "projects"] as const).map(t => (
             <button key={t} onClick={() => { playNav(); setTab(t); }} style={tabBtnSx(tab === t)}>
-              {t === "checkpoints" ? "🏁 CHECKPOINTS" : t === "tasks" ? "✅ TASKS" : t === "jobs" ? "💼 JOBS" : "🗂 PROJECTS"}
+              {t === "checkpoints" ? "🏁 CHECKPOINTS" : t === "tasks" ? "✅ TASKS" : t === "jobs" ? "📋 JOB BOARD" : "🗂 PROJECTS"}
             </button>
           ))}
         </div>
@@ -656,7 +660,7 @@ export default function TaskManagement() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                      {["Task", "Badge Type", "XC Value", "Cohort", "Checkpoint", "Status", ""].map(h => (
+                      {["Task", "Badge Type", "XC Value", "Cohort", "Checkpoint", "Status", "Mode", ""].map(h => (
                         <th key={h} style={{ padding: "14px 18px", textAlign: "left", fontSize: "11px",
                           fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "1px", textTransform: "uppercase" }}>{h}</th>
                       ))}
@@ -702,6 +706,24 @@ export default function TaskManagement() {
                             <span style={pill(task.status, sc)}>{task.status}</span>
                           </td>
                           <td style={{ padding: "14px 18px" }}>
+                            {(task as any).fromJobId ? (
+                              <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+                                background: "rgba(245,200,66,0.1)", border: "1px solid rgba(245,200,66,0.2)", color: "#f5c842" }}>
+                                📌 Job
+                              </span>
+                            ) : (task as any).completionMode === "one-time" ? (
+                              <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+                                background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", color: "#ef4444" }}>
+                                1x Only
+                              </span>
+                            ) : (
+                              <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+                                background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.15)", color: "#22c55e" }}>
+                                ♾ Open
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: "14px 18px" }}>
                             <div style={{ display: "flex", gap: "6px" }}>
                               <button onClick={() => openEditTask(task as Task)}
                                 style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
@@ -723,75 +745,194 @@ export default function TaskManagement() {
           </div>
         )}
 
-        {/* ══════════════════ JOBS TAB ══════════════════ */}
+        {/* ══════════════════ JOB BOARD TAB ══════════════════ */}
         {tab === "jobs" && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <p style={{ margin: 0, color: "rgba(255,255,255,0.4)", fontSize: "13px" }}>
-                {jobs.length} job{jobs.length !== 1 ? "s" : ""} listed
-              </p>
-              <button onClick={openNewJob} style={addBtnSx}>＋ New Job</button>
+            {/* Job Board Header */}
+            <div style={{
+              background: "linear-gradient(135deg, rgba(245,200,66,0.08), rgba(255,140,50,0.06))",
+              border: "1px solid rgba(245,200,66,0.15)", borderRadius: "16px",
+              padding: "24px 28px", marginBottom: "24px",
+              display: "flex", justifyContent: "space-between", alignItems: "center"
+            }}>
+              <div>
+                <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 900, color: "#f5c842",
+                  display: "flex", alignItems: "center", gap: "10px" }}>
+                  <span style={{ fontSize: "28px" }}>📋</span> JOB BOARD
+                </h2>
+                <p style={{ margin: 0, color: "rgba(245,200,66,0.6)", fontSize: "13px", letterSpacing: "0.05em" }}>
+                  {jobs.filter(j => j.status === "open").length} open posting{jobs.filter(j => j.status === "open").length !== 1 ? "s" : ""} · {jobs.length} total
+                </p>
+              </div>
+              <button onClick={openNewJob} style={{
+                padding: "12px 24px", borderRadius: "12px", fontSize: "14px", fontWeight: 800,
+                background: "linear-gradient(135deg, #f5c842, #ff8c32)",
+                border: "none", color: "#0a0a0f", cursor: "pointer",
+                boxShadow: "0 4px 16px rgba(245,200,66,0.3)",
+                display: "flex", alignItems: "center", gap: "8px"
+              }}>
+                <span style={{ fontSize: "18px" }}>+</span> Post New Job
+              </button>
+            </div>
+
+            {/* Status filter pills */}
+            <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" }}>
+              {["all", "open", "filled", "in_progress", "completed", "closed"].map(s => {
+                const count = s === "all" ? jobs.length : jobs.filter(j => j.status === s).length;
+                if (count === 0 && s !== "all") return null;
+                return (
+                  <span key={s} style={{
+                    padding: "5px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+                    background: s === "all" ? "rgba(245,200,66,0.1)" : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${s === "all" ? "rgba(245,200,66,0.2)" : "rgba(255,255,255,0.06)"}`,
+                    color: s === "all" ? "#f5c842" : s === "open" ? "#22c55e" : s === "filled" ? "#4f8ef7" : s === "completed" ? "#a78bfa" : "rgba(255,255,255,0.4)",
+                    cursor: "default"
+                  }}>
+                    {s === "all" ? "All" : s.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase())} ({count})
+                  </span>
+                );
+              })}
             </div>
 
             {jobs.length === 0 ? (
-              <div style={{ ...cardSx, padding: "60px", textAlign: "center" }}>
-                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "16px", margin: 0 }}>No jobs yet.</p>
+              <div style={{
+                background: "rgba(245,200,66,0.03)", border: "2px dashed rgba(245,200,66,0.15)",
+                borderRadius: "20px", padding: "60px", textAlign: "center"
+              }}>
+                <div style={{ fontSize: "48px", marginBottom: "12px" }}>📋</div>
+                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "16px", margin: "0 0 8px" }}>No job postings yet</p>
+                <p style={{ color: "rgba(255,255,255,0.2)", fontSize: "13px", margin: 0 }}>Post a job to the board and let players apply!</p>
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 {jobs.map(job => {
-                  const sc = statusColor(job.status === "open" ? "active" : "inactive");
+                  const isOpen = job.status === "open";
+                  const isFilled = job.status === "filled" || job.status === "in_progress";
+                  const isDone = job.status === "completed";
+                  const isClosed = job.status === "closed";
+                  const hired = job.hiredPlayers?.length || 0;
+                  const max = job.maxHires || 1;
+                  const applicantCount = job.applicants?.length || 0;
+                  const borderColor = isOpen ? "rgba(34,197,94,0.2)" : isFilled ? "rgba(79,142,247,0.2)" : isDone ? "rgba(167,139,250,0.2)" : "rgba(255,255,255,0.06)";
+                  const accentColor = isOpen ? "#22c55e" : isFilled ? "#4f8ef7" : isDone ? "#a78bfa" : "rgba(255,255,255,0.3)";
+
                   return (
-                    <div key={job.id} style={{ ...cardSx, padding: "22px", cursor: "pointer" }}
-                      onClick={() => openEditJob(job)}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
-                        <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#f0f0ff", flex: 1, paddingRight: "10px" }}>{job.title}</h3>
-                        <span style={pill(job.status, sc)}>{job.status}</span>
-                      </div>
-                      {job.description && <p style={{ margin: "0 0 14px", fontSize: "13px", color: "rgba(255,255,255,0.45)", lineHeight: 1.5 }}>{job.description}</p>}
-                      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", fontSize: "12px", fontWeight: 700 }}>
-                        <span style={{ background: "rgba(245,200,66,0.1)", padding: "4px 10px", borderRadius: "8px", color: "#f5c842" }}>
-                          {job.xpValue} XC
-                        </span>
-                        {job.coinType && <span style={{ background: "rgba(255,255,255,0.05)", padding: "4px 10px", borderRadius: "8px", color: "rgba(255,255,255,0.5)" }}>{job.coinType}</span>}
-                        <span style={{ background: "rgba(255,255,255,0.05)", padding: "4px 10px", borderRadius: "8px", color: "rgba(255,255,255,0.4)" }}>{job.cohort || "All"}</span>
-                        {job.maxHires && (
-                          <span style={{ background: "rgba(34,197,94,0.1)", padding: "4px 10px", borderRadius: "8px", color: "#22c55e" }}>
-                            👤 {(job.hiredPlayers?.length || 0)}/{job.maxHires} hired
-                          </span>
-                        )}
-                      </div>
-                      {/* Job → Task completion status bar (shown when job has transformed tasks) */}
-                      {(job.transformedTaskIds?.length ?? 0) > 0 && (() => {
-                        const total = job.transformedTaskIds!.length;
-                        const completed = job.transformedTaskIds!.filter(tid => {
-                          const t = tasks.find(tk => tk.id === tid);
-                          return t && t.status === "approved";
-                        }).length;
-                        const pct = Math.round((completed / total) * 100);
-                        return (
-                          <div style={{ marginTop: "12px" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>Task Progress</span>
-                              <span style={{ fontSize: "11px", color: pct === 100 ? "#22c55e" : "#a78bfa", fontWeight: 700 }}>{completed}/{total} done ({pct}%)</span>
+                    <div key={job.id} style={{
+                      background: "rgba(22,22,31,0.95)", border: `1px solid ${borderColor}`,
+                      borderRadius: "16px", overflow: "hidden", cursor: "pointer",
+                      transition: "border-color 0.2s"
+                    }} onClick={() => openEditJob(job)}>
+                      {/* Left accent bar */}
+                      <div style={{ display: "flex" }}>
+                        <div style={{ width: "4px", background: accentColor, flexShrink: 0 }} />
+                        <div style={{ flex: 1, padding: "22px 24px" }}>
+                          {/* Top row: title + status */}
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                                <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em",
+                                  color: accentColor }}>
+                                  {isOpen ? "NOW HIRING" : isFilled ? "POSITIONS FILLED" : isDone ? "COMPLETED" : isClosed ? "CLOSED" : job.status.toUpperCase()}
+                                </span>
+                                {job.intervalType && (
+                                  <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 700,
+                                    background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)", color: "#a78bfa" }}>
+                                    {job.intervalType}
+                                  </span>
+                                )}
+                              </div>
+                              <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#f0f0ff" }}>{job.title}</h3>
                             </div>
-                            <div style={{ height: "6px", borderRadius: "3px", background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-                              <div style={{
-                                width: `${pct}%`, height: "100%", borderRadius: "3px",
-                                background: pct === 100 ? "#22c55e" : "linear-gradient(90deg, #8b5cf6, #a78bfa)",
-                                transition: "width 0.4s"
-                              }} />
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                              <span style={{ fontSize: "20px", fontWeight: 900, color: "#f5c842" }}>{job.xpValue} XC</span>
+                              {(job as any).rewardBadges?.length > 0 && (
+                                <div style={{ display: "flex", gap: "3px" }}>
+                                  {(job as any).rewardBadges.slice(0, 3).map((b: any, i: number) => (
+                                    <span key={i} style={{ padding: "1px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
+                                      background: "rgba(79,142,247,0.1)", color: "#4f8ef7" }}>{b.name}</span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
-                        );
-                      })()}
-                      {/* Duplicate button */}
-                      <div style={{ marginTop: "12px" }}>
-                        <button onClick={(e) => { e.stopPropagation(); duplicateJob(job); }}
-                          style={{ padding: "5px 12px", background: "rgba(0,212,255,0.08)", border: "1px solid rgba(0,212,255,0.2)",
-                            borderRadius: "8px", color: "#00d4ff", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
-                          📋 Duplicate
-                        </button>
+
+                          {/* Description */}
+                          {job.description && (
+                            <p style={{ margin: "0 0 14px", fontSize: "13px", color: "rgba(255,255,255,0.5)", lineHeight: 1.6, maxWidth: "600px" }}>
+                              {job.description}
+                            </p>
+                          )}
+
+                          {/* Info row */}
+                          <div style={{ display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
+                            {/* Slots */}
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span style={{ fontSize: "14px" }}>👤</span>
+                              <div>
+                                <span style={{ fontSize: "13px", fontWeight: 700, color: hired >= max ? "#22c55e" : "#f0f0ff" }}>{hired}/{max}</span>
+                                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginLeft: "4px" }}>hired</span>
+                              </div>
+                            </div>
+
+                            {/* Applicants */}
+                            {applicantCount > 0 && (
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span style={{ fontSize: "14px" }}>📩</span>
+                                <span style={{ fontSize: "13px", fontWeight: 700, color: "#f5c842" }}>{applicantCount}</span>
+                                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>applicant{applicantCount !== 1 ? "s" : ""}</span>
+                              </div>
+                            )}
+
+                            {/* Cohort */}
+                            <span style={{ padding: "3px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+                              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }}>
+                              {job.cohort || "All Cohorts"}
+                            </span>
+
+                            {/* Timeline */}
+                            {job.timeline?.start && (
+                              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>
+                                {job.timeline.start} → {job.timeline.end || "Ongoing"}
+                              </span>
+                            )}
+
+                            {/* Actions */}
+                            <div style={{ marginLeft: "auto", display: "flex", gap: "6px" }}>
+                              <button onClick={(e) => { e.stopPropagation(); duplicateJob(job); }}
+                                style={{ padding: "5px 12px", background: "rgba(0,212,255,0.06)", border: "1px solid rgba(0,212,255,0.15)",
+                                  borderRadius: "8px", color: "#00d4ff", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
+                                📋 Duplicate
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Task completion progress bar (when job has transformed tasks) */}
+                          {(job.transformedTaskIds?.length ?? 0) > 0 && (() => {
+                            const total = job.transformedTaskIds!.length;
+                            const completed = job.transformedTaskIds!.filter(tid => {
+                              const t = tasks.find(tk => tk.id === tid);
+                              return t && t.status === "approved";
+                            }).length;
+                            const pct = Math.round((completed / total) * 100);
+                            return (
+                              <div style={{ marginTop: "14px", paddingTop: "14px", borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                                  <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>Task Completion</span>
+                                  <span style={{ fontSize: "12px", color: pct === 100 ? "#22c55e" : "#a78bfa", fontWeight: 700 }}>
+                                    {completed}/{total} tasks done ({pct}%)
+                                  </span>
+                                </div>
+                                <div style={{ height: "8px", borderRadius: "4px", background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                                  <div style={{
+                                    width: `${pct}%`, height: "100%", borderRadius: "4px",
+                                    background: pct === 100 ? "linear-gradient(90deg, #22c55e, #4ade80)" : "linear-gradient(90deg, #f5c842, #ff8c32)",
+                                    transition: "width 0.5s"
+                                  }} />
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </div>
                   );
@@ -1201,7 +1342,7 @@ export default function TaskManagement() {
                     min={0} style={inputSx} />
                 </Field>
               )}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "14px" }}>
                 <Field label="Cohort">
                   <select value={editingTask.cohort || "all"} onChange={e => setEditingTask(p => ({ ...p, cohort: e.target.value }))}
                     style={{ ...inputSx, cursor: "pointer" }}>
@@ -1224,7 +1365,20 @@ export default function TaskManagement() {
                     {checkpoints.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </Field>
+                <Field label="Completion">
+                  <select value={(editingTask as any).completionMode || "unlimited"} onChange={e => setEditingTask(p => ({ ...p, completionMode: e.target.value }))}
+                    style={{ ...inputSx, cursor: "pointer" }}>
+                    <option value="unlimited">Unlimited (Repeatable)</option>
+                    <option value="one-time">One-Time Only</option>
+                  </select>
+                </Field>
               </div>
+              {/* From Job indicator */}
+              {(editingTask as any).fromJobId && (
+                <div style={{ padding: "8px 14px", borderRadius: "10px", background: "rgba(245,200,66,0.08)", border: "1px solid rgba(245,200,66,0.15)", fontSize: "12px", color: "#f5c842", fontWeight: 600 }}>
+                  📌 This task was created from a Job Posting — assigned to hired player only
+                </div>
+              )}
               <Field label={`Resource Links (${taskLinks.filter(l => l.trim()).length})`}>
                 {taskLinks.map((link, i) => (
                   <div key={i} style={{ display: "flex", gap: "8px", marginBottom: i < taskLinks.length - 1 ? "6px" : 0 }}>

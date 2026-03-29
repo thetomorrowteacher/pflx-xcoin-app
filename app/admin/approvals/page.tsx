@@ -96,7 +96,7 @@ export default function AdminApprovals() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            message: `A student named ${player?.name || "Player"} submitted a task called "${task?.title}" but it is being rejected. Their submission proof: link="${task?.submissionProof?.linkUrl || "none"}", file="${task?.submissionProof?.fileUrl || "none"}", note="${task?.submissionProof?.note || "none"}". The task was due ${task?.dueDate || "unknown"} and submitted ${task?.submittedAt || "unknown"}. Write a brief, encouraging rejection message (2-3 sentences) explaining what might be missing and how they can improve for resubmission. Be specific and helpful.`,
+            message: `A player named ${player?.name || "Player"} submitted a task called "${task?.title}" but it is being rejected by the host. Their submission proof: link="${task?.submissionProof?.linkUrl || "none"}", file="${task?.submissionProof?.fileUrl || "none"}", note="${task?.submissionProof?.note || "none"}". The task was due ${task?.dueDate || "unknown"} and submitted ${task?.submittedAt || "unknown"}. Write a brief, encouraging rejection message (2-3 sentences) as a coach explaining what might be missing and how they can improve for resubmission. Be specific and helpful.`,
             role: "host",
             context: { taskTitle: task?.title, playerName: player?.name },
           }),
