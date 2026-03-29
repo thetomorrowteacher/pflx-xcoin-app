@@ -399,6 +399,11 @@ export interface Coin {
   description: string;
   xc: number;  // XC reward value for earning this Digital Badge
   image?: string;
+  // Residual income / course sponsorship
+  sponsorType?: "player" | "studio" | "none"; // Who sponsors this course/project
+  sponsorId?: string;       // Player ID or Studio ID of the sponsor
+  sponsorName?: string;     // Display name (cached for UI)
+  residualPercent?: number; // % of XC reward paid to sponsor on each badge earn (default 10%)
 }
 
 export interface CoinCategory {

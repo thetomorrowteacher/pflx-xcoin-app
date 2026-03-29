@@ -9,7 +9,9 @@ import {
   CoinCategory,
   mockUsers,
   mockSubmissions,
-  CoinSubmission
+  CoinSubmission,
+  mockStartupStudios,
+  StartupStudio
 } from "../../lib/data";
 import { applyPlayerImages } from "../../lib/playerImages";
 import { playReward, playSuccess, playClick, playDelete } from "../../lib/sounds";
@@ -27,6 +29,10 @@ export default function ManageCoinsPage() {
   const [isAdding, setIsAdding] = useState<number | null>(null); // Category index
   const [grantTarget, setGrantTarget] = useState<{playerId: string, coin: Coin, amount: number} | null>(null);
   const [newCoinImage, setNewCoinImage] = useState<string>(""); // base64 for new coin image
+  const [newSponsorType, setNewSponsorType] = useState<"player" | "studio" | "none">("none");
+  const [newSponsorId, setNewSponsorId] = useState("");
+  const [newSponsorName, setNewSponsorName] = useState("");
+  const [newResidualPercent, setNewResidualPercent] = useState(10);
   const [_tick, setTick] = useState(0);
 
   // Refresh player list every 2s so newly added players appear in picker
@@ -88,7 +94,11 @@ export default function ManageCoinsPage() {
       name: formData.get("name") as string,
       description: formData.get("description") as string,
       xc: parseInt(formData.get("xc") as string) || 0,
-      image: newCoinImage || undefined, // Use state instead of DOM query
+      image: newCoinImage || undefined,
+      sponsorType: newSponsorType !== "none" ? newSponsorType : undefined,
+      sponsorId: newSponsorType !== "none" ? newSponsorId : undefined,
+      sponsorName: newSponsorType !== "none" ? newSponsorName : undefined,
+      residualPercent: newSponsorType !== "none" ? newResidualPercent : undefined,
     };
     console.log(`[coins] Creating coin "${newCoin.name}", image: ${newCoin.image ? `${(newCoin.image.length / 1024).toFixed(1)}KB` : "none"}`);
     const newCats = [...categories];
@@ -97,7 +107,11 @@ export default function ManageCoinsPage() {
     // Sync back to mock array so auto-save picks it up
     COIN_CATEGORIES.splice(0, COIN_CATEGORIES.length, ...newCats);
     setIsAdding(null);
-    setNewCoinImage(""); // Reset for next creation
+    setNewCoinImage("");
+    setNewSponsorType("none");
+    setNewSponsorId("");
+    setNewSponsorName("");
+    setNewResidualPercent(10);
     playSuccess();
     await saveAndToast([saveCoinCategories], "Badge created — saved to cloud ✓");
   };
@@ -175,8 +189,13 @@ export default function ManageCoinsPage() {
                     <div style={{ flex: 1 }}>
                       <p style={{ margin: "0 0 4px", fontSize: "14px", fontWeight: 700, color: "#f0f0ff" }}>{coin.name}</p>
                       <p style={{ margin: "0 0 12px", fontSize: "12px", color: "rgba(255,255,255,0.4)", lineHeight: 1.4 }}>{coin.description}</p>
-                      <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+                      <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
                         <span style={{ fontSize: "11px", fontWeight: 700, color: "#4f8ef7", padding: "2px 8px", background: "rgba(79,142,247,0.1)", borderRadius: "6px" }}>{coin.xc} XC REWARD</span>
+                        {coin.sponsorType && coin.sponsorType !== "none" && coin.sponsorName && (
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: "#a78bfa", padding: "2px 8px", background: "rgba(167,139,250,0.1)", borderRadius: "6px" }}>
+                            {coin.residualPercent || 10}% → {coin.sponsorName}
+                          </span>
+                        )}
                       </div>
                       <div style={{ display: "flex", gap: "8px" }}>
                         <button 
@@ -257,6 +276,85 @@ export default function ManageCoinsPage() {
                   </div>
                 </div>
 
+                {/* Course Sponsor & Residual Income */}
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "16px" }}>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "rgba(167,139,250,0.9)", marginBottom: "12px", letterSpacing: "0.05em" }}>COURSE / PROJECT SPONSOR</label>
+
+                  <div style={{ marginBottom: "12px" }}>
+                    <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Sponsor Type</label>
+                    <select
+                      value={editingCoin.coin.sponsorType || "none"}
+                      onChange={e => {
+                        const val = e.target.value as "player" | "studio" | "none";
+                        setEditingCoin({...editingCoin, coin: {...editingCoin.coin, sponsorType: val, sponsorId: "", sponsorName: ""}});
+                      }}
+                      style={{ width: "100%", padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white", appearance: "auto" }}
+                    >
+                      <option value="none" style={{ background: "#16161f" }}>No Sponsor</option>
+                      <option value="player" style={{ background: "#16161f" }}>Player</option>
+                      <option value="studio" style={{ background: "#16161f" }}>Startup Studio</option>
+                    </select>
+                  </div>
+
+                  {editingCoin.coin.sponsorType === "player" && (
+                    <div style={{ marginBottom: "12px" }}>
+                      <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Select Player</label>
+                      <select
+                        value={editingCoin.coin.sponsorId || ""}
+                        onChange={e => {
+                          const p = mockUsers.find(u => u.id === e.target.value);
+                          setEditingCoin({...editingCoin, coin: {...editingCoin.coin, sponsorId: e.target.value, sponsorName: p?.brandName || p?.name || ""}});
+                        }}
+                        style={{ width: "100%", padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white", appearance: "auto" }}
+                      >
+                        <option value="" style={{ background: "#16161f" }}>— Choose Player —</option>
+                        {mockUsers.filter(u => u.role === "player").map(u => (
+                          <option key={u.id} value={u.id} style={{ background: "#16161f" }}>{u.brandName || u.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {editingCoin.coin.sponsorType === "studio" && (
+                    <div style={{ marginBottom: "12px" }}>
+                      <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Select Startup Studio</label>
+                      <select
+                        value={editingCoin.coin.sponsorId || ""}
+                        onChange={e => {
+                          const s = mockStartupStudios.find(st => st.id === e.target.value);
+                          setEditingCoin({...editingCoin, coin: {...editingCoin.coin, sponsorId: e.target.value, sponsorName: s?.name || ""}});
+                        }}
+                        style={{ width: "100%", padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white", appearance: "auto" }}
+                      >
+                        <option value="" style={{ background: "#16161f" }}>— Choose Studio —</option>
+                        {mockStartupStudios.map(s => (
+                          <option key={s.id} value={s.id} style={{ background: "#16161f" }}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {editingCoin.coin.sponsorType && editingCoin.coin.sponsorType !== "none" && (
+                    <div style={{ marginBottom: "4px" }}>
+                      <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Residual Income %</label>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <input
+                          type="number"
+                          min="1"
+                          max="50"
+                          value={editingCoin.coin.residualPercent ?? 10}
+                          onChange={e => setEditingCoin({...editingCoin, coin: {...editingCoin.coin, residualPercent: parseInt(e.target.value) || 10}})}
+                          style={{ flex: 1, padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white" }}
+                        />
+                        <span style={{ fontSize: "13px", color: "rgba(167,139,250,0.7)", minWidth: "90px" }}>
+                          = {((editingCoin.coin.residualPercent ?? 10) / 100 * editingCoin.coin.xc).toFixed(0)} XC / badge
+                        </span>
+                      </div>
+                      <p style={{ margin: "6px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.25)" }}>Industry standard: 10%. Sponsor earns this % of XC each time a player completes the course.</p>
+                    </div>
+                  )}
+                </div>
+
                 <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
                   <button type="button" onClick={() => setEditingCoin(null)} style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", cursor: "pointer" }}>Cancel</button>
                   <button type="submit" style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "#f5c842", border: "none", color: "#000", fontWeight: 700, cursor: "pointer" }}>Save Changes</button>
@@ -301,6 +399,76 @@ export default function ManageCoinsPage() {
                       {newCoinImage ? "✓ Image Ready — Click to Change" : "Upload Badge Image"}
                     </label>
                   </div>
+                </div>
+
+                {/* Course Sponsor & Residual Income */}
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "16px" }}>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "rgba(167,139,250,0.9)", marginBottom: "12px", letterSpacing: "0.05em" }}>COURSE / PROJECT SPONSOR</label>
+
+                  <div style={{ marginBottom: "12px" }}>
+                    <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Sponsor Type</label>
+                    <select
+                      value={newSponsorType}
+                      onChange={e => { setNewSponsorType(e.target.value as "player" | "studio" | "none"); setNewSponsorId(""); setNewSponsorName(""); }}
+                      style={{ width: "100%", padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white", appearance: "auto" }}
+                    >
+                      <option value="none" style={{ background: "#16161f" }}>No Sponsor</option>
+                      <option value="player" style={{ background: "#16161f" }}>Player</option>
+                      <option value="studio" style={{ background: "#16161f" }}>Startup Studio</option>
+                    </select>
+                  </div>
+
+                  {newSponsorType === "player" && (
+                    <div style={{ marginBottom: "12px" }}>
+                      <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Select Player</label>
+                      <select
+                        value={newSponsorId}
+                        onChange={e => { const p = mockUsers.find(u => u.id === e.target.value); setNewSponsorId(e.target.value); setNewSponsorName(p?.brandName || p?.name || ""); }}
+                        style={{ width: "100%", padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white", appearance: "auto" }}
+                      >
+                        <option value="" style={{ background: "#16161f" }}>— Choose Player —</option>
+                        {mockUsers.filter(u => u.role === "player").map(u => (
+                          <option key={u.id} value={u.id} style={{ background: "#16161f" }}>{u.brandName || u.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {newSponsorType === "studio" && (
+                    <div style={{ marginBottom: "12px" }}>
+                      <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Select Startup Studio</label>
+                      <select
+                        value={newSponsorId}
+                        onChange={e => { const s = mockStartupStudios.find(st => st.id === e.target.value); setNewSponsorId(e.target.value); setNewSponsorName(s?.name || ""); }}
+                        style={{ width: "100%", padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white", appearance: "auto" }}
+                      >
+                        <option value="" style={{ background: "#16161f" }}>— Choose Studio —</option>
+                        {mockStartupStudios.map(s => (
+                          <option key={s.id} value={s.id} style={{ background: "#16161f" }}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {newSponsorType !== "none" && (
+                    <div style={{ marginBottom: "4px" }}>
+                      <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Residual Income %</label>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <input
+                          type="number"
+                          min="1"
+                          max="50"
+                          value={newResidualPercent}
+                          onChange={e => setNewResidualPercent(parseInt(e.target.value) || 10)}
+                          style={{ flex: 1, padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white" }}
+                        />
+                        <span style={{ fontSize: "13px", color: "rgba(167,139,250,0.7)", minWidth: "90px" }}>
+                          Industry default: 10%
+                        </span>
+                      </div>
+                      <p style={{ margin: "6px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.25)" }}>Sponsor earns this % of XC each time a player completes the course and earns the badge.</p>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
