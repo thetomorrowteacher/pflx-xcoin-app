@@ -81,6 +81,7 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
   const designerLabel = dr?.brandType ? (designerTypeLabels[dr.brandType] ?? dr.brandType) : null;
   const majorPathway = dr?.topPathways?.[0] ?? profileUser.pathway ?? null;
   const minorPathway = dr?.topPathways?.[1] ?? null;
+  const alternatePathway = dr?.topPathways?.[2] ?? null;
   const visionParts = dr?.visionStatement
     ? [dr.visionStatement.create, dr.visionStatement.impact, dr.visionStatement.perspective, dr.visionStatement.future].filter(Boolean)
     : [];
@@ -157,7 +158,6 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
               
               <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "14px", fontWeight: 600, color: "rgba(255,255,255,0.6)" }}>
                 <div style={{ background: "rgba(255,255,255,0.05)", padding: "6px 16px", borderRadius: "20px" }}>🏫 {profileUser.cohort}</div>
-                <div style={{ background: "rgba(255,255,255,0.05)", padding: "6px 16px", borderRadius: "20px" }}>🧭 {profileUser.pathway} Pathway</div>
                 <div style={{ background: "rgba(255,255,255,0.05)", padding: "6px 16px", borderRadius: "20px" }}>📅 Since {profileUser.joinedAt}</div>
               </div>
             </div>
@@ -192,6 +192,11 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
                       {minorPathway && (
                         <span style={{ padding: "5px 14px", borderRadius: "20px", background: "rgba(0,212,255,0.06)", border: "1px solid rgba(0,212,255,0.15)", fontSize: "12px", fontWeight: 700, color: "rgba(0,212,255,0.65)" }}>
                           Minor: {minorPathway}
+                        </span>
+                      )}
+                      {alternatePathway && (
+                        <span style={{ padding: "5px 14px", borderRadius: "20px", background: "rgba(0,212,255,0.03)", border: "1px solid rgba(0,212,255,0.10)", fontSize: "12px", fontWeight: 700, color: "rgba(0,212,255,0.45)" }}>
+                          Alternate: {alternatePathway}
                         </span>
                       )}
                     </div>

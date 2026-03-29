@@ -540,7 +540,7 @@ export let mockUsers: User[] = [
     badgeCounts: { signature: 1, executive: 4, premium: 3, primary: 20 },
     diagnosticResult: {
       brandType: "creative-director",
-      topPathways: ["Digital Design", "Content Creator"],
+      topPathways: ["Digital Design", "Content Creator", "Web Dev"],
       style: "futuristic",
       scores: { maker: 72, visionary: 85, storyteller: 78, technologist: 65 },
       visionStatement: {
@@ -574,7 +574,7 @@ export let mockUsers: User[] = [
     badgeCounts: { signature: 2, executive: 6, premium: 4, primary: 30 },
     diagnosticResult: {
       brandType: "digital-innovator",
-      topPathways: ["Content Creator", "Game Designer"],
+      topPathways: ["Content Creator", "Game Designer", "Digital Design"],
       style: "dynamic",
       scores: { maker: 68, visionary: 90, storyteller: 88, technologist: 74 },
       visionStatement: {
@@ -608,7 +608,7 @@ export let mockUsers: User[] = [
     badgeCounts: { signature: 0, executive: 2, premium: 2, primary: 11 },
     diagnosticResult: {
       brandType: "technical-builder",
-      topPathways: ["Web Dev", "Game Designer"],
+      topPathways: ["Web Dev", "Game Designer", "Content Creator"],
       style: "minimal",
       scores: { maker: 91, visionary: 70, storyteller: 55, technologist: 95 },
       visionStatement: {
