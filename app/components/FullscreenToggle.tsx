@@ -51,8 +51,8 @@ export default function FullscreenToggle() {
       style={{
         position: "fixed",
         bottom: "20px",
-        right: "20px",
-        zIndex: 9998,
+        left: "244px",
+        zIndex: 99999,
         width: "36px",
         height: "36px",
         borderRadius: "6px",
