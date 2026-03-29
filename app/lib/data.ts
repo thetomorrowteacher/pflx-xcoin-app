@@ -214,6 +214,13 @@ export interface PFLXModifier {
   effectType?: ModifierEffect;      // What effect is applied
   effectValue?: number;             // Flat amount OR multiplier (1.1 = +10%)
   scope?: "task" | "job" | "checkpoint" | "all"; // What entity it targets
+  // ── Availability restrictions ───────────────────────────────────
+  availableTo?: "all" | "restricted";  // "all" = everyone can see/buy, "restricted" = filtered
+  minRank?: number;                     // Minimum Evolution Rank required (1-10)
+  maxRank?: number;                     // Maximum rank allowed (for beginner-only items)
+  minLevel?: number;                    // Minimum level required
+  allowedCohorts?: string[];            // Specific cohort names, empty = all cohorts
+  allowedStudios?: string[];            // Specific studio IDs, empty = all studios
 }
 
 // Helper: human-readable label for a trigger event

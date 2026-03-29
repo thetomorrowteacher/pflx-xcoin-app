@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
 import {
   User, PFLXModifier, mockModifiers,
-  ModifierTrigger, ModifierEffect, triggerLabel, effectLabel
+  ModifierTrigger, ModifierEffect, triggerLabel, effectLabel,
+  getMockCohorts, mockStartupStudios
 } from "../../lib/data";
 import { playSuccess, playError, playClick, playDelete } from "../../lib/sounds";
 import { saveModifiers } from "../../lib/store";
@@ -517,6 +518,115 @@ export default function AdminModifiers() {
                     </div>
                   )}
                 </div>
+
+                {/* ── Availability Restrictions (upgrades only) ────── */}
+                {editingMod.type === "upgrade" && (
+                  <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "16px", marginTop: "8px" }}>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "rgba(245,200,66,0.85)", marginBottom: "12px", letterSpacing: "0.05em" }}>AVAILABILITY RESTRICTIONS</label>
+
+                    <div style={{ marginBottom: "12px" }}>
+                      <label style={{ display: "block", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.08em" }}>Who Can See This Item?</label>
+                      <select
+                        value={editingMod.availableTo || "all"}
+                        onChange={e => setEditingMod({ ...editingMod, availableTo: e.target.value as "all" | "restricted" })}
+                        className="input-field"
+                      >
+                        <option value="all">Everyone (No Restrictions)</option>
+                        <option value="restricted">Restricted (Set Rules Below)</option>
+                      </select>
+                    </div>
+
+                    {editingMod.availableTo === "restricted" && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "12px", background: "rgba(245,200,66,0.04)", borderRadius: "12px", border: "1px solid rgba(245,200,66,0.1)" }}>
+                        {/* Rank Range */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                          <div>
+                            <label style={{ display: "block", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: "6px", textTransform: "uppercase" }}>Min Rank (1-10)</label>
+                            <input
+                              type="number" min={0} max={10}
+                              value={editingMod.minRank ?? ""}
+                              onChange={e => setEditingMod({ ...editingMod, minRank: parseInt(e.target.value) || undefined })}
+                              className="input-field" placeholder="Any"
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: "block", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: "6px", textTransform: "uppercase" }}>Max Rank (1-10)</label>
+                            <input
+                              type="number" min={0} max={10}
+                              value={editingMod.maxRank ?? ""}
+                              onChange={e => setEditingMod({ ...editingMod, maxRank: parseInt(e.target.value) || undefined })}
+                              className="input-field" placeholder="Any"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Min Level */}
+                        <div>
+                          <label style={{ display: "block", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: "6px", textTransform: "uppercase" }}>Min Level</label>
+                          <input
+                            type="number" min={0}
+                            value={editingMod.minLevel ?? ""}
+                            onChange={e => setEditingMod({ ...editingMod, minLevel: parseInt(e.target.value) || undefined })}
+                            className="input-field" placeholder="Any level"
+                          />
+                        </div>
+
+                        {/* Cohort Selection */}
+                        <div>
+                          <label style={{ display: "block", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: "6px", textTransform: "uppercase" }}>Allowed Cohorts</label>
+                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                            {getMockCohorts().map(c => {
+                              const selected = (editingMod.allowedCohorts || []).includes(c);
+                              return (
+                                <button key={c} type="button"
+                                  onClick={() => {
+                                    const current = editingMod.allowedCohorts || [];
+                                    const next = selected ? current.filter(x => x !== c) : [...current, c];
+                                    setEditingMod({ ...editingMod, allowedCohorts: next.length > 0 ? next : undefined });
+                                  }}
+                                  style={{
+                                    padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: 600, cursor: "pointer",
+                                    background: selected ? "rgba(245,200,66,0.2)" : "rgba(255,255,255,0.05)",
+                                    border: selected ? "1px solid rgba(245,200,66,0.4)" : "1px solid rgba(255,255,255,0.1)",
+                                    color: selected ? "#f5c842" : "rgba(255,255,255,0.5)",
+                                  }}
+                                >{c}</button>
+                              );
+                            })}
+                            {getMockCohorts().length === 0 && <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>No cohorts found</span>}
+                          </div>
+                          <p style={{ margin: "4px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.2)" }}>Leave empty for all cohorts</p>
+                        </div>
+
+                        {/* Studio Selection */}
+                        <div>
+                          <label style={{ display: "block", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: "6px", textTransform: "uppercase" }}>Allowed Startup Studios</label>
+                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                            {mockStartupStudios.map(s => {
+                              const selected = (editingMod.allowedStudios || []).includes(s.id);
+                              return (
+                                <button key={s.id} type="button"
+                                  onClick={() => {
+                                    const current = editingMod.allowedStudios || [];
+                                    const next = selected ? current.filter(x => x !== s.id) : [...current, s.id];
+                                    setEditingMod({ ...editingMod, allowedStudios: next.length > 0 ? next : undefined });
+                                  }}
+                                  style={{
+                                    padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: 600, cursor: "pointer",
+                                    background: selected ? `rgba(${s.colorRgb},0.2)` : "rgba(255,255,255,0.05)",
+                                    border: selected ? `1px solid rgba(${s.colorRgb},0.4)` : "1px solid rgba(255,255,255,0.1)",
+                                    color: selected ? s.color : "rgba(255,255,255,0.5)",
+                                  }}
+                                >{s.icon} {s.name}</button>
+                              );
+                            })}
+                          </div>
+                          <p style={{ margin: "4px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.2)" }}>Leave empty for all studios</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Save / Cancel */}
                 <div style={{ display: "flex", gap: "12px", marginTop: "4px" }}>

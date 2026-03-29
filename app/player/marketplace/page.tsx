@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
-import { User, PFLXModifier, mockModifiers, mockPlayerModifiers, PlayerModifier, mockTransactions } from "../../lib/data";
+import { User, PFLXModifier, mockModifiers, mockPlayerModifiers, PlayerModifier, mockTransactions, getCurrentRank } from "../../lib/data";
 import { playSuccess, playError } from "../../lib/sounds";
 
 export default function PlayerMarketplace() {
@@ -19,7 +19,23 @@ export default function PlayerMarketplace() {
     if (u.role !== "player") { router.push("/admin"); return; }
     if (!u.onboardingComplete) { router.push("/diagnostic"); return; }
     setUser(u);
-    setUpgrades(mockModifiers.filter(m => m.type === "upgrade"));
+    // Filter upgrades by availability restrictions
+    const playerRank = getCurrentRank(u.totalXcoin).level;
+    const allUpgrades = mockModifiers.filter(m => m.type === "upgrade");
+    const visibleUpgrades = allUpgrades.filter(m => {
+      if (!m.availableTo || m.availableTo === "all") return true;
+      // Check rank restrictions
+      if (m.minRank && playerRank < m.minRank) return false;
+      if (m.maxRank && playerRank > m.maxRank) return false;
+      // Check level restrictions
+      if (m.minLevel && u.level < m.minLevel) return false;
+      // Check cohort restrictions
+      if (m.allowedCohorts && m.allowedCohorts.length > 0 && !m.allowedCohorts.includes(u.cohort)) return false;
+      // Check studio restrictions
+      if (m.allowedStudios && m.allowedStudios.length > 0 && (!u.studioId || !m.allowedStudios.includes(u.studioId))) return false;
+      return true;
+    });
+    setUpgrades(visibleUpgrades);
     setMyModifiers(mockPlayerModifiers.filter(m => m.playerId === u.id));
   }, [router]);
 
