@@ -217,6 +217,8 @@ export default function DiagnosticPage() {
   const [manualBrandType, setManualBrandType] = useState("");
   const [manualPathways, setManualPathways] = useState<string[]>([]);
   const [manualVisionText, setManualVisionText] = useState("");
+  const [manualBrandName, setManualBrandName] = useState("");
+  const [manualSlogan, setManualSlogan] = useState("");
 
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
@@ -325,6 +327,8 @@ export default function DiagnosticPage() {
         diagnosticComplete: true,
         pathway: pathwayLabels[topPathways[0]]?.name || user.pathway,
         diagnosticResult: fullResult,
+        ...(manualBrandName.trim() ? { brandName: manualBrandName.trim() } : {}),
+        ...(manualSlogan.trim() ? { brandingComplete: true } : {}),
       };
       localStorage.setItem("pflx_user", JSON.stringify(updatedUser));
       const idx = mockUsers.findIndex(u => u.id === user.id);
@@ -336,6 +340,9 @@ export default function DiagnosticPage() {
         }
       }
       setUser(updatedUser);
+      // Pre-populate branding fields if entered in manual mode
+      if (manualBrandName.trim()) setBrandName(manualBrandName.trim());
+      if (manualSlogan.trim()) setSlogan(manualSlogan.trim());
       setPlacing(false);
       setTimeout(() => setStep("branding"), 600);
     }, 2800);
@@ -518,6 +525,35 @@ export default function DiagnosticPage() {
                 />
                 <p style={{ margin: "6px 0 0", fontSize: "10px", color: "rgba(0,212,255,0.3)" }}>The AI will analyze your vision to match you with the best Startup Studio</p>
               </div>
+
+              {/* Brand Name & Slogan */}
+              <div style={{ marginBottom: "20px" }}>
+                <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 700, color: "#f472b6", letterSpacing: "0.1em", textTransform: "uppercase" }}>Personal Brand</p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <div>
+                    <label style={{ display: "block", margin: "0 0 4px", fontSize: "10px", color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Brand Name</label>
+                    <input
+                      type="text"
+                      value={manualBrandName}
+                      onChange={e => setManualBrandName(e.target.value)}
+                      placeholder="Your creative identity (e.g. PixelProphet, CodeCrafter)"
+                      maxLength={30}
+                      style={{ width: "100%", padding: "14px", borderRadius: "12px", border: "1px solid rgba(244,114,182,0.2)", background: "rgba(244,114,182,0.04)", color: "#fff", fontSize: "14px", fontFamily: "inherit", fontWeight: 700, outline: "none", boxSizing: "border-box", letterSpacing: "0.02em" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", margin: "0 0 4px", fontSize: "10px", color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Slogan</label>
+                    <input
+                      type="text"
+                      value={manualSlogan}
+                      onChange={e => setManualSlogan(e.target.value)}
+                      placeholder="Your brand motto or tagline"
+                      maxLength={60}
+                      style={{ width: "100%", padding: "14px", borderRadius: "12px", border: "1px solid rgba(244,114,182,0.2)", background: "rgba(244,114,182,0.04)", color: "#fff", fontSize: "13px", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div style={{ display: "flex", gap: "12px" }}>
@@ -527,8 +563,8 @@ export default function DiagnosticPage() {
               </button>
               <button
                 onClick={handleSkipComplete}
-                disabled={!manualVisionText.trim()}
-                style={{ flex: 2, padding: "18px", borderRadius: "14px", border: "none", cursor: manualVisionText.trim() ? "pointer" : "not-allowed", background: manualVisionText.trim() ? "linear-gradient(90deg,#f5c842,#f97316)" : "rgba(255,255,255,0.06)", color: manualVisionText.trim() ? "#000" : "rgba(255,255,255,0.25)", fontSize: "15px", fontWeight: 900, letterSpacing: "0.06em" }}>
+                disabled={!manualVisionText.trim() || !manualBrandName.trim()}
+                style={{ flex: 2, padding: "18px", borderRadius: "14px", border: "none", cursor: (manualVisionText.trim() && manualBrandName.trim()) ? "pointer" : "not-allowed", background: (manualVisionText.trim() && manualBrandName.trim()) ? "linear-gradient(90deg,#f5c842,#f97316)" : "rgba(255,255,255,0.06)", color: (manualVisionText.trim() && manualBrandName.trim()) ? "#000" : "rgba(255,255,255,0.25)", fontSize: "15px", fontWeight: 900, letterSpacing: "0.06em" }}>
                 ANALYZE &amp; FIND MY STUDIO &rarr;
               </button>
             </div>
