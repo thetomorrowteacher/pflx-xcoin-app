@@ -473,9 +473,9 @@ export const COIN_CATEGORIES: CoinCategory[] = [
   {
     name: "Signature Badges (Skill Mastery)",
     coins: [
-      { name: "Cert: Photoshop", description: "Industry certification achievement.", xc: 5000 },
-      { name: "Cert: Premiere", description: "Industry certification achievement.", xc: 5000 },
-      { name: "Master Builder", description: "Exceptional mastery of pathway tools.", xc: 5000 },
+      { name: "Cert: Photoshop", description: "Industry certification achievement.", xc: 5000, sponsorType: "player" as const, sponsorId: "player-1", sponsorName: "PixelQueen", residualPercent: 10 },
+      { name: "Cert: Premiere", description: "Industry certification achievement.", xc: 5000, sponsorType: "player" as const, sponsorId: "player-2", sponsorName: "MotionMaster", residualPercent: 12 },
+      { name: "Master Builder", description: "Exceptional mastery of pathway tools.", xc: 5000, sponsorType: "player" as const, sponsorId: "player-1", sponsorName: "PixelQueen", residualPercent: 8 },
     ]
   }
 ];

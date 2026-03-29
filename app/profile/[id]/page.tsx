@@ -69,6 +69,16 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
     { sourceName: "Signature Badges (Skill Mastery)", targetName: "Official Certifications",   color: "#ef4444", colorRgb: "239,68,68",    rarity: "Legendary", rarityGradient: "linear-gradient(135deg, #ef4444, #dc2626)" },
   ];
 
+  // Ownership stake — coins this player sponsors (residual income)
+  const allCoins = COIN_CATEGORIES.flatMap(cat => cat.coins);
+  const sponsoredCoins = allCoins.filter(c => c.sponsorId === profileUser.id);
+  const totalResidualEarned = sponsoredCoins.reduce((sum, coin) => {
+    // Count how many times ANY player earned this coin, then multiply by residual %
+    const timesEarned = mockSubmissions.filter(s => s.coinType === coin.name && s.status === "approved").reduce((a, s) => a + s.amount, 0);
+    const pct = (coin.residualPercent ?? 10) / 100;
+    return sum + Math.floor(timesEarned * coin.xc * pct);
+  }, 0);
+
   // Studio + diagnostic
   const studio = mockStartupStudios.find(s => s.id === profileUser.studioId);
   const dr = profileUser.diagnosticResult;
@@ -278,6 +288,51 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
                     <p style={{ margin: 0, fontSize: "8px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", fontWeight: 700 }}>{s.label}</p>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Ownership Stake / Investor Card ────────────────────────── */}
+          {sponsoredCoins.length > 0 && (
+            <div className="cv-card" style={{
+              marginBottom: "32px", borderRadius: "16px", padding: "22px 24px",
+              background: "rgba(245,200,66,0.06)", border: "1px solid rgba(245,200,66,0.25)",
+              position: "relative", overflow: "hidden",
+            }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg, rgba(245,200,66,0.7), rgba(249,115,22,0.5), transparent)" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "16px" }}>
+                <div style={{
+                  width: "42px", height: "42px", borderRadius: "12px",
+                  background: "linear-gradient(135deg, rgba(245,200,66,0.2), rgba(249,115,22,0.15))",
+                  border: "1px solid rgba(245,200,66,0.3)",
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px",
+                }}>💰</div>
+                <div>
+                  <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(245,200,66,0.5)" }}>OWNERSHIP STAKE</div>
+                  <div style={{ fontSize: "16px", fontWeight: 900, color: "#f5c842" }}>Course & Project Investor</div>
+                </div>
+                <div style={{ marginLeft: "auto", textAlign: "right" }}>
+                  <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(34,197,94,0.5)", marginBottom: "2px" }}>REVENUE EARNED</div>
+                  <div style={{ fontSize: "24px", fontWeight: 900, color: "#22c55e", fontFamily: "monospace" }}>{totalResidualEarned.toLocaleString()} XC</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {sponsoredCoins.map(coin => {
+                  const pct = coin.residualPercent ?? 10;
+                  return (
+                    <div key={coin.name} style={{
+                      padding: "8px 14px", borderRadius: "10px",
+                      background: "rgba(245,200,66,0.08)", border: "1px solid rgba(245,200,66,0.15)",
+                      display: "flex", alignItems: "center", gap: "8px",
+                    }}>
+                      {coin.image && <span style={{ fontSize: "16px" }}>{coin.image}</span>}
+                      <div>
+                        <div style={{ fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.8)" }}>{coin.name}</div>
+                        <div style={{ fontSize: "10px", fontWeight: 700, color: "rgba(245,200,66,0.7)", fontFamily: "monospace" }}>{pct}% residual · {coin.xc} XC</div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
