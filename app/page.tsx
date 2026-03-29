@@ -3,53 +3,33 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { mockUsers, isHostUser } from "./lib/data";
+import { saveUsers } from "./lib/store";
 
-type Step = "select" | "pin" | "change-pin";
+type Step = "select" | "pin" | "change-pin" | "claim";
 
 export default function Home() {
   const router = useRouter();
 
   const [step, setStep] = useState<Step>("select");
-  const [playerName, setPlayerName] = useState("");
-  const [rememberName, setRememberName] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pin, setPin] = useState("");
   const [showPin, setShowPin] = useState(false);
   const [keepSignedIn, setKeepSignedIn] = useState(false);
-  const [nameError, setNameError] = useState("");
   const [pinError, setPinError] = useState("");
   const [btnHover, setBtnHover] = useState(false);
   // Change-PIN state
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [changePinError, setChangePinError] = useState("");
-
-  useEffect(() => {
-    const saved = localStorage.getItem("pflx_remembered_name");
-    if (saved) { setPlayerName(saved); setRememberName(true); }
-  }, []);
+  // Claim account state
+  const [claimEmail, setClaimEmail] = useState("");
+  const [claimError, setClaimError] = useState("");
+  const [claimSuccess, setClaimSuccess] = useState(false);
+  const [tempPin, setTempPin] = useState("");
 
   const players = mockUsers.filter(u => u.role === "player" && !u.isHost);
   const hosts = mockUsers.filter(u => isHostUser(u));
   const selectedUser = mockUsers.find(u => u.id === selectedId) ?? null;
-
-  const handleNameSubmit = () => {
-    setNameError("");
-    if (!playerName.trim()) { setNameError("Player name is required"); return; }
-    const q = playerName.toLowerCase().trim();
-    const match = mockUsers.find(u =>
-      u.name?.toLowerCase() === q ||
-      u.brandName?.toLowerCase() === q
-    );
-    if (match) {
-      setSelectedId(match.id);
-      if (rememberName) localStorage.setItem("pflx_remembered_name", playerName.trim());
-      else localStorage.removeItem("pflx_remembered_name");
-      setStep("pin");
-    } else {
-      setNameError("No account found. Contact your instructor.");
-    }
-  };
 
   const handleBrandSelect = (id: string) => {
     setSelectedId(id);
@@ -61,9 +41,7 @@ export default function Home() {
     setPinError("");
     const correctPin = selectedUser.pin ?? (selectedUser.role === "admin" ? "0000" : "1234");
     if (pin === correctPin) {
-      if (rememberName && selectedUser.name) localStorage.setItem("pflx_remembered_name", selectedUser.name);
-
-      // If player hasn't changed PIN yet, go to change-pin step
+      // If player hasn't changed PIN yet (claimed account), go to change-pin step
       if (selectedUser.role === "player" && !selectedUser.isHost && selectedUser.pinChanged === false) {
         setStep("change-pin");
         return;
@@ -100,6 +78,7 @@ export default function Home() {
     const updatedUser = { ...selectedUser, pin: newPin, pinChanged: true };
     localStorage.setItem("pflx_user", JSON.stringify(updatedUser));
     if (keepSignedIn) localStorage.setItem("pflx_keep_signed_in", "true");
+    saveUsers(mockUsers);
 
     // Now route based on onboarding status
     if (!updatedUser.onboardingComplete) {
@@ -109,7 +88,40 @@ export default function Home() {
     }
   };
 
-  const goBack = () => { setStep("select"); setPin(""); setPinError(""); setSelectedId(null); setNewPin(""); setConfirmPin(""); setChangePinError(""); setPlayerName(""); };
+  const handleClaimAccount = () => {
+    setClaimError("");
+    if (!claimEmail.trim()) { setClaimError("Email address is required"); return; }
+    const match = mockUsers.find(u => u.email?.toLowerCase() === claimEmail.toLowerCase().trim());
+    if (!match) {
+      setClaimError("No account found with that email. Contact your instructor.");
+      return;
+    }
+
+    // Generate a temporary 4-digit PIN
+    const generated = String(Math.floor(1000 + Math.random() * 9000));
+    setTempPin(generated);
+
+    // Update the user's PIN to the temp PIN and mark as not changed
+    const idx = mockUsers.findIndex(u => u.id === match.id);
+    if (idx >= 0) {
+      mockUsers[idx].pin = generated;
+      mockUsers[idx].pinChanged = false;
+    }
+    saveUsers(mockUsers);
+
+    setClaimSuccess(true);
+  };
+
+  const goBack = () => {
+    setStep("select");
+    setPin(""); setPinError(""); setSelectedId(null);
+    setNewPin(""); setConfirmPin(""); setChangePinError("");
+  };
+
+  const goBackFromClaim = () => {
+    setStep("select");
+    setClaimEmail(""); setClaimError(""); setClaimSuccess(false); setTempPin("");
+  };
 
   // ── Design tokens ─────────────────────────────────────────────────────────
   const CYAN = "#00d4ff";
@@ -143,10 +155,6 @@ export default function Home() {
     letterSpacing: "0.12em",
     marginBottom: "8px",
     textTransform: "uppercase",
-  };
-
-  const dividerStyle: React.CSSProperties = {
-    display: "flex", alignItems: "center", gap: "12px", margin: "18px 0",
   };
 
   return (
@@ -213,81 +221,12 @@ export default function Home() {
           backdropFilter: "blur(20px)",
         }}>
 
-          {/* ══ STEP 1 ══════════════════════════════════════════════════ */}
+          {/* ══ STEP 1: BRAND SELECT ══════════════════════════════════ */}
           {step === "select" && (
             <>
-              {/* Player name field */}
+              {/* Brand dropdown — primary login */}
               <div style={{ marginBottom: "20px" }}>
-                <label style={labelStyle}>Player Name</label>
-                <input
-                  type="text"
-                  value={playerName}
-                  onChange={e => { setPlayerName(e.target.value); setNameError(""); }}
-                  onKeyDown={e => e.key === "Enter" && handleNameSubmit()}
-                  placeholder="Enter your name..."
-                  style={nameError ? inputErr : inputStyle}
-                  autoFocus
-                />
-                {nameError && (
-                  <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#ff6b6b", letterSpacing: "0.02em" }}>{nameError}</p>
-                )}
-              </div>
-
-              {/* Remember me */}
-              <label style={{
-                display: "flex", alignItems: "center", gap: "10px",
-                cursor: "pointer", fontSize: "12px", color: "rgba(255,255,255,0.4)",
-                letterSpacing: "0.03em", marginBottom: "20px",
-              }}>
-                <div
-                  onClick={() => setRememberName(r => !r)}
-                  style={{
-                    width: "16px", height: "16px", borderRadius: "3px", flexShrink: 0,
-                    border: `1.5px solid ${rememberName ? CYAN : "rgba(255,255,255,0.2)"}`,
-                    background: rememberName ? "rgba(0,212,255,0.2)" : "transparent",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    cursor: "pointer", transition: "all .15s",
-                  }}
-                >
-                  {rememberName && <span style={{ color: CYAN, fontSize: "10px", fontWeight: 900 }}>&#x2713;</span>}
-                </div>
-                REMEMBER ME ON THIS DEVICE
-              </label>
-
-              {/* Initialize Session button */}
-              <button
-                onClick={handleNameSubmit}
-                disabled={!playerName.trim()}
-                onMouseEnter={() => setBtnHover(true)}
-                onMouseLeave={() => setBtnHover(false)}
-                style={{
-                  width: "100%", padding: "14px",
-                  borderRadius: "8px", border: "none",
-                  background: playerName.trim()
-                    ? `linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%)`
-                    : "rgba(255,255,255,0.06)",
-                  color: playerName.trim() ? "#ffffff" : "rgba(255,255,255,0.2)",
-                  fontSize: "13px", fontWeight: 800,
-                  letterSpacing: "0.12em", textTransform: "uppercase",
-                  cursor: playerName.trim() ? "pointer" : "default",
-                  marginBottom: "20px",
-                  transition: "all .2s",
-                  boxShadow: playerName.trim() && btnHover ? `0 0 24px rgba(0,212,255,0.3)` : "none",
-                  transform: playerName.trim() && btnHover ? "translateY(-1px)" : "none",
-                }}>
-                Initialize Session
-              </button>
-
-              {/* Divider */}
-              <div style={dividerStyle}>
-                <div style={{ flex: 1, height: "1px", background: "rgba(0,212,255,0.12)" }} />
-                <span style={{ fontSize: "10px", color: "rgba(0,212,255,0.4)", fontWeight: 700, letterSpacing: "0.1em" }}>OR SELECT BRAND</span>
-                <div style={{ flex: 1, height: "1px", background: "rgba(0,212,255,0.12)" }} />
-              </div>
-
-              {/* Brand dropdown */}
-              <div style={{ position: "relative", marginBottom: "16px" }}>
-                <label style={labelStyle}>Brand Name</label>
+                <label style={labelStyle}>Select Your Brand</label>
                 <div style={{ position: "relative" }}>
                   <select
                     defaultValue=""
@@ -302,14 +241,14 @@ export default function Home() {
                     <optgroup label="── Host ──" style={{ background: "#0a1218", color: CYAN_DIM }}>
                       {hosts.map(h => (
                         <option key={h.id} value={h.id} style={{ background: "#0a1218", color: "#fff" }}>
-                          &#x1F6E1; {h.brandName ?? h.name}{h.isHost ? " (Co-Host)" : ""}
+                          {h.brandName ?? h.name}
                         </option>
                       ))}
                     </optgroup>
                     <optgroup label="── Players ──" style={{ background: "#0a1218", color: CYAN_DIM }}>
                       {players.map(p => (
                         <option key={p.id} value={p.id} style={{ background: "#0a1218", color: "#fff" }}>
-                          {p.brandName ?? p.name} &mdash; {p.name}
+                          {p.brandName ?? p.name}
                         </option>
                       ))}
                     </optgroup>
@@ -318,9 +257,16 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Divider */}
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "24px 0" }}>
+                <div style={{ flex: 1, height: "1px", background: "rgba(0,212,255,0.12)" }} />
+                <span style={{ fontSize: "10px", color: "rgba(0,212,255,0.4)", fontWeight: 700, letterSpacing: "0.1em" }}>NEW PLAYER?</span>
+                <div style={{ flex: 1, height: "1px", background: "rgba(0,212,255,0.12)" }} />
+              </div>
+
               {/* Claim account */}
               <button
-                onClick={() => router.push("/signup")}
+                onClick={() => { setStep("claim"); setClaimEmail(""); setClaimError(""); setClaimSuccess(false); setTempPin(""); }}
                 style={{
                   width: "100%", padding: "12px",
                   borderRadius: "8px",
@@ -339,7 +285,7 @@ export default function Home() {
           {/* ══ STEP 2: PIN ═════════════════════════════════════════════ */}
           {step === "pin" && selectedUser && (
             <>
-              {/* Player preview */}
+              {/* Player preview — brand name only */}
               <div style={{
                 display: "flex", alignItems: "center", gap: "12px",
                 padding: "12px 14px", marginBottom: "22px",
@@ -361,7 +307,7 @@ export default function Home() {
                 </div>
                 <div style={{ flex: 1, overflow: "hidden" }}>
                   <div style={{ fontWeight: 700, fontSize: "14px", color: "#ffffff", letterSpacing: "0.02em" }}>{selectedUser.brandName ?? selectedUser.name}</div>
-                  <div style={{ fontSize: "11px", color: CYAN_DIM, letterSpacing: "0.05em" }}>{selectedUser.name}</div>
+                  <div style={{ fontSize: "11px", color: CYAN_DIM, letterSpacing: "0.05em" }}>{isHostUser(selectedUser) ? "System Host" : "Player"}</div>
                 </div>
                 <button onClick={goBack} style={{ background: "none", border: "none", color: CYAN_DIM, cursor: "pointer", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                   Change
@@ -375,7 +321,7 @@ export default function Home() {
                   <input
                     type={showPin ? "text" : "password"}
                     value={pin}
-                    onChange={e => { setPin(e.target.value.slice(0, 6)); setPinError(""); }}
+                    onChange={e => { setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6)); setPinError(""); }}
                     onKeyDown={e => e.key === "Enter" && pin.length >= 4 && handleSignIn()}
                     placeholder="&#x2022;&#x2022;&#x2022;&#x2022;"
                     maxLength={6}
@@ -416,7 +362,7 @@ export default function Home() {
                   KEEP ME SIGNED IN
                 </label>
                 <button
-                  onClick={() => alert("Contact your instructor to reset your PIN.")}
+                  onClick={() => alert("Use 'Claim Player Account' on the login screen to reset your PIN.")}
                   style={{ background: "none", border: "none", color: CYAN_DIM, fontSize: "11px", fontWeight: 700, cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" }}>
                   Reset PIN
                 </button>
@@ -438,27 +384,11 @@ export default function Home() {
                   fontSize: "13px", fontWeight: 800,
                   letterSpacing: "0.12em", textTransform: "uppercase",
                   cursor: pin.length >= 4 ? "pointer" : "default",
-                  marginBottom: "12px",
                   transition: "all .2s",
                   boxShadow: pin.length >= 4 && btnHover ? "0 0 24px rgba(0,212,255,0.3)" : "none",
                   transform: pin.length >= 4 && btnHover ? "translateY(-1px)" : "none",
                 }}>
                 Initialize Session
-              </button>
-
-              <button
-                onClick={() => router.push("/signup")}
-                style={{
-                  width: "100%", padding: "12px",
-                  borderRadius: "8px",
-                  background: "transparent",
-                  border: `1px solid rgba(0,212,255,0.15)`,
-                  color: "rgba(0,212,255,0.45)",
-                  fontSize: "11px", fontWeight: 700,
-                  letterSpacing: "0.1em", textTransform: "uppercase",
-                  cursor: "pointer",
-                }}>
-                Claim Player Account
               </button>
             </>
           )}
@@ -542,6 +472,134 @@ export default function Home() {
                 }}>
                 Set My PIN &amp; Continue
               </button>
+            </>
+          )}
+
+          {/* ══ STEP 4: CLAIM ACCOUNT ═══════════════════════════════════ */}
+          {step === "claim" && (
+            <>
+              {!claimSuccess ? (
+                <>
+                  {/* Back link */}
+                  <button
+                    onClick={goBackFromClaim}
+                    style={{
+                      background: "none", border: "none", color: CYAN_DIM, cursor: "pointer",
+                      fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em",
+                      textTransform: "uppercase", marginBottom: "18px", padding: 0,
+                      display: "flex", alignItems: "center", gap: "6px",
+                    }}
+                  >
+                    &#x2190; Back to Login
+                  </button>
+
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px",
+                    background: "rgba(0,212,255,0.05)", border: "1px solid rgba(0,212,255,0.15)",
+                    borderRadius: "10px", marginBottom: "20px",
+                  }}>
+                    <span style={{ fontSize: "18px" }}>&#x1F4E7;</span>
+                    <div>
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: CYAN, letterSpacing: "0.05em" }}>CLAIM YOUR ACCOUNT</div>
+                      <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>
+                        Enter your email to receive a temporary PIN
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Email field */}
+                  <div style={{ marginBottom: "20px" }}>
+                    <label style={labelStyle}>Email Address</label>
+                    <input
+                      type="email"
+                      value={claimEmail}
+                      onChange={e => { setClaimEmail(e.target.value); setClaimError(""); }}
+                      onKeyDown={e => e.key === "Enter" && handleClaimAccount()}
+                      placeholder="Enter your email..."
+                      style={claimError ? inputErr : inputStyle}
+                      autoFocus
+                    />
+                    {claimError && (
+                      <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#ff6b6b", letterSpacing: "0.02em" }}>{claimError}</p>
+                    )}
+                  </div>
+
+                  {/* Claim button */}
+                  <button
+                    onClick={handleClaimAccount}
+                    disabled={!claimEmail.trim()}
+                    onMouseEnter={() => setBtnHover(true)}
+                    onMouseLeave={() => setBtnHover(false)}
+                    style={{
+                      width: "100%", padding: "14px",
+                      borderRadius: "8px", border: "none",
+                      background: claimEmail.trim()
+                        ? "linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%)"
+                        : "rgba(255,255,255,0.06)",
+                      color: claimEmail.trim() ? "#ffffff" : "rgba(255,255,255,0.2)",
+                      fontSize: "13px", fontWeight: 800,
+                      letterSpacing: "0.12em", textTransform: "uppercase",
+                      cursor: claimEmail.trim() ? "pointer" : "default",
+                      transition: "all .2s",
+                      boxShadow: claimEmail.trim() && btnHover ? "0 0 24px rgba(0,212,255,0.3)" : "none",
+                      transform: claimEmail.trim() && btnHover ? "translateY(-1px)" : "none",
+                    }}>
+                    Generate Temporary PIN
+                  </button>
+                </>
+              ) : (
+                <>
+                  {/* Success — show temp PIN */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: "10px", padding: "14px 16px",
+                    background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.3)",
+                    borderRadius: "10px", marginBottom: "20px",
+                  }}>
+                    <span style={{ fontSize: "20px" }}>&#x2705;</span>
+                    <div>
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: "#4ade80", letterSpacing: "0.05em" }}>ACCOUNT CLAIMED</div>
+                      <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>
+                        Your temporary PIN has been generated
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Display temp PIN */}
+                  <div style={{
+                    textAlign: "center", padding: "20px",
+                    background: "rgba(0,212,255,0.05)",
+                    border: "1px solid rgba(0,212,255,0.2)",
+                    borderRadius: "12px", marginBottom: "14px",
+                  }}>
+                    <div style={{ fontSize: "11px", color: CYAN_DIM, letterSpacing: "0.12em", marginBottom: "8px", fontWeight: 700 }}>YOUR TEMPORARY PIN</div>
+                    <div style={{ fontSize: "36px", fontWeight: 900, color: "#fff", letterSpacing: "0.3em", fontFamily: "monospace" }}>{tempPin}</div>
+                  </div>
+
+                  <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", textAlign: "center", margin: "0 0 20px", lineHeight: 1.5 }}>
+                    Write this down. Select your brand name on the login screen and enter this PIN. You&apos;ll be prompted to create a personal PIN.
+                  </p>
+
+                  {/* Go to login */}
+                  <button
+                    onClick={goBackFromClaim}
+                    onMouseEnter={() => setBtnHover(true)}
+                    onMouseLeave={() => setBtnHover(false)}
+                    style={{
+                      width: "100%", padding: "14px",
+                      borderRadius: "8px", border: "none",
+                      background: "linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%)",
+                      color: "#ffffff",
+                      fontSize: "13px", fontWeight: 800,
+                      letterSpacing: "0.12em", textTransform: "uppercase",
+                      cursor: "pointer",
+                      transition: "all .2s",
+                      boxShadow: btnHover ? "0 0 24px rgba(0,212,255,0.3)" : "none",
+                      transform: btnHover ? "translateY(-1px)" : "none",
+                    }}>
+                    Go to Login
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
