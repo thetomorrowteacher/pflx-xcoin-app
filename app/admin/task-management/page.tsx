@@ -20,6 +20,34 @@ const cpDays = (cp: Checkpoint) => {
   return Math.max(1, Math.round(ms / 86400000));
 };
 
+/* ── Total earnings helper ─────────────────────────────────────────── */
+const calcBadgeXC = (badges?: { name: string; xc: number }[]) =>
+  (badges || []).reduce((sum, b) => sum + (b.xc || 0), 0);
+
+const fmtXC = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k` : n.toLocaleString();
+
+/* Earnings pill component */
+function EarningsPill({ label, xc, badges, color = "#f5c842" }: { label?: string; xc: number; badges: number; color?: string }) {
+  if (xc === 0 && badges === 0) return null;
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center", gap: "6px",
+      padding: "4px 12px", borderRadius: "8px",
+      background: `${color}10`, border: `1px solid ${color}25`,
+    }}>
+      {label && <span style={{ fontSize: "10px", fontWeight: 700, color: `${color}80`, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</span>}
+      <span style={{ fontSize: "13px", fontWeight: 800, color }}>
+        {fmtXC(xc)} XC
+      </span>
+      {badges > 0 && (
+        <span style={{ fontSize: "11px", fontWeight: 600, color: "#4f8ef7" }}>
+          ({badges} badge{badges !== 1 ? "s" : ""})
+        </span>
+      )}
+    </div>
+  );
+}
+
 const statusColor = (s: string) => {
   if (s === "active")   return { bg: "rgba(34,197,94,0.15)",  border: "rgba(34,197,94,0.4)",  text: "#22c55e" };
   if (s === "upcoming") return { bg: "rgba(79,142,247,0.15)", border: "rgba(79,142,247,0.4)", text: "#4f8ef7" };
@@ -573,7 +601,12 @@ export default function TaskManagement() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "20px" }}>
                 {checkpoints.map(cp => {
                   const sc = statusColor(cp.status);
-                  const assignedCount = tasks.filter(t => t.roundId === cp.id).length;
+                  const cpTasks = tasks.filter(t => t.roundId === cp.id);
+                  const assignedCount = cpTasks.length;
+                  const cpBadgeXC = calcBadgeXC((cp as any).rewardBadges);
+                  const cpTaskXC = cpTasks.reduce((sum, t) => sum + ((t as any).xpValue || 0), 0);
+                  const cpTotalXC = cpBadgeXC + cpTaskXC;
+                  const cpTotalBadges = ((cp as any).rewardBadges?.length || 0) + cpTasks.reduce((s, t) => s + ((t as any).rewardBadges?.length || 0), 0);
                   return (
                     <div key={cp.id} style={{ ...cardSx, cursor: "pointer" }} onClick={() => openEditCP(cp)}>
                       {/* Banner */}
@@ -618,6 +651,7 @@ export default function TaskManagement() {
                           <span style={{ background: "rgba(245,200,66,0.1)", padding: "4px 10px", borderRadius: "8px", color: "#f5c842" }}>
                             ✅ {assignedCount} task{assignedCount !== 1 ? "s" : ""}
                           </span>
+                          <EarningsPill label="Total" xc={cpTotalXC} badges={cpTotalBadges} />
                           {cp.assignTo && cp.assignTo !== "all" && (
                             <span style={{ background: "rgba(255,255,255,0.05)", padding: "4px 10px", borderRadius: "8px" }}>
                               👥 {cp.assignTo}
@@ -691,7 +725,14 @@ export default function TaskManagement() {
                             )}
                           </td>
                           <td style={{ padding: "14px 18px" }}>
-                            <span style={{ color: "#f5c842", fontWeight: 800, fontSize: "14px" }}>{task.xpValue} XC</span>
+                            <span style={{ color: "#f5c842", fontWeight: 800, fontSize: "14px" }}>
+                              {fmtXC((task.xpValue || 0) + calcBadgeXC((task as any).rewardBadges))} XC
+                            </span>
+                            {(task as any).rewardBadges?.length > 0 && (
+                              <span style={{ display: "block", fontSize: "10px", color: "#4f8ef7", fontWeight: 600, marginTop: "2px" }}>
+                                {(task as any).rewardBadges.length} badge{(task as any).rewardBadges.length !== 1 ? "s" : ""}
+                              </span>
+                            )}
                           </td>
                           <td style={{ padding: "14px 18px", fontSize: "13px", color: "rgba(255,255,255,0.5)" }}>{task.cohort || "All"}</td>
                           <td style={{ padding: "14px 18px" }}>
@@ -844,9 +885,14 @@ export default function TaskManagement() {
                               <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#f0f0ff" }}>{job.title}</h3>
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
-                              <span style={{ fontSize: "20px", fontWeight: 900, color: "#f5c842" }}>{job.xpValue} XC</span>
+                              <span style={{ fontSize: "20px", fontWeight: 900, color: "#f5c842" }}>
+                                {fmtXC((job.xpValue || 0) + calcBadgeXC((job as any).rewardBadges))} XC
+                              </span>
                               {(job as any).rewardBadges?.length > 0 && (
-                                <div style={{ display: "flex", gap: "3px" }}>
+                                <div style={{ display: "flex", gap: "3px", alignItems: "center" }}>
+                                  <span style={{ fontSize: "10px", fontWeight: 700, color: "#4f8ef7" }}>
+                                    {(job as any).rewardBadges.length} badge{(job as any).rewardBadges.length !== 1 ? "s" : ""}
+                                  </span>
                                   {(job as any).rewardBadges.slice(0, 3).map((b: any, i: number) => (
                                     <span key={i} style={{ padding: "1px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
                                       background: "rgba(79,142,247,0.1)", color: "#4f8ef7" }}>{b.name}</span>
@@ -962,6 +1008,15 @@ export default function TaskManagement() {
                 {projects.map(proj => {
                   const sc = statusColor(proj.status === "active" ? "active" : proj.status === "archived" ? "archived" : "upcoming");
                   const inCPs = mockCheckpoints.filter(cp => ((cp as any).projectIds ?? []).includes(proj.id));
+                  const projTasks = tasks.filter(t => proj.taskIds.includes(t.id));
+                  const projJobs = jobs.filter(j => proj.jobIds.includes(j.id));
+                  const projBadgeXC = calcBadgeXC((proj as any).rewardBadges);
+                  const projTaskXC = projTasks.reduce((s, t) => s + ((t as any).xpValue || 0), 0);
+                  const projJobXC = projJobs.reduce((s, j) => s + (j.xpValue || 0), 0);
+                  const projTotalXC = projBadgeXC + (proj.xcRewardPool || 0) + projTaskXC + projJobXC;
+                  const projTotalBadges = ((proj as any).rewardBadges?.length || 0)
+                    + projTasks.reduce((s, t) => s + ((t as any).rewardBadges?.length || 0), 0)
+                    + projJobs.reduce((s, j) => s + ((j as any).rewardBadges?.length || 0), 0);
                   return (
                     <div key={proj.id} style={{ ...cardSx, padding: "22px", cursor: "pointer" }}
                       onClick={() => openEditProject(proj)}>
@@ -983,11 +1038,7 @@ export default function TaskManagement() {
                         <span style={{ background: "rgba(167,139,250,0.1)", padding: "3px 10px", borderRadius: "8px", color: "#a78bfa" }}>
                           💼 {proj.jobIds.length} job{proj.jobIds.length !== 1 ? "s" : ""}
                         </span>
-                        {proj.xcRewardPool ? (
-                          <span style={{ background: "rgba(245,200,66,0.1)", padding: "3px 10px", borderRadius: "8px", color: "#f5c842" }}>
-                            ⚡ {proj.xcRewardPool.toLocaleString()} XC pool
-                          </span>
-                        ) : null}
+                        <EarningsPill label="Total" xc={projTotalXC} badges={projTotalBadges} />
                         {proj.dueDate && (
                           <span style={{ background: "rgba(255,255,255,0.05)", padding: "3px 10px", borderRadius: "8px", color: "rgba(255,255,255,0.4)" }}>
                             📅 Due {proj.dueDate}
