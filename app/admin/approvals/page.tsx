@@ -37,6 +37,9 @@ export default function AdminApprovals() {
   const [bulkAnalyzing, setBulkAnalyzing] = useState(false);
   const [showQuickClear, setShowQuickClear] = useState(false);
 
+  /* ── Rejection feedback modal state ──────────────────────────────── */
+  const [rejectModal, setRejectModal] = useState<{ taskId: string; feedback: string; generating: boolean } | null>(null);
+
   useEffect(() => {
     // Load mock data
     import("../../lib/data").then((data) => {
@@ -70,13 +73,65 @@ export default function AdminApprovals() {
     showToast("Task approved! X-Coin & XP awarded. 🎉", "success");
   };
 
-  const handleRejectTask = (taskId: string) => {
+  /* Opens the reject modal — auto-generates AI feedback if analysis exists */
+  const openRejectModal = async (taskId: string) => {
+    const ai = analyses[taskId];
+    let draft = "";
+    if (ai) {
+      const parts: string[] = [];
+      if (ai.flags.length > 0) parts.push("Issues found: " + ai.flags.join("; ") + ".");
+      if (ai.summary) parts.push(ai.summary);
+      parts.push("Please review the feedback, make corrections, and resubmit when ready.");
+      draft = parts.join(" ");
+    }
+    setRejectModal({ taskId, feedback: draft, generating: false });
+
+    // If no AI analysis yet, auto-generate feedback via Gemini
+    if (!ai) {
+      setRejectModal(prev => prev ? { ...prev, generating: true } : null);
+      try {
+        const task = tasks.find(t => t.id === taskId);
+        const player = mockUsers.find(u => u.id === task?.submittedBy);
+        const res = await fetch("/api/gemini", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: `A student named ${player?.name || "Player"} submitted a task called "${task?.title}" but it is being rejected. Their submission proof: link="${task?.submissionProof?.linkUrl || "none"}", file="${task?.submissionProof?.fileUrl || "none"}", note="${task?.submissionProof?.note || "none"}". The task was due ${task?.dueDate || "unknown"} and submitted ${task?.submittedAt || "unknown"}. Write a brief, encouraging rejection message (2-3 sentences) explaining what might be missing and how they can improve for resubmission. Be specific and helpful.`,
+            role: "host",
+            context: { taskTitle: task?.title, playerName: player?.name },
+          }),
+        });
+        const data = await res.json();
+        if (data.reply) {
+          setRejectModal(prev => prev ? { ...prev, feedback: data.reply, generating: false } : null);
+        } else {
+          setRejectModal(prev => prev ? { ...prev, generating: false } : null);
+        }
+      } catch {
+        setRejectModal(prev => prev ? { ...prev, feedback: "Your submission needs some improvements. Please review the task requirements and resubmit with stronger proof of completion.", generating: false } : null);
+      }
+    }
+  };
+
+  const handleRejectTask = (taskId: string, feedback?: string) => {
     const idx = mockTasks.findIndex(t => t.id === taskId);
-    if (idx !== -1) (mockTasks[idx] as any).status = "rejected";
-    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: "rejected" as const } : t));
+    if (idx !== -1) {
+      (mockTasks[idx] as any).status = "rejected";
+      if (feedback) {
+        (mockTasks[idx] as any).rejectionFeedback = feedback;
+        (mockTasks[idx] as any).rejectedAt = new Date().toISOString().split("T")[0];
+      }
+    }
+    setTasks((prev) => prev.map((t) => t.id === taskId ? {
+      ...t,
+      status: "rejected" as const,
+      rejectionFeedback: feedback || undefined,
+      rejectedAt: new Date().toISOString().split("T")[0],
+    } : t));
     playError();
     saveAndToast([saveTasks], "Task rejected — saved to cloud ✓");
-    showToast("Task rejected.", "error");
+    showToast("Task rejected with feedback sent to player.", "error");
+    setRejectModal(null);
   };
 
   const handleApproveTrade = (id: string) => {
@@ -440,7 +495,7 @@ export default function AdminApprovals() {
                         >
                           {isAnalyzing ? "⟳" : "🤖"} {isAnalyzing ? "..." : "Analyze"}
                         </button>
-                        <button onClick={() => handleRejectTask(t.id)} style={{ padding: "8px 16px", borderRadius: "8px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>✕</button>
+                        <button onClick={() => openRejectModal(t.id)} style={{ padding: "8px 16px", borderRadius: "8px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>✕ Reject</button>
                         <button onClick={() => handleApproveTask(t.id)} style={{ padding: "8px 16px", borderRadius: "8px", background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)", color: "#8b5cf6", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>Approve</button>
                       </div>
                     </div>
@@ -591,6 +646,69 @@ export default function AdminApprovals() {
             * Note: PFLX Tax will take away from XP and Rank. Digital Badges (X-Coins) remain unchanged.
           </p>
         </div>
+
+        {/* ══════════════════ REJECTION FEEDBACK MODAL ══════════════════ */}
+        {rejectModal && (() => {
+          const task = tasks.find(t => t.id === rejectModal.taskId);
+          const player = players.find(u => u.id === task?.submittedBy);
+          return (
+            <div style={{
+              position: "fixed", inset: 0, zIndex: 9999,
+              background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)",
+              display: "flex", alignItems: "center", justifyContent: "center"
+            }} onClick={() => setRejectModal(null)}>
+              <div style={{
+                background: "#16161f", border: "1px solid rgba(239,68,68,0.2)",
+                borderRadius: "20px", padding: "28px", width: "520px", maxWidth: "90vw",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.6)"
+              }} onClick={e => e.stopPropagation()}>
+                <h3 style={{ margin: "0 0 4px", fontSize: "18px", fontWeight: 800, color: "#ef4444" }}>
+                  Reject Submission
+                </h3>
+                <p style={{ margin: "0 0 16px", fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>
+                  {task?.title} — <span style={{ color: "#f0f0ff" }}>{player?.name}</span>
+                </p>
+
+                <label style={{ display: "block", marginBottom: "6px", fontSize: "12px", fontWeight: 600, color: "rgba(255,255,255,0.5)" }}>
+                  Feedback for Player {rejectModal.generating && <span style={{ color: "#a78bfa" }}>(AI generating...)</span>}
+                </label>
+                <textarea
+                  value={rejectModal.feedback}
+                  onChange={e => setRejectModal(prev => prev ? { ...prev, feedback: e.target.value } : null)}
+                  rows={5}
+                  placeholder="Explain what needs to be fixed or improved..."
+                  style={{
+                    width: "100%", padding: "12px", borderRadius: "10px",
+                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                    color: "#f0f0ff", fontSize: "14px", lineHeight: 1.5, resize: "vertical",
+                    fontFamily: "inherit"
+                  }}
+                />
+                <p style={{ margin: "8px 0 16px", fontSize: "11px", color: "rgba(255,255,255,0.25)", fontStyle: "italic" }}>
+                  This feedback will be shown to the player so they can improve and resubmit.
+                </p>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                  <button onClick={() => setRejectModal(null)} style={{
+                    padding: "10px 20px", borderRadius: "10px", background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)",
+                    fontSize: "13px", fontWeight: 600, cursor: "pointer"
+                  }}>Cancel</button>
+                  <button
+                    onClick={() => handleRejectTask(rejectModal.taskId, rejectModal.feedback)}
+                    disabled={rejectModal.generating}
+                    style={{
+                      padding: "10px 20px", borderRadius: "10px",
+                      background: rejectModal.generating ? "rgba(239,68,68,0.2)" : "#ef4444",
+                      border: "none", color: rejectModal.generating ? "rgba(255,255,255,0.4)" : "white",
+                      fontSize: "13px", fontWeight: 700, cursor: rejectModal.generating ? "not-allowed" : "pointer"
+                    }}
+                  >Reject & Send Feedback</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </main>
     </div>
   );

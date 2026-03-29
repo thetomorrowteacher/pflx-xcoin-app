@@ -122,6 +122,8 @@ export interface Task {
   investorStakes?: InvestorStake[]; // XP investments boosting this task's value
   assignedTo?: "all" | string[]; // "all" = everyone, string[] = player IDs or cohort names
   link?: string; // Optional resource link (Google Doc, Canva, YouTube, etc.)
+  rejectionFeedback?: string; // AI-generated or host-written feedback when rejected
+  rejectedAt?: string; // ISO date when rejection happened
 }
 
 export interface Checkpoint {
