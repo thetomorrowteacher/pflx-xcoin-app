@@ -114,27 +114,70 @@ YOUR ROLE:
 - Never make up data — only reference what's in the context provided`;
 }
 
+function buildPathwaySystemPrompt(context: Record<string, unknown>): string {
+  return `${PFLX_SYSTEM_KNOWLEDGE}
+
+YOU ARE THE PFLX PATHWAY GUIDE — a friendly AI assistant helping students navigate the Core Pathway Development Portal.
+
+The Pathway Portal is where students explore and complete skill development pathways. There are 7 pathways:
+1. Digital Artist — digital art, illustration, design tools
+2. Music Producer — music creation, audio engineering, beats
+3. Videographer — video production, editing, storytelling
+4. Professional Entrepreneur — business planning, pitching, startup skills
+5. Graphic Designer — visual design, branding, layout
+6. Web Developer — coding, websites, web applications
+7. Content Creator — social media, writing, content strategy
+
+Each pathway has multiple courses/nodes. Completing a course earns the student a Signature Badge (the highest-tier badge) and XC rewards. Some courses are locked until prerequisites are met.
+
+CURRENT CONTEXT:
+${JSON.stringify(context, null, 2)}
+
+YOUR ROLE:
+- Help students understand which pathway fits their interests and goals
+- Explain what skills they'll learn in each pathway
+- Guide students through course completion steps
+- Motivate students who are stuck or unsure which path to take
+- Explain how completing pathways connects to earning XC and badges in the X-Coin app
+- If a student is on a specific pathway, help them understand next steps and what's coming up
+- Keep responses concise (2-3 paragraphs max), encouraging, and focused on skill development
+- NEVER discuss topics outside PFLX — redirect to pathway content`;
+}
+
+// ─── CORS headers for cross-origin Portal calls ────────────────────────────
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
 // ─── API Route ──────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     if (!GEMINI_API_KEY) {
-      return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 });
+      return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500, headers: CORS_HEADERS });
     }
 
     const body = await req.json();
     const { message, role, context } = body as {
       message: string;
-      role: "player" | "host";
+      role: "player" | "host" | "pathway";
       context: Record<string, unknown>;
     };
 
     if (!message || !role) {
-      return NextResponse.json({ error: "Missing message or role" }, { status: 400 });
+      return NextResponse.json({ error: "Missing message or role" }, { status: 400, headers: CORS_HEADERS });
     }
 
-    const systemPrompt = role === "player"
-      ? buildPlayerSystemPrompt(context || {})
-      : buildHostSystemPrompt(context || {});
+    const systemPrompt = role === "pathway"
+      ? buildPathwaySystemPrompt(context || {})
+      : role === "player"
+        ? buildPlayerSystemPrompt(context || {})
+        : buildHostSystemPrompt(context || {});
 
     const geminiBody = {
       system_instruction: { parts: [{ text: systemPrompt }] },
@@ -155,15 +198,15 @@ export async function POST(req: NextRequest) {
     if (!res.ok) {
       const errText = await res.text();
       console.error("[gemini] API error:", res.status, errText);
-      return NextResponse.json({ error: "Gemini API error", details: errText }, { status: res.status });
+      return NextResponse.json({ error: "Gemini API error", details: errText }, { status: res.status, headers: CORS_HEADERS });
     }
 
     const data = await res.json();
     const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't generate a response. Try asking differently!";
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({ reply }, { headers: CORS_HEADERS });
   } catch (err) {
     console.error("[gemini] Route error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return NextResponse.json({ error: "Internal error" }, { status: 500, headers: CORS_HEADERS });
   }
 }
