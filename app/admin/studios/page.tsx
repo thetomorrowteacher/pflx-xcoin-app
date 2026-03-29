@@ -178,15 +178,12 @@ export default function StudiosPage() {
 
           {/* ── Header ──────────────────────────────────────────────────── */}
           <div style={{ marginBottom: "32px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
-              <span style={{ fontSize: "28px" }}>🏢</span>
-              <h1 style={{ margin: 0, fontSize: "26px", fontWeight: 900, color: "#fff", letterSpacing: "0.05em" }}>
-                STARTUP STUDIOS
-              </h1>
-            </div>
-            <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.4)", letterSpacing: "0.03em" }}>
-              Manage studio membership, XC pools, corporate tax rates, and player assignments
-            </p>
+            <h1 style={{ fontSize: "28px", fontWeight: 900, margin: "0 0 4px", letterSpacing: "0.08em",
+              background: "linear-gradient(90deg, #00d4ff, #a78bfa, #00d4ff)",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              filter: "drop-shadow(0 0 10px rgba(0,212,255,0.4))"
+            }}>🏢 STARTUP STUDIOS</h1>
+            <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.1em" }}>[ MANAGE STUDIO MEMBERSHIP, XC POOLS & PLAYER ASSIGNMENTS ]</p>
           </div>
 
           {/* ── System Stats Row ─────────────────────────────────────────── */}
