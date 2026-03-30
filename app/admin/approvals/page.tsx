@@ -247,7 +247,7 @@ export default function AdminApprovals() {
     });
 
     saveAndToast([saveTransactions], "Fine saved to cloud ✓");
-    showToast(`Successfully issued fine: ${tax.name} (-${tax.costXcoin} XP)`, "success");
+    showToast(`Successfully issued fine: ${tax.name} (-${tax.costXcoin} XC)`, "success");
     setSelectedPlayerId("");
     setSelectedTaxId("");
   };

@@ -287,14 +287,9 @@ export default function AdminModifiers() {
 
               {/* Cost & Duration Row */}
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {mod.costXcoin > 0 && (
-                  <span style={{ padding: "4px 10px", borderRadius: "8px", background: "rgba(79,142,247,0.1)", color: "#4f8ef7", fontSize: "11px", fontWeight: 700 }}>
-                    ⚡ {mod.costXcoin} XP
-                  </span>
-                )}
-                {mod.costBadge > 0 && (
+                {(mod.costXcoin > 0 || mod.costBadge > 0) && (
                   <span style={{ padding: "4px 10px", borderRadius: "8px", background: "rgba(245,200,66,0.1)", color: "#f5c842", fontSize: "11px", fontWeight: 700 }}>
-                    🪙 {mod.costBadge} XC
+                    🪙 {mod.costXcoin + mod.costBadge} XC
                   </span>
                 )}
                 <span style={{ padding: "4px 10px", borderRadius: "8px", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.35)", fontSize: "11px", fontWeight: 700 }}>
@@ -382,16 +377,10 @@ export default function AdminModifiers() {
                   <textarea required value={editingMod.description} onChange={e => setEditingMod({ ...editingMod, description: e.target.value })} className="input-field" style={{ minHeight: "72px" }} placeholder="What does this modifier do?" />
                 </div>
 
-                {/* XP Cost + XC Cost */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.08em" }}>XP {editingMod.type === "tax" ? "Fine" : "Cost"}</label>
-                    <input type="number" min={0} value={editingMod.costXcoin} onChange={e => setEditingMod({ ...editingMod, costXcoin: parseInt(e.target.value) || 0 })} className="input-field" />
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.08em" }}>X-Coin {editingMod.type === "tax" ? "Fine" : "Cost"}</label>
-                    <input type="number" min={0} value={editingMod.costBadge} onChange={e => setEditingMod({ ...editingMod, costBadge: parseInt(e.target.value) || 0 })} className="input-field" />
-                  </div>
+                {/* XC Cost */}
+                <div>
+                  <label style={{ display: "block", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.08em" }}>X-Coin {editingMod.type === "tax" ? "Fine" : "Cost"}</label>
+                  <input type="number" min={0} value={editingMod.costXcoin} onChange={e => setEditingMod({ ...editingMod, costXcoin: parseInt(e.target.value) || 0 })} className="input-field" />
                 </div>
 
                 {/* Duration */}
