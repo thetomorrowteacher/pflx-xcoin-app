@@ -220,6 +220,22 @@ export default function DiagnosticPage() {
   const [manualBrandName, setManualBrandName] = useState("");
   const [manualSlogan, setManualSlogan] = useState("");
 
+  // Upload diagnostic state
+  const [isUploadMode, setIsUploadMode] = useState(false);
+  const [uploadImage, setUploadImage] = useState<string | null>(null);
+  const [uploadMimeType, setUploadMimeType] = useState("image/jpeg");
+  const [uploadAnalyzing, setUploadAnalyzing] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [uploadResult, setUploadResult] = useState<{
+    brandType: string;
+    scores: { maker: number; visionary: number; storyteller: number; technologist: number };
+    topPathways: string[];
+    style: string;
+    visionStatement: { create: string; impact: string; perspective: string; future: string };
+    confidence: number;
+    extractedFields: string[];
+  } | null>(null);
+
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
     if (!stored) { router.push("/"); return; }
@@ -348,6 +364,87 @@ export default function DiagnosticPage() {
     }, 2800);
   };
 
+  // Handle diagnostic image upload
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadError("");
+    setUploadResult(null);
+    setUploadMimeType(file.type || "image/jpeg");
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setUploadImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Send uploaded image to AI for analysis
+  const handleAnalyzeUpload = async () => {
+    if (!uploadImage || !user) return;
+    setUploadAnalyzing(true);
+    setUploadError("");
+    try {
+      const res = await fetch("/api/analyze-diagnostic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: uploadImage, mimeType: uploadMimeType }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setUploadError(data.message || data.error || "Could not analyze image. Try a clearer photo.");
+        setUploadAnalyzing(false);
+        return;
+      }
+      setUploadResult(data.result);
+      setUploadAnalyzing(false);
+    } catch {
+      setUploadError("Network error — please try again.");
+      setUploadAnalyzing(false);
+    }
+  };
+
+  // Accept the AI-analyzed result and proceed to placement
+  const handleAcceptUploadResult = () => {
+    if (!uploadResult || !user) return;
+    setStep("placement");
+    setPlacing(true);
+    setTimeout(() => {
+      const fullResult: DiagnosticResult = {
+        brandType: uploadResult.brandType as DiagnosticResult["brandType"],
+        scores: uploadResult.scores,
+        topPathways: uploadResult.topPathways,
+        style: uploadResult.style,
+        visionStatement: uploadResult.visionStatement,
+        completedAt: new Date().toISOString(),
+      };
+      setResults(fullResult);
+
+      const studioId = assignStudioFromDiagnostic(fullResult);
+      const studio = mockStartupStudios.find(s => s.id === studioId)!;
+      setAssignedStudio(studio);
+
+      const updatedUser: User = {
+        ...user,
+        studioId,
+        diagnosticComplete: true,
+        pathway: pathwayLabels[fullResult.topPathways[0]]?.name || user.pathway,
+        diagnosticResult: fullResult,
+      };
+      localStorage.setItem("pflx_user", JSON.stringify(updatedUser));
+      const idx = mockUsers.findIndex(u => u.id === user.id);
+      if (idx >= 0) {
+        mockUsers[idx] = updatedUser;
+        const sIdx = mockStartupStudios.findIndex(s => s.id === studioId);
+        if (sIdx >= 0 && !mockStartupStudios[sIdx].members.includes(user.id)) {
+          mockStartupStudios[sIdx].members.push(user.id);
+        }
+      }
+      setUser(updatedUser);
+      setPlacing(false);
+      setTimeout(() => setStep("branding"), 600);
+    }, 2800);
+  };
+
   // Complete branding → mark onboarding complete → welcome
   const handleBrandingComplete = () => {
     if (!user) return;
@@ -421,6 +518,15 @@ export default function DiagnosticPage() {
               </button>
             </div>
 
+            {/* Upload previous diagnostic */}
+            <button
+              onClick={() => { setIsUploadMode(true); setStep("assessment"); }}
+              style={{ padding: "16px", borderRadius: "14px", border: "1px solid rgba(167,139,250,0.3)", background: "rgba(167,139,250,0.06)", color: "#a78bfa", fontSize: "14px", fontWeight: 700, cursor: "pointer", transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}
+            >
+              <span style={{ fontSize: "20px" }}>{"\uD83D\uDCF7"}</span>
+              Upload a Previous Diagnostic &rarr;
+            </button>
+
             {/* Skip option */}
             <button
               onClick={() => { setIsSkipMode(true); setStep("assessment"); }}
@@ -432,7 +538,7 @@ export default function DiagnosticPage() {
         )}
 
         {/* ── ASSESSMENT (full or skip/manual) ── */}
-        {step === "assessment" && !isSkipMode && (
+        {step === "assessment" && !isSkipMode && !isUploadMode && (
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             {/* Progress bar */}
             <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: "100px", height: "6px", overflow: "hidden" }}>
@@ -568,6 +674,161 @@ export default function DiagnosticPage() {
                 ANALYZE &amp; FIND MY STUDIO &rarr;
               </button>
             </div>
+          </div>
+        )}
+
+        {/* ── UPLOAD DIAGNOSTIC ── */}
+        {step === "assessment" && isUploadMode && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div style={{ background: "rgba(167,139,250,0.05)", border: "1px solid rgba(167,139,250,0.2)", borderRadius: "18px", padding: "24px" }}>
+              <h2 style={{ margin: "0 0 8px", fontSize: "20px", fontWeight: 800, color: "#a78bfa" }}>Upload Previous Diagnostic</h2>
+              <p style={{ margin: "0 0 24px", fontSize: "13px", color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
+                Take a photo or screenshot of your completed diagnostic results. The AI will read the image and automatically load your profile.
+              </p>
+
+              {/* Upload area */}
+              {!uploadImage ? (
+                <label style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "16px", padding: "48px 24px", borderRadius: "16px", border: "2px dashed rgba(167,139,250,0.3)", background: "rgba(167,139,250,0.04)", cursor: "pointer", transition: "all 0.2s" }}>
+                  <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "rgba(167,139,250,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px" }}>{"\uD83D\uDCF7"}</div>
+                  <div style={{ textAlign: "center" }}>
+                    <p style={{ margin: "0 0 4px", fontSize: "15px", fontWeight: 700, color: "#a78bfa" }}>Tap to upload image</p>
+                    <p style={{ margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.3)" }}>Photo, screenshot, or scan of your diagnostic</p>
+                  </div>
+                  <input type="file" accept="image/*" capture="environment" onChange={handleImageUpload} style={{ display: "none" }} />
+                </label>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {/* Image preview */}
+                  <div style={{ position: "relative", borderRadius: "16px", overflow: "hidden", border: "2px solid rgba(167,139,250,0.3)" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={uploadImage} alt="Diagnostic upload" style={{ width: "100%", height: "auto", maxHeight: "400px", objectFit: "contain", background: "#0a0c14", display: "block" }} />
+                    <button onClick={() => { setUploadImage(null); setUploadResult(null); setUploadError(""); }}
+                      style={{ position: "absolute", top: "8px", right: "8px", width: "32px", height: "32px", borderRadius: "50%", background: "rgba(0,0,0,0.7)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {"\u2715"}
+                    </button>
+                  </div>
+
+                  {/* Analyze button */}
+                  {!uploadResult && !uploadAnalyzing && (
+                    <button onClick={handleAnalyzeUpload}
+                      style={{ padding: "16px", borderRadius: "14px", border: "none", cursor: "pointer", background: "linear-gradient(90deg,#a78bfa,#00d4ff)", color: "#000", fontSize: "15px", fontWeight: 900, letterSpacing: "0.06em", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
+                      <span style={{ fontSize: "18px" }}>{"\uD83E\uDDE0"}</span>
+                      ANALYZE WITH AI
+                    </button>
+                  )}
+
+                  {/* Analyzing spinner */}
+                  {uploadAnalyzing && (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", padding: "20px", borderRadius: "14px", background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.2)" }}>
+                      <div style={{ width: "24px", height: "24px", borderRadius: "50%", border: "3px solid rgba(167,139,250,0.3)", borderTopColor: "#a78bfa", animation: "spin 0.8s linear infinite" }} />
+                      <span style={{ fontSize: "14px", fontWeight: 700, color: "#a78bfa" }}>AI is reading your diagnostic...</span>
+                    </div>
+                  )}
+
+                  {/* Error */}
+                  {uploadError && (
+                    <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444", fontSize: "13px", fontWeight: 600 }}>
+                      {uploadError}
+                    </div>
+                  )}
+
+                  {/* Results preview */}
+                  {uploadResult && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      <div style={{ padding: "20px", borderRadius: "16px", background: "rgba(0,212,255,0.04)", border: "2px solid rgba(0,212,255,0.2)" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                          <p style={{ margin: 0, fontSize: "12px", fontWeight: 700, color: "rgba(0,212,255,0.5)", letterSpacing: "0.12em" }}>AI EXTRACTED RESULTS</p>
+                          <span style={{ padding: "4px 10px", borderRadius: "100px", background: uploadResult.confidence >= 0.7 ? "rgba(34,197,94,0.12)" : "rgba(245,200,66,0.12)", border: `1px solid ${uploadResult.confidence >= 0.7 ? "rgba(34,197,94,0.4)" : "rgba(245,200,66,0.4)"}`, color: uploadResult.confidence >= 0.7 ? "#22c55e" : "#f5c842", fontSize: "10px", fontWeight: 800 }}>
+                            {Math.round(uploadResult.confidence * 100)}% CONFIDENCE
+                          </span>
+                        </div>
+
+                        {/* Brand Type */}
+                        <div style={{ marginBottom: "16px" }}>
+                          <p style={{ margin: "0 0 4px", fontSize: "11px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em" }}>BRAND TYPE</p>
+                          <p style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: CYAN }}>
+                            {brandTypes[uploadResult.brandType]?.name || uploadResult.brandType}
+                          </p>
+                        </div>
+
+                        {/* Scores */}
+                        <div style={{ marginBottom: "16px" }}>
+                          <p style={{ margin: "0 0 8px", fontSize: "11px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em" }}>CREATIVE DIMENSIONS</p>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                            {[
+                              { label: "Maker", val: uploadResult.scores.maker, color: "#f5c842" },
+                              { label: "Visionary", val: uploadResult.scores.visionary, color: "#a78bfa" },
+                              { label: "Storyteller", val: uploadResult.scores.storyteller, color: "#f472b6" },
+                              { label: "Technologist", val: uploadResult.scores.technologist, color: CYAN },
+                            ].map(d => (
+                              <div key={d.label} style={{ background: "rgba(0,0,0,0.3)", borderRadius: "10px", padding: "10px 12px" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                                  <span style={{ fontSize: "11px", fontWeight: 600, color: d.color }}>{d.label}</span>
+                                  <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>{d.val}/6</span>
+                                </div>
+                                <div style={{ height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "2px", overflow: "hidden" }}>
+                                  <div style={{ height: "100%", width: `${(d.val / 6) * 100}%`, background: d.color, borderRadius: "2px" }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Top Pathways */}
+                        <div style={{ marginBottom: "16px" }}>
+                          <p style={{ margin: "0 0 8px", fontSize: "11px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em" }}>TOP PATHWAYS</p>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                            {uploadResult.topPathways.map((p, i) => (
+                              <span key={p} style={{ padding: "6px 12px", borderRadius: "100px", background: "rgba(0,212,255,0.08)", border: "1px solid rgba(0,212,255,0.2)", color: CYAN, fontSize: "12px", fontWeight: 700 }}>
+                                #{i + 1} {pathwayLabels[p]?.name || p}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Style */}
+                        <div style={{ marginBottom: uploadResult.visionStatement?.create ? "16px" : "0" }}>
+                          <p style={{ margin: "0 0 4px", fontSize: "11px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em" }}>CREATIVE STYLE</p>
+                          <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#f472b6", textTransform: "capitalize" }}>{uploadResult.style}</p>
+                        </div>
+
+                        {/* Vision Statement (if extracted) */}
+                        {uploadResult.visionStatement?.create && (
+                          <div>
+                            <p style={{ margin: "0 0 8px", fontSize: "11px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em" }}>VISION STATEMENT</p>
+                            <div style={{ background: "rgba(167,139,250,0.06)", borderRadius: "10px", padding: "12px", border: "1px solid rgba(167,139,250,0.15)" }}>
+                              <p style={{ margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.6)", lineHeight: 1.7, fontStyle: "italic" }}>
+                                {uploadResult.visionStatement.create && <>&ldquo;I create {uploadResult.visionStatement.create}</>}
+                                {uploadResult.visionStatement.impact && <> that will {uploadResult.visionStatement.impact}</>}
+                                {uploadResult.visionStatement.perspective && <>. My perspective: {uploadResult.visionStatement.perspective}</>}
+                                {uploadResult.visionStatement.future && <>. In 2 years: {uploadResult.visionStatement.future}</>}
+                                {uploadResult.visionStatement.create && <>.&rdquo;</>}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Accept / Retry buttons */}
+                      <button onClick={handleAcceptUploadResult}
+                        style={{ padding: "18px", borderRadius: "14px", border: "none", cursor: "pointer", background: "linear-gradient(90deg,#00d4ff,#a78bfa)", color: "#000", fontSize: "15px", fontWeight: 900, letterSpacing: "0.06em" }}>
+                        LOOKS RIGHT — FIND MY STUDIO {"\u2192"}
+                      </button>
+                      <button onClick={() => { setUploadResult(null); setUploadImage(null); }}
+                        style={{ padding: "12px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "rgba(255,255,255,0.4)", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>
+                        Not right? Upload a different image
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Back button */}
+            <button onClick={() => { setIsUploadMode(false); setStep("intro"); setUploadImage(null); setUploadResult(null); setUploadError(""); }}
+              style={{ padding: "14px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "rgba(255,255,255,0.4)", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
+              {"\u2190"} Back to options
+            </button>
           </div>
         )}
 
