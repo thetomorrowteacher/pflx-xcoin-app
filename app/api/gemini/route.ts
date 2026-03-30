@@ -155,6 +155,29 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
+// ─── Retry helper with exponential backoff ──────────────────────────────────
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3,
+  baseDelay = 1000
+): Promise<Response> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, options);
+    if (res.ok) return res;
+    // Only retry on 429 (rate limit) or 503 (service unavailable)
+    if ((res.status === 429 || res.status === 503) && attempt < maxRetries) {
+      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 500;
+      console.log(`[gemini] ${res.status} on attempt ${attempt + 1}, retrying in ${Math.round(delay)}ms...`);
+      await new Promise((r) => setTimeout(r, delay));
+      continue;
+    }
+    return res; // Non-retryable error or max retries hit — return as-is
+  }
+  throw lastError || new Error("Retry exhausted");
+}
+
 // ─── API Route ──────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
@@ -189,7 +212,7 @@ export async function POST(req: NextRequest) {
       },
     };
 
-    const res = await fetch(GEMINI_URL, {
+    const res = await fetchWithRetry(GEMINI_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(geminiBody),
@@ -198,7 +221,16 @@ export async function POST(req: NextRequest) {
     if (!res.ok) {
       const errText = await res.text();
       console.error("[gemini] API error:", res.status, errText);
-      return NextResponse.json({ error: "Gemini API error", details: errText }, { status: res.status, headers: CORS_HEADERS });
+      const userMessage =
+        res.status === 429
+          ? "rate_limited"
+          : res.status === 403
+            ? "api_key_invalid"
+            : "api_error";
+      return NextResponse.json(
+        { error: userMessage, details: errText, status: res.status },
+        { status: res.status, headers: CORS_HEADERS }
+      );
     }
 
     const data = await res.json();

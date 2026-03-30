@@ -483,14 +483,24 @@ export default function PlayerAssistant() {
         speak(data.reply, voiceOn);
         return;
       }
+      // Handle specific error types from API
+      const errData = await res.json().catch(() => ({ error: "unknown" }));
+      setThinking(false);
+      const fn = player.name.split(" ")[0];
+      if (errData.error === "rate_limited") {
+        addMsg("assistant", `Whoa ${fn}, I'm getting a lot of questions right now! Give me about 30 seconds and ask again. You can also try "prioritize", "my tasks", or "help" for quick answers.`);
+      } else {
+        addMsg("assistant", `I hit a temporary glitch, ${fn} — try again in a moment! You can also use "prioritize", "my tasks", or "help" for quick answers.`);
+      }
+      return;
     } catch (err) {
       console.error("[PlayerAssistant] Gemini call failed:", err);
     }
 
-    // Fallback if Gemini fails
+    // Fallback (network error)
     setThinking(false);
     const firstName = player.name.split(" ")[0];
-    addMsg("assistant", `Sorry ${firstName}, I'm having trouble connecting to AI right now. Try "prioritize", "my tasks", or "help" for quick answers!`);
+    addMsg("assistant", `Sorry ${firstName}, I'm having trouble connecting right now. Try "prioritize", "my tasks", or "help" for quick answers!`);
   }, [input, player, router, voiceOn]);
 
   // Voice

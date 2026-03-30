@@ -465,12 +465,23 @@ export default function AIAssistant() {
         if(voiceOn) speak(data.reply);
         return;
       }
+      // Handle specific error types from API
+      const errData = await res.json().catch(() => ({ error: "unknown" }));
+      setIsTyping(false);
+      if (errData.error === "rate_limited") {
+        addMessage({role:"assistant",text:`I'm getting a lot of requests right now! Give me about 30 seconds and try again. In the meantime, try "analyze submissions", "at-risk", or "help" for quick answers.`});
+      } else if (errData.error === "api_key_invalid") {
+        addMessage({role:"assistant",text:`My AI connection needs to be reconfigured. Please check the Gemini API key in your environment settings. You can still use "analyze submissions", "at-risk", or "help" for quick answers!`});
+      } else {
+        addMessage({role:"assistant",text:`I hit a temporary issue — try again in a moment! You can also use "analyze submissions", "at-risk", or "help" for quick answers.`});
+      }
+      return;
     } catch (err) {
       console.error("[AIAssistant] Gemini call failed:", err);
     }
-    // Fallback
+    // Fallback (network error)
     setIsTyping(false);
-    addMessage({role:"assistant",text:`Sorry, I'm having trouble connecting to AI right now. Try "analyze submissions", "at-risk", or "help" for quick answers!`});
+    addMessage({role:"assistant",text:`Sorry, I'm having trouble connecting right now. Try "analyze submissions", "at-risk", or "help" for quick answers!`});
   },[addMessage,analyzeSubmission,router,voiceOn]);
 
   // ── Voice recognition ────────────────────────────────────────────────────
