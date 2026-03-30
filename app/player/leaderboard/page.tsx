@@ -69,7 +69,7 @@ function ChipSelect<T extends string>({
 
 // ─── Grid template shared between header and rows ────────────────────────
 // STATUS | avatar | PLAYER | STUDIO | EVO RANK | SIG | EXEC | PREM | PRI | TOTAL | XC | SCORE
-const GRID = "72px 36px 1fr 110px 115px 78px 78px 78px 78px 70px 90px 82px";
+const GRID = "56px 36px minmax(130px,1fr) 100px 100px 68px 68px 68px 68px 62px 82px 76px";
 
 // ─── Studio logo helper — tries image, falls back to emoji ────────────────
 function StudioLogo({ studioId, icon, color, colorRgb, size = 56 }: {

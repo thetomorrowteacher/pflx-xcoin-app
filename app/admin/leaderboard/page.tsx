@@ -463,7 +463,7 @@ export default function AdminLeaderboard() {
           {/* ── Column headers (clickable sort) ──────────────────────── */}
           <div style={{
             display: "grid",
-            gridTemplateColumns: "72px 1fr 110px 130px 100px 100px 100px 100px 88px 100px 90px",
+            gridTemplateColumns: "56px minmax(140px,1fr) 100px 110px 80px 80px 80px 80px 72px 90px 82px",
             padding: "9px 16px", gap: "0 6px", alignItems: "center",
             borderBottom: "1px solid rgba(0,212,255,0.08)",
             background: "rgba(0,212,255,0.02)",
@@ -496,7 +496,7 @@ export default function AdminLeaderboard() {
             return (
               <div key={p.id} style={{
                 display: "grid",
-                gridTemplateColumns: "72px 1fr 110px 130px 100px 100px 100px 100px 88px 100px 90px",
+                gridTemplateColumns: "56px minmax(140px,1fr) 100px 110px 80px 80px 80px 80px 72px 90px 82px",
                 padding: "12px 16px", gap: "0 8px", alignItems: "center",
                 borderBottom: i < players.length - 1 ? "1px solid rgba(0,212,255,0.05)" : "none",
                 background: i % 2 === 0 ? "transparent" : "rgba(0,212,255,0.015)",
