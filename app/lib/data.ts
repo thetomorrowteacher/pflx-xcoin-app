@@ -661,11 +661,11 @@ export function getStatusScore(user: User): number {
   const rankLevel = getCurrentRank(user.totalXcoin, user).level;
   const b = getBadgeBreakdown(user);
   return (
-    rankLevel     * 100000 +
-    b.signature   * 10000  +
-    b.executive   * 1000   +
-    b.premium     * 100    +
-    b.primary     * 10     +
+    (rankLevel - 1) * 100000 +
+    b.signature     * 10000  +
+    b.executive     * 1000   +
+    b.premium       * 100    +
+    b.primary       * 10     +
     Math.floor(user.xcoin / 100)
   );
 }

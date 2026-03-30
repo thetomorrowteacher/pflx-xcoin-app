@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
-import { User, Task, mockTasks, mockUsers, CoinSubmission, mockSubmissions, mockModifiers, mockTransactions } from "../../lib/data";
+import { User, Task, mockTasks, mockUsers, CoinSubmission, mockSubmissions, mockModifiers, mockTransactions, COIN_CATEGORIES } from "../../lib/data";
 import { playSuccess, playError } from "../../lib/sounds";
 import { saveUsers, saveTransactions, saveSubmissions, saveTasks, saveTrades, saveInvestments } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
@@ -66,10 +66,58 @@ export default function AdminApprovals() {
 
   const handleApproveTask = (taskId: string) => {
     const idx = mockTasks.findIndex(t => t.id === taskId);
-    if (idx !== -1) (mockTasks[idx] as any).status = "approved";
+    if (idx === -1) return;
+    const task = mockTasks[idx];
+    (mockTasks[idx] as any).status = "approved";
+
+    // Award XC + badges to the submitting player
+    const player = mockUsers.find(u => u.id === task.submittedBy);
+    if (player) {
+      // Award XC from rewardCoins
+      let xcAwarded = 0;
+      if (task.rewardCoins && task.rewardCoins.length > 0) {
+        if (!player.badgeCounts) player.badgeCounts = { signature: 0, executive: 0, premium: 0, primary: 0 };
+        task.rewardCoins.forEach(rc => {
+          const coinDef = COIN_CATEGORIES.flatMap(c => c.coins).find(c => c.name === rc.coinName);
+          const xc = coinDef ? coinDef.xc * rc.amount : (task.xpValue || 0);
+          player.xcoin += xc;
+          player.totalXcoin += xc;
+          player.digitalBadges += rc.amount;
+          xcAwarded += xc;
+          // Update per-type badge breakdown
+          const category = COIN_CATEGORIES.find(cat => cat.coins.some(c => c.name === rc.coinName));
+          if (category) {
+            const catName = category.name.toLowerCase();
+            if (catName.includes("primary")) player.badgeCounts!.primary += rc.amount;
+            else if (catName.includes("premium")) player.badgeCounts!.premium += rc.amount;
+            else if (catName.includes("executive")) player.badgeCounts!.executive += rc.amount;
+            else if (catName.includes("signature")) player.badgeCounts!.signature += rc.amount;
+          }
+          mockTransactions.push({
+            id: `tx-${Date.now()}-${player.id}-${rc.coinName}`,
+            userId: player.id, type: "task_reward", amount: xc, currency: "xcoin",
+            description: `Task Approved: ${task.title} — ${rc.coinName}`,
+            createdAt: new Date().toISOString().split("T")[0],
+          });
+        });
+      } else if (task.xpValue) {
+        // Fallback: award xpValue directly if no rewardCoins
+        player.xcoin += task.xpValue;
+        player.totalXcoin += task.xpValue;
+        xcAwarded = task.xpValue;
+        mockTransactions.push({
+          id: `tx-${Date.now()}-${player.id}-xp`,
+          userId: player.id, type: "task_reward", amount: task.xpValue, currency: "xcoin",
+          description: `Task Approved: ${task.title}`,
+          createdAt: new Date().toISOString().split("T")[0],
+        });
+      }
+      console.log(`[task-approve] Player "${player.brandName||player.name}": +${xcAwarded} XC, badges=`, player.badgeCounts);
+    }
+
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: "approved" as const } : t));
     playSuccess();
-    saveAndToast([saveTasks], "Task approved — saved to cloud ✓");
+    saveAndToast([saveTasks, saveUsers, saveTransactions], "Task approved — saved to cloud ✓");
     showToast("Task approved! X-Coin & XP awarded. 🎉", "success");
   };
 
@@ -147,6 +195,21 @@ export default function AdminApprovals() {
     playSuccess();
     saveAndToast([saveTrades], "Trade approved — saved to cloud ✓");
     showToast("XP Trade approved! Credits transferred.", "success");
+  };
+
+  const handleRejectTrade = (id: string) => {
+    setTrades(prev => {
+      const updated = prev.map(t => t.id === id ? { ...t, status: "rejected" } : t);
+      // Sync to mock array
+      import("../../lib/data").then(d => {
+        const idx = d.mockTrades.findIndex((t: any) => t.id === id);
+        if (idx >= 0) d.mockTrades[idx].status = "rejected";
+      });
+      return updated;
+    });
+    playError();
+    saveAndToast([saveTrades], "Trade rejected — saved to cloud ✓");
+    showToast("XP Trade rejected.", "error");
   };
 
   const handleApproveInvestment = (id: string) => {
@@ -336,7 +399,7 @@ export default function AdminApprovals() {
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                       <p style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#4f8ef7" }}>⚡ {tr.amount}</p>
-                      <button onClick={() => { playError(); showToast("Trade rejected", "error"); }} style={{ padding: "8px 16px", borderRadius: "8px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>✕</button>
+                      <button onClick={() => handleRejectTrade(tr.id)} style={{ padding: "8px 16px", borderRadius: "8px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>✕</button>
                       <button onClick={() => handleApproveTrade(tr.id)} style={{ padding: "8px 16px", borderRadius: "8px", background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.3)", color: "#22c55e", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>Approve</button>
                     </div>
                   </div>
