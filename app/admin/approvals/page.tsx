@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
-import { User, Task, mockTasks, mockUsers, CoinSubmission, mockSubmissions, mockModifiers, mockTransactions, COIN_CATEGORIES } from "../../lib/data";
+import { User, Task, mockTasks, mockUsers, CoinSubmission, mockSubmissions, mockModifiers, mockTransactions, COIN_CATEGORIES, getCurrentRank } from "../../lib/data";
 import { playSuccess, playError } from "../../lib/sounds";
 import { saveUsers, saveTransactions, saveSubmissions, saveTasks, saveTrades, saveInvestments } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
@@ -55,7 +55,10 @@ export default function AdminApprovals() {
     const stored = localStorage.getItem("pflx_user");
     if (!stored) { router.push("/"); return; }
     const u = JSON.parse(stored) as User;
-    if (u.role !== "admin") { router.push("/player"); return; }
+    // Allow admins + Executive Evo Rank players (Chief level 9, Partner level 10)
+    const rankLevel = getCurrentRank(u.totalXcoin, u).level;
+    const isExecutiveRank = rankLevel >= 9;
+    if (u.role !== "admin" && !isExecutiveRank) { router.push("/player"); return; }
     setUser(u);
   }, [router]);
 

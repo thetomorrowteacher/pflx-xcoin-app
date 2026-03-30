@@ -2,7 +2,7 @@
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { useState, useEffect } from "react";
-import { User, isHostUser } from "../lib/data";
+import { User, isHostUser, getCurrentRank } from "../lib/data";
 import { playNav, playClick, getSoundSettings, saveSoundSettings, SoundSettings, syncAmbient } from "../lib/sounds";
 import { applyPlayerImages } from "../lib/playerImages";
 
@@ -75,7 +75,13 @@ export default function SideNav({ user }: NavProps) {
   const router = useRouter();
   const pathname = usePathname();
   const isHost = isHostUser(user);
-  const links = isHost ? adminLinks : playerLinks;
+  // Executive Evo Rank players (Chief level 9+, Partner level 10) get access to Approvals
+  const rankLevel = getCurrentRank(user.totalXcoin, user).level;
+  const isExecutiveRank = rankLevel >= 9;
+  const basePlayerLinks = isExecutiveRank
+    ? [...playerLinks.slice(0, -1), { href: "/admin/approvals", label: "Approvals", icon: "🔔" }, playerLinks[playerLinks.length - 1]]
+    : playerLinks;
+  const links = isHost ? adminLinks : basePlayerLinks;
   // Always show the latest uploaded profile image, even if localStorage is stale
   const displayUser = applyPlayerImages([user])[0] ?? user;
   const [soundOn, setSoundOn] = useState(true);
