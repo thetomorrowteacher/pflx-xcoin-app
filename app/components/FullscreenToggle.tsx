@@ -5,16 +5,12 @@ export default function FullscreenToggle() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hovered, setHovered] = useState(false);
 
-  // Detect if running inside an iframe
-  const isInIframe = typeof window !== "undefined" && window.self !== window.top;
-
-  const getFullscreenElement = () =>
-    document.fullscreenElement ||
-    (document as any).webkitFullscreenElement ||
-    (document as any).msFullscreenElement;
-
   const updateState = useCallback(() => {
-    const fs = !!getFullscreenElement();
+    const fs = !!(
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement ||
+      (document as any).msFullscreenElement
+    );
     setIsFullscreen(fs);
     if (fs) {
       sessionStorage.setItem("pflx_fullscreen", "1");
@@ -28,11 +24,13 @@ export default function FullscreenToggle() {
     document.addEventListener("webkitfullscreenchange", updateState);
 
     // Auto-re-enter fullscreen if it was active on the previous page
-    if (sessionStorage.getItem("pflx_fullscreen") === "1" && !getFullscreenElement()) {
-      requestFS().catch(() => {
+    if (
+      sessionStorage.getItem("pflx_fullscreen") === "1" &&
+      !document.fullscreenElement
+    ) {
+      document.documentElement.requestFullscreen().catch(() => {
         const reEnter = () => {
-          requestFS().catch(() => {});
-          document.removeEventListener("click", reEnter);
+          document.documentElement.requestFullscreen().catch(() => {});
         };
         document.addEventListener("click", reEnter, { once: true });
       });
@@ -44,54 +42,27 @@ export default function FullscreenToggle() {
     };
   }, [updateState]);
 
-  // Cross-browser fullscreen request that works in iframes
-  async function requestFS() {
+  // MUST be synchronous — browsers require fullscreen calls
+  // to happen directly inside a user-gesture (click) handler.
+  // Using async/await breaks the gesture chain and the call silently fails.
+  const toggle = () => {
     const el = document.documentElement as any;
+    const doc = document as any;
 
-    // Try standard API first
-    if (el.requestFullscreen) {
-      return el.requestFullscreen();
-    }
-    // WebKit (Safari/iOS)
-    if (el.webkitRequestFullscreen) {
-      return el.webkitRequestFullscreen();
-    }
-    // MS Edge/IE
-    if (el.msRequestFullscreen) {
-      return el.msRequestFullscreen();
-    }
-    throw new Error("Fullscreen API not available");
-  }
-
-  async function exitFS() {
-    if (document.exitFullscreen) return document.exitFullscreen();
-    if ((document as any).webkitExitFullscreen) return (document as any).webkitExitFullscreen();
-    if ((document as any).msExitFullscreen) return (document as any).msExitFullscreen();
-  }
-
-  const toggle = async () => {
-    if (getFullscreenElement()) {
-      exitFS();
-      return;
-    }
-
-    try {
-      await requestFS();
-    } catch {
-      // Fullscreen failed — likely blocked in an iframe without allowfullscreen
-      // Try sending a message to the parent frame to request fullscreen on the iframe
-      if (isInIframe) {
-        try {
-          window.parent.postMessage({ type: "pflx-request-fullscreen" }, "*");
-        } catch {}
-
-        // Also try opening in a new tab as ultimate fallback
-        // Give postMessage 500ms to work, then open new tab if still not fullscreen
-        setTimeout(() => {
-          if (!getFullscreenElement()) {
-            window.open(window.location.href, "_blank");
-          }
-        }, 500);
+    if (document.fullscreenElement || doc.webkitFullscreenElement) {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (doc.webkitExitFullscreen) {
+        doc.webkitExitFullscreen();
+      }
+    } else {
+      if (el.requestFullscreen) {
+        el.requestFullscreen().then(() => {
+          sessionStorage.setItem("pflx_fullscreen", "1");
+        }).catch(() => {});
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+        sessionStorage.setItem("pflx_fullscreen", "1");
       }
     }
   };
@@ -101,7 +72,7 @@ export default function FullscreenToggle() {
       onClick={toggle}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      title={isFullscreen ? "Exit Fullscreen" : isInIframe ? "Open Fullscreen" : "Toggle Fullscreen"}
+      title={isFullscreen ? "Exit Fullscreen" : "Toggle Fullscreen"}
       style={{
         position: "fixed",
         bottom: "36px",
