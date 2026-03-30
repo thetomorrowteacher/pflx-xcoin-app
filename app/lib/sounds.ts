@@ -280,6 +280,168 @@ export function playModalClose(): void {
   osc.stop(now + 0.15);
 }
 
+/** Cash register — ka-ching for purchases and marketplace transactions */
+export function playCashRegister(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.rewards) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.4;
+  const now = ctx.currentTime;
+  // Drawer slide
+  makeTone(ctx, 180, now, 0.06, "sawtooth", v * 0.3);
+  makeTone(ctx, 280, now + 0.04, 0.04, "sawtooth", v * 0.2);
+  // Bell ding (ka)
+  makeTone(ctx, 2800, now + 0.1, 0.08, "sine", v * 0.7);
+  makeTone(ctx, 3400, now + 0.11, 0.06, "sine", v * 0.4);
+  // Ching (higher ring)
+  makeTone(ctx, 3800, now + 0.2, 0.15, "sine", v);
+  makeTone(ctx, 4200, now + 0.22, 0.12, "sine", v * 0.5);
+  // Shimmer tail
+  makeTone(ctx, 2600, now + 0.3, 0.2, "sine", v * 0.2);
+}
+
+/** Coin shower — multiple coins falling (big XC reward or jackpot) */
+export function playCoinShower(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.rewards) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.3;
+  const now = ctx.currentTime;
+  // Cascade of metallic pings at random-ish intervals
+  const freqs = [2400, 3000, 2100, 3600, 2800, 1900, 3200, 2500, 3400, 2000];
+  freqs.forEach((f, i) => {
+    const t = i * 0.06 + (i % 3) * 0.02;
+    makeTone(ctx, f, now + t, 0.08, "sine", v * (0.6 + Math.random() * 0.4));
+    makeTone(ctx, f * 0.5, now + t + 0.02, 0.05, "square", v * 0.15);
+  });
+  // Bass thud as coins land
+  makeTone(ctx, 100, now + 0.5, 0.2, "sine", v * 0.4);
+}
+
+/** Wallet open — soft leather snap for wallet/inventory views */
+export function playWalletOpen(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.clicks) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.25;
+  const now = ctx.currentTime;
+  // Snap
+  makeTone(ctx, 600, now, 0.02, "square", v);
+  makeTone(ctx, 400, now + 0.02, 0.04, "sine", v * 0.6);
+  // Soft whoosh
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(300, now + 0.04);
+  osc.frequency.exponentialRampToValueAtTime(600, now + 0.12);
+  gain.gain.setValueAtTime(0, now + 0.04);
+  gain.gain.linearRampToValueAtTime(v * 0.4, now + 0.06);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+  osc.start(now + 0.04);
+  osc.stop(now + 0.2);
+}
+
+/** Trade complete — handshake chime for barter/trade approvals */
+export function playTradeComplete(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.rewards) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.4;
+  const now = ctx.currentTime;
+  // Two-note handshake
+  makeTone(ctx, 523, now, 0.12, "sine", v);
+  makeTone(ctx, 659, now + 0.1, 0.12, "sine", v);
+  // Confirmation bell
+  makeTone(ctx, 1047, now + 0.22, 0.2, "sine", v * 0.7);
+  makeTone(ctx, 1047 * 1.005, now + 0.22, 0.2, "sine", v * 0.2); // slight detune for richness
+  // Warm bass
+  makeTone(ctx, 262, now, 0.35, "sine", v * 0.25);
+}
+
+/** Invest — deep hum with rising overtones for investment proposals */
+export function playInvest(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.rewards) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.35;
+  const now = ctx.currentTime;
+  // Deep foundation
+  makeTone(ctx, 110, now, 0.4, "sine", v * 0.4);
+  // Rising harmonic series
+  [[220, 0.05], [330, 0.12], [440, 0.2], [660, 0.3]].forEach(([f, t]) => {
+    makeTone(ctx, f, now + t, 0.25 - t * 0.4, "sine", v * 0.6);
+  });
+  // Sparkle top
+  makeTone(ctx, 1320, now + 0.35, 0.15, "sine", v * 0.3);
+}
+
+/** Notification ping — gentle attention-getter for approvals/alerts */
+export function playNotification(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.alerts) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.3;
+  const now = ctx.currentTime;
+  // Two-tone notification
+  makeTone(ctx, 880, now, 0.1, "sine", v);
+  makeTone(ctx, 1175, now + 0.12, 0.15, "sine", v * 0.8);
+  // Subtle ring
+  makeTone(ctx, 1760, now + 0.25, 0.1, "sine", v * 0.3);
+}
+
+/** Unlock — achievement/pathway unlock sound */
+export function playUnlock(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.rewards) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.45;
+  const now = ctx.currentTime;
+  // Lock click
+  makeTone(ctx, 300, now, 0.03, "square", v * 0.5);
+  makeTone(ctx, 500, now + 0.03, 0.03, "square", v * 0.3);
+  // Magical reveal
+  [[523, 0.08], [784, 0.16], [1047, 0.24], [1568, 0.32]].forEach(([f, t]) => {
+    makeTone(ctx, f, now + t, 0.2, "sine", v * 0.7);
+    makeTone(ctx, f * 2, now + t + 0.02, 0.12, "sine", v * 0.15); // octave shimmer
+  });
+  // Warm pad
+  makeTone(ctx, 262, now + 0.08, 0.5, "sine", v * 0.2);
+}
+
+/** Submit — whoosh-up for task/proof submissions */
+export function playSubmit(): void {
+  const s = getSoundSettings();
+  if (!s.enabled || !s.clicks) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  const v = s.volume * 0.25;
+  const now = ctx.currentTime;
+  // Quick ascending sweep
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(300, now);
+  osc.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(v, now + 0.03);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+  osc.start(now);
+  osc.stop(now + 0.25);
+  // Confirmation tick
+  makeTone(ctx, 1400, now + 0.18, 0.04, "sine", v * 0.6);
+}
+
 // ── Ambient HUD hum ─────────────────────────────────────────────────────────
 let _ambOsc: OscillatorNode | null = null;
 let _ambGain: GainNode | null = null;

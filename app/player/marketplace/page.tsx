@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
 import { User, PFLXModifier, mockModifiers, mockPlayerModifiers, PlayerModifier, mockTransactions, getCurrentRank } from "../../lib/data";
-import { playSuccess, playError } from "../../lib/sounds";
+import { playSuccess, playError, playCashRegister } from "../../lib/sounds";
 
 export default function PlayerMarketplace() {
   const router = useRouter();
@@ -81,7 +81,7 @@ export default function PlayerMarketplace() {
     mockPlayerModifiers.push(newMod);
     setMyModifiers([...myModifiers, newMod]);
 
-    playSuccess();
+    playCashRegister();
     showToast(`Successfully purchased ${mod.name}! 🚀`, "success");
   };
 

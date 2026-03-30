@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
 import { User, mockPflxRanks, PFLXRank, mockGamePeriods, GamePeriod, isHostUser, COIN_CATEGORIES,
 } from "../../lib/data";
-import { getSoundSettings, saveSoundSettings, SoundSettings, playClick, playNav, playSuccess, playReward, playAlert, playError, playDelete, playSave, playCoin, playBadge, playTax, playToggle, playModalOpen, playModalClose, playLevelUp } from "../../lib/sounds";
+import { getSoundSettings, saveSoundSettings, SoundSettings, playClick, playNav, playSuccess, playReward, playAlert, playError, playDelete, playSave, playCoin, playBadge, playTax, playToggle, playModalOpen, playModalClose, playLevelUp, playCashRegister, playCoinShower, playWalletOpen, playTradeComplete, playInvest, playNotification, playUnlock, playSubmit } from "../../lib/sounds";
 import { saveGamePeriods, savePflxRanks } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
 import { compressImage, compressBannerImage } from "../../lib/imageUtils";
@@ -413,12 +413,20 @@ export default function AdminSettings() {
                 { label: "Click", fn: playClick, color: "#4f8ef7" },
                 { label: "Nav", fn: playNav, color: "#4f8ef7" },
                 { label: "Toggle", fn: playToggle, color: "#4f8ef7" },
+                { label: "Submit", fn: playSubmit, color: "#4f8ef7" },
                 { label: "Success", fn: playSuccess, color: "#22c55e" },
                 { label: "Reward", fn: playReward, color: "#f5c842" },
                 { label: "Badge", fn: playBadge, color: "#f5c842" },
                 { label: "Coin", fn: playCoin, color: "#f5c842" },
+                { label: "Ka-Ching", fn: playCashRegister, color: "#f5c842" },
+                { label: "Coin Shower", fn: playCoinShower, color: "#f5c842" },
+                { label: "Trade", fn: playTradeComplete, color: "#22c55e" },
+                { label: "Invest", fn: playInvest, color: "#a855f7" },
+                { label: "Wallet", fn: playWalletOpen, color: "#00d4ff" },
+                { label: "Unlock", fn: playUnlock, color: "#a855f7" },
                 { label: "Save", fn: playSave, color: "#00d4ff" },
                 { label: "Level Up", fn: playLevelUp, color: "#a855f7" },
+                { label: "Notification", fn: playNotification, color: "#f97316" },
                 { label: "Tax", fn: playTax, color: "#ef4444" },
                 { label: "Error", fn: playError, color: "#ef4444" },
                 { label: "Delete", fn: playDelete, color: "#ef4444" },

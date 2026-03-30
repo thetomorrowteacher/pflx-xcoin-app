@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
 import { User, Task, mockTasks, mockUsers, CoinSubmission, mockSubmissions, mockModifiers, mockTransactions, COIN_CATEGORIES, getCurrentRank } from "../../lib/data";
-import { playSuccess, playError } from "../../lib/sounds";
+import { playSuccess, playError, playTradeComplete, playInvest, playCashRegister } from "../../lib/sounds";
 import { saveUsers, saveTransactions, saveSubmissions, saveTasks, saveTrades, saveInvestments } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
 
@@ -119,9 +119,9 @@ export default function AdminApprovals() {
     }
 
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: "approved" as const } : t));
-    playSuccess();
+    playCashRegister();
     saveAndToast([saveTasks, saveUsers, saveTransactions], "Task approved — saved to cloud ✓");
-    showToast("Task approved! X-Coin & XP awarded. 🎉", "success");
+    showToast("Task approved! X-Coin awarded. 🎉", "success");
   };
 
   /* Opens the reject modal — auto-generates AI feedback if analysis exists */
@@ -195,7 +195,7 @@ export default function AdminApprovals() {
       });
       return updated;
     });
-    playSuccess();
+    playTradeComplete();
     saveAndToast([saveTrades], "Trade approved — saved to cloud ✓");
     showToast("XP Trade approved! Credits transferred.", "success");
   };
@@ -225,7 +225,7 @@ export default function AdminApprovals() {
       });
       return updated;
     });
-    playSuccess();
+    playInvest();
     saveAndToast([saveInvestments], "Investment approved — saved to cloud ✓");
     showToast("Investment Proposal approved! Stake is now active.", "success");
   };

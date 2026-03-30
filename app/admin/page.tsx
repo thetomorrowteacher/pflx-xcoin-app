@@ -6,7 +6,7 @@ import { User, mockTasks, mockUsers, mockModifiers, mockTransactions, COIN_CATEG
 import { applyPlayerImages } from "../lib/playerImages";
 import { saveUsers, saveTransactions } from "../lib/store";
 import { saveAndToast } from "../lib/saveToast";
-import { playReward, playBadge, playCoin, playTax, playError, playClick, playNav, playToggle } from "../lib/sounds";
+import { playReward, playBadge, playCoin, playCoinShower, playTax, playError, playClick, playNav, playToggle } from "../lib/sounds";
 
 // ── Multi-select player picker ────────────────────────────────────────────────
 function PlayerPicker({
@@ -419,7 +419,7 @@ export default function AdminDashboard() {
           amount: amt, currency: "xcoin", description: grantNote || "Admin XC Grant", createdAt: now });
       });
       console.log(`[xc-grant] Granted ${amt} XC to ${grantPlayerIds.length} player(s), ${mockTransactions.length} total txns`);
-      playCoin();
+      amt >= 1000 ? playCoinShower() : playCoin();
       saveAndToast([saveUsers, saveTransactions], "XC granted — saved to cloud ✓");
       showToast(`+${amt.toLocaleString()} XC granted to ${grantPlayerIds.length} player(s).`, "success");
     } else {
