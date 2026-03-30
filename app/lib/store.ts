@@ -86,7 +86,12 @@ export async function initStore(): Promise<void> {
         const pflxKeys = ['users','checkpoints','tasks','jobs','transactions','modifiers','coinCategories'];
         const hasData = pflxKeys.some(k => all[k] && Array.isArray(all[k]) && all[k].length > 0);
 
+        // Track whether this app has ever had real data (prevents re-seeding after data loss)
+        const everInitialized = typeof window !== "undefined" && localStorage.getItem("pflx_ever_initialized") === "1";
+
         if (hasData) {
+          // Mark that real data has been loaded at least once
+          if (typeof window !== "undefined") localStorage.setItem("pflx_ever_initialized", "1");
           const spliceOps: [string, () => void][] = [
             ["users",             () => { if (all.users?.length)             D.mockUsers.splice(0, D.mockUsers.length, ...all.users); }],
             ["checkpoints",       () => { if (all.checkpoints?.length)       D.mockCheckpoints.splice(0, D.mockCheckpoints.length, ...all.checkpoints); }],
@@ -111,6 +116,12 @@ export async function initStore(): Promise<void> {
             setProgress(65 + Math.round(((i + 1) / spliceOps.length) * 30), `Loading ${spliceOps[i][0]}...`);
           }
           console.log("[store] ✓ Loaded", Object.keys(all).length, "collections from Supabase");
+        } else if (everInitialized) {
+          // Data was loaded before but now Supabase returned empty — DON'T overwrite!
+          console.warn("[store] ⚠ Supabase returned empty but app was previously initialized — skipping seed to prevent data loss");
+          console.warn("[store] This likely means Supabase had a connection issue or the database was paused.");
+          setProgress(80, "Warning: cloud data may be missing");
+          _needsSeed = false;
         } else {
           _needsSeed = true;
           setProgress(80, "First launch — preparing data...");
