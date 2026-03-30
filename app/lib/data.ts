@@ -126,6 +126,7 @@ export interface Task {
   rejectedAt?: string; // ISO date when rejection happened
   completionMode?: "one-time" | "unlimited"; // one-time = once per player, unlimited = repeatable
   fromJobId?: string; // If this task was created from a job posting
+  requirement?: "required" | "available"; // required = mandatory (in checkpoint), available = optional (cohort-wide)
 }
 
 export interface Checkpoint {
@@ -140,6 +141,7 @@ export interface Checkpoint {
   seasonId?: string;    // links this round to a GamePeriod season
   bannerImage?: string; // base64 or URL — displayed as art on round/season cards
   projectIds?: string[]; // Projects included in this checkpoint (auto-pulls their tasks/jobs)
+  jobIds?: string[]; // Jobs directly assigned to this checkpoint
   link?: string; // Optional resource link
   rewardBadges?: { name: string; xc: number }[]; // Multi-badge rewards for checkpoint completion
 }
@@ -176,6 +178,8 @@ export interface Job {
   transformedTaskIds?: string[]; // Task IDs created when job transforms into tasks
   // Work ethic / scheduling
   intervalType?: "daily" | "weekly" | "biweekly" | "monthly"; // How often tasks are prompted
+  roundId?: string; // Which checkpoint this job belongs to (when directly assigned)
+  requirement?: "required" | "available"; // required = mandatory (in checkpoint), available = optional
 }
 
 // Helper: check if a task/job is visible to a given player

@@ -107,7 +107,13 @@ export default function PlayerTasks() {
 
   const mySubmitted = tasks.filter((t) => t.submittedBy === user.id);
   const myRejected = tasks.filter((t) => t.submittedBy === user.id && t.status === "rejected");
-  const open = tasks.filter((t) => t.status === "open" && t.submittedBy !== user.id);
+  const open = tasks.filter((t) => t.status === "open" && t.submittedBy !== user.id)
+    .sort((a, b) => {
+      // Required tasks (in checkpoint) sort first
+      const aReq = a.roundId ? 0 : 1;
+      const bReq = b.roundId ? 0 : 1;
+      return aReq - bReq;
+    });
   const display = filter === "open" ? open : filter === "rejected" ? myRejected : mySubmitted;
 
   const statusStyle = (status: string) => {
@@ -169,10 +175,23 @@ export default function PlayerTasks() {
               }}>
                 {/* Header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <span style={{
-                    padding: "3px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 600,
-                    background: "rgba(139,92,246,0.12)", color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.2)"
-                  }}>{t.category}</span>
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    <span style={{
+                      padding: "3px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 600,
+                      background: "rgba(139,92,246,0.12)", color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.2)"
+                    }}>{t.category}</span>
+                    {t.roundId ? (
+                      <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 700,
+                        background: "rgba(245,200,66,0.1)", border: "1px solid rgba(245,200,66,0.2)", color: "#f5c842" }}>
+                        📌 Required
+                      </span>
+                    ) : (
+                      <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 700,
+                        background: "rgba(0,212,255,0.06)", border: "1px solid rgba(0,212,255,0.12)", color: "#00d4ff" }}>
+                        Optional
+                      </span>
+                    )}
+                  </div>
                   <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.3)" }}>Due {t.dueDate}</span>
                 </div>
 

@@ -141,6 +141,8 @@ export default function TaskManagement() {
 
   // Checkpoint project selection
   const [cpProjectIds, setCpProjectIds] = useState<string[]>([]);
+  // Checkpoint job selection
+  const [cpJobIds, setCpJobIds] = useState<string[]>([]);
 
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
@@ -159,6 +161,7 @@ export default function TaskManagement() {
     setEditingCP({ status: "upcoming", startDate: "", endDate: "", assignTo: "all" });
     setCpTaskIds([]);
     setCpProjectIds([]);
+    setCpJobIds([]);
     setCpBadges([]);
     setCpBadgeSearch("");
     setCpBadgeDropdown(false);
@@ -170,6 +173,7 @@ export default function TaskManagement() {
     setEditingCP({ ...cp });
     setCpTaskIds(tasks.filter(t => t.roundId === cp.id).map(t => t.id));
     setCpProjectIds((cp as any).projectIds ?? []);
+    setCpJobIds((cp as any).jobIds ?? []);
     setCpBadges((cp as any).rewardBadges ?? []);
     setCpBadgeSearch("");
     setCpBadgeDropdown(false);
@@ -194,16 +198,18 @@ export default function TaskManagement() {
     const isNew = !editingCP.id;
     const cpId  = editingCP.id || `cp_${Date.now()}`;
 
-    // Expand project tasks/jobs into the checkpoint task list
+    // Expand project tasks/jobs into the checkpoint lists
     const projectExpandedTaskIds = new Set<string>(cpTaskIds);
+    const projectExpandedJobIds = new Set<string>(cpJobIds);
     cpProjectIds.forEach(projId => {
       const proj = mockProjects.find(p => p.id === projId);
       if (proj) {
         proj.taskIds.forEach(tid => projectExpandedTaskIds.add(tid));
-        // Note: jobs are referenced separately; we only add tasks to roundId
+        proj.jobIds.forEach(jid => projectExpandedJobIds.add(jid));
       }
     });
     const finalTaskIds = Array.from(projectExpandedTaskIds);
+    const finalJobIds = Array.from(projectExpandedJobIds);
 
     const saved: Checkpoint = {
       id: cpId,
@@ -215,6 +221,7 @@ export default function TaskManagement() {
       assignTo: editingCP.assignTo || "all",
       bannerImage: editingCP.bannerImage,
       projectIds: cpProjectIds,
+      jobIds: cpJobIds,
       rewardBadges: cpBadges,
     } as Checkpoint;
 
@@ -227,16 +234,35 @@ export default function TaskManagement() {
       if (idx >= 0) mockCheckpoints[idx] = saved;
     }
 
-    // Sync task roundIds (including tasks expanded from selected projects)
-    const updatedTasks = tasks.map(t => ({
-      ...t,
-      roundId: finalTaskIds.includes(t.id) ? cpId : (t.roundId === cpId ? undefined : t.roundId),
-    }));
+    // Sync task roundIds + requirement flags
+    // Tasks IN a checkpoint = required; tasks REMOVED from checkpoint = available
+    const updatedTasks = tasks.map(t => {
+      const inCheckpoint = finalTaskIds.includes(t.id);
+      const wasInCheckpoint = t.roundId === cpId;
+      return {
+        ...t,
+        roundId: inCheckpoint ? cpId : (wasInCheckpoint ? undefined : t.roundId),
+        requirement: inCheckpoint ? "required" as const : (wasInCheckpoint ? "available" as const : t.requirement),
+      };
+    });
     setTasks(updatedTasks);
     updatedTasks.forEach((t, i) => { mockTasks[i] = t; });
 
+    // Sync job roundIds + requirement flags
+    const updatedJobs = jobs.map(j => {
+      const inCheckpoint = finalJobIds.includes(j.id);
+      const wasInCheckpoint = (j as any).roundId === cpId;
+      return {
+        ...j,
+        roundId: inCheckpoint ? cpId : (wasInCheckpoint ? undefined : (j as any).roundId),
+        requirement: inCheckpoint ? "required" as const : (wasInCheckpoint ? "available" as const : (j as any).requirement),
+      };
+    });
+    setJobs(updatedJobs);
+    updatedJobs.forEach((j, i) => { mockJobs[i] = j; });
+
     playSuccess();
-    saveAndToast([saveCheckpoints, saveTasks], "Checkpoint saved to cloud ✓");
+    saveAndToast([saveCheckpoints, saveTasks, saveJobs], "Checkpoint saved to cloud ✓");
     setCpModal(false);
   };
 
@@ -245,8 +271,14 @@ export default function TaskManagement() {
     setCheckpoints(prev => prev.filter(c => c.id !== cpId));
     const idx = mockCheckpoints.findIndex(c => c.id === cpId);
     if (idx >= 0) mockCheckpoints.splice(idx, 1);
-    setTasks(prev => prev.map(t => t.roundId === cpId ? { ...t, roundId: undefined } : t));
-    saveAndToast([saveCheckpoints, saveTasks], "Checkpoint deleted — saved to cloud ✓");
+    // Clear roundId on tasks and jobs that belonged to this checkpoint, set them as available
+    setTasks(prev => prev.map(t => t.roundId === cpId ? { ...t, roundId: undefined, requirement: "available" as const } : t));
+    setJobs(prev => prev.map(j => (j as any).roundId === cpId ? { ...j, roundId: undefined, requirement: "available" as const } : j));
+    saveAndToast([saveCheckpoints, saveTasks, saveJobs], "Checkpoint deleted — saved to cloud ✓");
+  };
+
+  const toggleCpJob = (jobId: string) => {
+    setCpJobIds(prev => prev.includes(jobId) ? prev.filter(id => id !== jobId) : [...prev, jobId]);
   };
 
   // ── Task handlers ─────────────────────────────────────────────────────────
@@ -694,7 +726,7 @@ export default function TaskManagement() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                      {["Task", "Badge Type", "XC Value", "Cohort", "Checkpoint", "Status", "Mode", ""].map(h => (
+                      {["Task", "Badge Type", "XC Value", "Cohort", "Checkpoint", "Status", "Mode", "Type", ""].map(h => (
                         <th key={h} style={{ padding: "14px 18px", textAlign: "left", fontSize: "11px",
                           fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "1px", textTransform: "uppercase" }}>{h}</th>
                       ))}
@@ -765,6 +797,19 @@ export default function TaskManagement() {
                             )}
                           </td>
                           <td style={{ padding: "14px 18px" }}>
+                            {task.roundId ? (
+                              <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+                                background: "rgba(245,200,66,0.1)", border: "1px solid rgba(245,200,66,0.2)", color: "#f5c842" }}>
+                                📌 Required
+                              </span>
+                            ) : (
+                              <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+                                background: "rgba(0,212,255,0.08)", border: "1px solid rgba(0,212,255,0.15)", color: "#00d4ff" }}>
+                                📂 Available
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: "14px 18px" }}>
                             <div style={{ display: "flex", gap: "6px" }}>
                               <button onClick={() => openEditTask(task as Task)}
                                 style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
@@ -772,8 +817,8 @@ export default function TaskManagement() {
                                   cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>Edit</button>
                               <button onClick={() => duplicateTask(task as Task)}
                                 style={{ background: "rgba(0,212,255,0.08)", border: "1px solid rgba(0,212,255,0.2)",
-                                  borderRadius: "8px", color: "#00d4ff", padding: "6px 10px",
-                                  cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>📋</button>
+                                  borderRadius: "8px", color: "#00d4ff", padding: "6px 14px",
+                                  cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>📋 Duplicate</button>
                             </div>
                           </td>
                         </tr>
@@ -1276,6 +1321,54 @@ export default function TaskManagement() {
                   })}
                 </div>
               </Field>
+
+              {/* Job selection */}
+              <Field label={`Assign Jobs (${cpJobIds.length} selected)`}>
+                <div style={{ maxHeight: "180px", overflowY: "auto", background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(245,200,66,0.15)", borderRadius: "10px", padding: "8px" }}>
+                  {jobs.length === 0 ? (
+                    <p style={{ margin: "16px", color: "rgba(255,255,255,0.3)", fontSize: "13px" }}>No jobs yet. Create jobs in the Job Board tab first.</p>
+                  ) : jobs.map(job => {
+                    const checked = cpJobIds.includes(job.id);
+                    const includedViaProject = !checked && cpProjectIds.some(pId => {
+                      const p = projects.find(pr => pr.id === pId);
+                      return p?.jobIds.includes(job.id);
+                    });
+                    const otherCp = !checked && !includedViaProject && (job as any).roundId && (job as any).roundId !== editingCP.id
+                      ? checkpoints.find(c => c.id === (job as any).roundId)
+                      : null;
+                    return (
+                      <label key={job.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 12px",
+                        borderRadius: "8px", cursor: "pointer", transition: "background 0.15s",
+                        background: checked ? "rgba(245,200,66,0.1)" : includedViaProject ? "rgba(167,139,250,0.07)" : "transparent" }}>
+                        <input type="checkbox" checked={checked || includedViaProject} onChange={() => !includedViaProject && toggleCpJob(job.id)}
+                          style={{ width: "16px", height: "16px", accentColor: includedViaProject ? "#a78bfa" : "#f5c842", cursor: includedViaProject ? "default" : "pointer" }} />
+                        <div style={{ flex: 1 }}>
+                          <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: (checked || includedViaProject) ? "#f0f0ff" : "rgba(255,255,255,0.7)" }}>
+                            💼 {job.title}
+                          </p>
+                          <p style={{ margin: 0, fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>
+                            {job.slots} slots · {(job as any).xpValue || job.xcReward} XC
+                            {includedViaProject && <span style={{ color: "#a78bfa", marginLeft: "8px" }}>via project</span>}
+                            {otherCp && <span style={{ color: "#f5c842", marginLeft: "8px" }}>⚠ in "{otherCp.name}"</span>}
+                          </p>
+                        </div>
+                        <span style={{ fontSize: "13px", fontWeight: 800, color: checked ? "#f5c842" : includedViaProject ? "#a78bfa" : "rgba(255,255,255,0.2)" }}>
+                          {(checked || includedViaProject) ? "✓" : "+"}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </Field>
+
+              {/* Requirement info */}
+              <div style={{ background: "rgba(79,142,247,0.06)", border: "1px solid rgba(79,142,247,0.15)", borderRadius: "10px", padding: "12px 16px" }}>
+                <p style={{ margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>
+                  <span style={{ color: "#f5c842", fontWeight: 700 }}>📌 Required:</span> Tasks and jobs assigned to this checkpoint become <strong style={{ color: "#4f8ef7" }}>required</strong> for all assigned players.
+                  <br /><span style={{ color: "#00d4ff", fontWeight: 700 }}>📂 Available:</span> Tasks and jobs assigned to a cohort but <em>not</em> in a checkpoint remain <strong style={{ color: "#00d4ff" }}>available</strong> (optional).
+                </p>
+              </div>
 
             </div>
 
