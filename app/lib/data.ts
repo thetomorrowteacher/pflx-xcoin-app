@@ -193,6 +193,18 @@ export function getMockCohorts(): string[] {
   return [...new Set(mockUsers.filter(u => u.role === "player").map(u => u.cohort))];
 }
 
+// ─── Cohort Groups ─────────────────────────────────────────────────
+// Named groups of cohorts for quick pre-selected groupings.
+// A cohort can belong to multiple groups.
+export interface CohortGroup {
+  id: string;
+  name: string;
+  cohorts: string[];  // Array of cohort names in this group
+  color?: string;     // Optional accent color for display
+}
+
+export let mockCohortGroups: CohortGroup[] = [];
+
 export interface Transaction {
   id: string;
   userId: string;

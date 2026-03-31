@@ -110,6 +110,7 @@ export async function initStore(): Promise<void> {
             ["coinCategories",    () => { if (all.coinCategories?.length)    D.COIN_CATEGORIES.splice(0, D.COIN_CATEGORIES.length, ...all.coinCategories); }],
             ["trades",            () => { if (all.trades?.length)            D.mockTrades.splice(0, D.mockTrades.length, ...all.trades); }],
             ["investments",       () => { if (all.investments?.length)       D.mockInvestments.splice(0, D.mockInvestments.length, ...all.investments); }],
+            ["cohortGroups",      () => { if (all.cohortGroups?.length)      D.mockCohortGroups.splice(0, D.mockCohortGroups.length, ...all.cohortGroups); }],
           ];
           for (let i = 0; i < spliceOps.length; i++) {
             spliceOps[i][1]();
@@ -142,6 +143,7 @@ export async function initStore(): Promise<void> {
                 ["coinCategories",    () => { if (seedAll.coinCategories?.length)    D.COIN_CATEGORIES.splice(0, D.COIN_CATEGORIES.length, ...(seedAll.coinCategories as any[])); }],
                 ["trades",            () => { if (seedAll.trades?.length)            D.mockTrades.splice(0, D.mockTrades.length, ...(seedAll.trades as any[])); }],
                 ["investments",       () => { if (seedAll.investments?.length)       D.mockInvestments.splice(0, D.mockInvestments.length, ...(seedAll.investments as any[])); }],
+                ["cohortGroups",      () => { if (seedAll.cohortGroups?.length)      D.mockCohortGroups.splice(0, D.mockCohortGroups.length, ...(seedAll.cohortGroups as any[])); }],
               ];
               for (const [, fn] of seedSplice) fn();
               console.log("[store] ✓ Loaded seed-data.json fallback with", Object.keys(seedAll).length, "collections");
@@ -245,6 +247,9 @@ export function saveTrades() {
 export function saveInvestments() {
   return saveData("investments", D.mockInvestments);
 }
+export function saveCohortGroups() {
+  return saveData("cohortGroups", D.mockCohortGroups);
+}
 
 /**
  * Convenience: save everything at once (used after bulk operations).
@@ -268,5 +273,6 @@ export async function saveAll() {
     saveCoinCategories(),
     saveTrades(),
     saveInvestments(),
+    saveCohortGroups(),
   ]);
 }

@@ -7,8 +7,9 @@ import {
   mockTasks, mockJobs, mockCheckpoints, mockUsers, mockProjects,
   COIN_CATEGORIES, RewardCoin, getMockCohorts,
   isHostUser,
+  CohortGroup, mockCohortGroups,
 } from "../../lib/data";
-import { saveCheckpoints, saveTasks, saveJobs, saveProjects } from "../../lib/store";
+import { saveCheckpoints, saveTasks, saveJobs, saveProjects, saveCohortGroups } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
 import { playClick, playNav, playSuccess, playError, playDelete, playModalOpen, playModalClose } from "../../lib/sounds";
 import { compressBannerImage } from "../../lib/imageUtils";
@@ -93,12 +94,120 @@ const inputSx: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
+// ── Multi-Cohort Selector ────────────────────────────────────────────────────
+// Chip-style multi-select for cohorts + cohort groups.
+// value: "all" | string[] (array of selected cohort names)
+function MultiCohortSelector({
+  value,
+  onChange,
+  cohorts,
+  groups,
+  label = "Assign To",
+}: {
+  value: "all" | string[] | undefined;
+  onChange: (v: "all" | string[]) => void;
+  cohorts: string[];
+  groups: CohortGroup[];
+  label?: string;
+}) {
+  const isAll = !value || value === "all";
+  const selected: string[] = isAll ? [] : (value as string[]);
+
+  const toggle = (cohort: string) => {
+    if (isAll) {
+      // Switching from "all" to specific: select just this one
+      onChange([cohort]);
+    } else {
+      const next = selected.includes(cohort)
+        ? selected.filter(c => c !== cohort)
+        : [...selected, cohort];
+      onChange(next.length === 0 ? "all" : next);
+    }
+  };
+
+  const toggleGroup = (group: CohortGroup) => {
+    if (isAll) {
+      onChange([...group.cohorts]);
+    } else {
+      const allInGroup = group.cohorts.every(c => selected.includes(c));
+      if (allInGroup) {
+        // Remove all cohorts from this group
+        const next = selected.filter(c => !group.cohorts.includes(c));
+        onChange(next.length === 0 ? "all" : next);
+      } else {
+        // Add all cohorts from this group
+        const next = [...new Set([...selected, ...group.cohorts])];
+        onChange(next);
+      }
+    }
+  };
+
+  return (
+    <div>
+      <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px" }}>{label}</p>
+      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+        {/* All button */}
+        <button type="button" onClick={() => onChange("all")}
+          style={{
+            padding: "5px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700,
+            cursor: "pointer", transition: "all 0.15s", border: "1px solid",
+            background: isAll ? "rgba(0,212,255,0.15)" : "rgba(255,255,255,0.04)",
+            borderColor: isAll ? "rgba(0,212,255,0.5)" : "rgba(255,255,255,0.1)",
+            color: isAll ? "#00d4ff" : "rgba(255,255,255,0.4)",
+          }}>All Cohorts</button>
+        {/* Divider */}
+        {groups.length > 0 && <div style={{ width: "1px", height: "20px", background: "rgba(255,255,255,0.1)", margin: "0 2px" }} />}
+        {/* Groups */}
+        {groups.map(g => {
+          const allIn = !isAll && g.cohorts.every(c => selected.includes(c));
+          const someIn = !isAll && g.cohorts.some(c => selected.includes(c));
+          const gc = g.color || "#a78bfa";
+          return (
+            <button key={g.id} type="button" onClick={() => toggleGroup(g)}
+              style={{
+                padding: "5px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700,
+                cursor: "pointer", transition: "all 0.15s", border: "1px solid",
+                background: allIn ? `${gc}20` : someIn ? `${gc}10` : "rgba(255,255,255,0.04)",
+                borderColor: allIn ? `${gc}60` : someIn ? `${gc}30` : "rgba(255,255,255,0.1)",
+                color: allIn ? gc : someIn ? `${gc}aa` : "rgba(255,255,255,0.4)",
+              }}>
+              📁 {g.name}
+              {someIn && !allIn && <span style={{ marginLeft: "4px", opacity: 0.6 }}>~</span>}
+              {allIn && <span style={{ marginLeft: "4px" }}>✓</span>}
+            </button>
+          );
+        })}
+        {(groups.length > 0 && cohorts.length > 0) && <div style={{ width: "1px", height: "20px", background: "rgba(255,255,255,0.1)", margin: "0 2px" }} />}
+        {/* Individual cohorts */}
+        {cohorts.map(c => {
+          const on = !isAll && selected.includes(c);
+          return (
+            <button key={c} type="button" onClick={() => toggle(c)}
+              style={{
+                padding: "5px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700,
+                cursor: "pointer", transition: "all 0.15s", border: "1px solid",
+                background: on ? "rgba(79,142,247,0.15)" : "rgba(255,255,255,0.04)",
+                borderColor: on ? "rgba(79,142,247,0.5)" : "rgba(255,255,255,0.1)",
+                color: on ? "#4f8ef7" : "rgba(255,255,255,0.4)",
+              }}>{c}{on && " ✓"}</button>
+          );
+        })}
+      </div>
+      {!isAll && selected.length > 0 && (
+        <p style={{ margin: "4px 0 0", fontSize: "10px", color: "rgba(79,142,247,0.5)" }}>
+          {selected.length} cohort{selected.length !== 1 ? "s" : ""} selected
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function TaskManagement() {
   const router = useRouter();
   const [user, setUser]           = useState<User | null>(null);
-  const [tab, setTab]             = useState<"checkpoints" | "tasks" | "jobs" | "projects">("checkpoints");
+  const [tab, setTab]             = useState<"checkpoints" | "tasks" | "jobs" | "projects" | "cohort-groups">("checkpoints");
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([...mockCheckpoints]);
   const [tasks, setTasks]         = useState<Task[]>([...mockTasks]);
   const [jobs, setJobs]           = useState<Job[]>([...mockJobs]);
@@ -143,6 +252,11 @@ export default function TaskManagement() {
   const [cpProjectIds, setCpProjectIds] = useState<string[]>([]);
   // Checkpoint job selection
   const [cpJobIds, setCpJobIds] = useState<string[]>([]);
+
+  // Cohort group state
+  const [cohortGroups, setCohortGroups] = useState<CohortGroup[]>([...mockCohortGroups]);
+  const [editingGroup, setEditingGroup] = useState<Partial<CohortGroup> | null>(null);
+  const [groupModal, setGroupModal] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
@@ -218,7 +332,8 @@ export default function TaskManagement() {
       startDate: editingCP.startDate || "",
       endDate: editingCP.endDate || "",
       status: (editingCP.status as Checkpoint["status"]) || "upcoming",
-      assignTo: editingCP.assignTo || "all",
+      assignTo: (editingCP as any).assignTo || "all",
+      assignedTo: (editingCP as any).assignTo || "all",
       bannerImage: editingCP.bannerImage,
       projectIds: cpProjectIds,
       jobIds: cpJobIds,
@@ -331,6 +446,7 @@ export default function TaskManagement() {
       xpValue: totalXC,
       rewardBadges: taskBadges,  // multi-badge array
       cohort: editingTask.cohort || "all",
+      assignedTo: editingTask.assignedTo || (editingTask.cohort && editingTask.cohort !== "all" ? [editingTask.cohort] : "all"),
       status: (editingTask.status as Task["status"]) || "active",
       roundId: editingTask.roundId,
       link: cleanLinks[0] || "",
@@ -423,6 +539,7 @@ export default function TaskManagement() {
       coinType: editingJob.coinType || "",
       xpValue: editingJob.xpValue || 500,
       cohort: editingJob.cohort || "all",
+      assignedTo: editingJob.assignedTo || (editingJob.cohort && editingJob.cohort !== "all" ? [editingJob.cohort] : "all"),
       status: (editingJob.status as Job["status"]) || "open",
       maxHires: editingJob.maxHires || 1,
       hiredPlayers: editingJob.hiredPlayers || [],
@@ -607,9 +724,9 @@ export default function TaskManagement() {
         <div style={{ display: "flex", gap: "4px", marginBottom: "28px",
           background: "rgba(255,255,255,0.03)", borderRadius: "12px",
           border: "1px solid rgba(255,255,255,0.06)", padding: "4px", width: "fit-content" }}>
-          {(["checkpoints", "tasks", "jobs", "projects"] as const).map(t => (
+          {(["checkpoints", "tasks", "jobs", "projects", "cohort-groups"] as const).map(t => (
             <button key={t} onClick={() => { playNav(); setTab(t); }} style={tabBtnSx(tab === t)}>
-              {t === "checkpoints" ? "🏁 CHECKPOINTS" : t === "tasks" ? "✅ TASKS" : t === "jobs" ? "📋 JOB BOARD" : "🗂 PROJECTS"}
+              {t === "checkpoints" ? "🏁 CHECKPOINTS" : t === "tasks" ? "✅ TASKS" : t === "jobs" ? "📋 JOB BOARD" : t === "projects" ? "🗂 PROJECTS" : "👥 COHORT GROUPS"}
             </button>
           ))}
         </div>
@@ -1112,7 +1229,164 @@ export default function TaskManagement() {
             )}
           </div>
         )}
+        {/* ══════════════════ COHORT GROUPS TAB ══════════════════ */}
+        {tab === "cohort-groups" && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <div>
+                <p style={{ margin: 0, color: "rgba(255,255,255,0.4)", fontSize: "13px" }}>
+                  {cohortGroups.length} group{cohortGroups.length !== 1 ? "s" : ""} · {cohorts.length} cohort{cohorts.length !== 1 ? "s" : ""} available
+                </p>
+                <p style={{ margin: "4px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.2)" }}>
+                  Groups let you quickly assign content to pre-selected sets of cohorts. A cohort can belong to multiple groups.
+                </p>
+              </div>
+              <button onClick={() => { playClick(); setEditingGroup({ name: "", cohorts: [], color: "#a78bfa" }); setGroupModal(true); }}
+                style={addBtnSx}>＋ New Group</button>
+            </div>
+
+            {cohortGroups.length === 0 ? (
+              <div style={{ ...cardSx, padding: "60px", textAlign: "center" }}>
+                <div style={{ fontSize: "48px", marginBottom: "16px" }}>👥</div>
+                <h3 style={{ color: "#f0f0ff", margin: "0 0 8px" }}>No Cohort Groups Yet</h3>
+                <p style={{ color: "rgba(255,255,255,0.35)", margin: 0, fontSize: "14px" }}>
+                  Create groups to quickly assign checkpoints, tasks, and projects to multiple cohorts at once.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: "12px" }}>
+                {cohortGroups.map(g => (
+                  <div key={g.id} style={{
+                    ...cardSx, padding: "20px", display: "flex", alignItems: "center", gap: "16px",
+                    borderColor: `${g.color || "#a78bfa"}25`,
+                  }}>
+                    <div style={{
+                      width: "48px", height: "48px", borderRadius: "12px",
+                      background: `${g.color || "#a78bfa"}15`,
+                      border: `2px solid ${g.color || "#a78bfa"}40`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "20px", fontWeight: 900, color: g.color || "#a78bfa",
+                    }}>📁</div>
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{ margin: "0 0 4px", fontSize: "16px", fontWeight: 800, color: g.color || "#a78bfa" }}>{g.name}</h3>
+                      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                        {g.cohorts.map(c => (
+                          <span key={c} style={{
+                            padding: "2px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+                            background: "rgba(79,142,247,0.1)", border: "1px solid rgba(79,142,247,0.25)", color: "#4f8ef7",
+                          }}>{c}</span>
+                        ))}
+                        {g.cohorts.length === 0 && (
+                          <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>No cohorts assigned</span>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button onClick={() => { playClick(); setEditingGroup({ ...g }); setGroupModal(true); }}
+                        style={{ padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer",
+                          background: "rgba(79,142,247,0.1)", border: "1px solid rgba(79,142,247,0.25)", color: "#4f8ef7" }}>Edit</button>
+                      <button onClick={() => {
+                        if (!confirm(`Delete group "${g.name}"?`)) return;
+                        playDelete();
+                        const next = cohortGroups.filter(x => x.id !== g.id);
+                        setCohortGroups(next);
+                        mockCohortGroups.splice(0, mockCohortGroups.length, ...next);
+                        saveAndToast([saveCohortGroups], "Group deleted ✓");
+                      }} style={{ padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer",
+                          background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444" }}>Delete</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </main>
+
+      {/* ══════════════════ COHORT GROUP MODAL ══════════════════ */}
+      {groupModal && editingGroup && (
+        <ModalBG onClose={() => { playClick(); setGroupModal(false); }}>
+          <div style={{ padding: "32px" }}>
+            <h2 style={{ margin: "0 0 24px", fontSize: "20px", fontWeight: 900, color: "#f0f0ff" }}>
+              {editingGroup.id ? "Edit Cohort Group" : "New Cohort Group"}
+            </h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <Field label="Group Name *">
+                <input value={editingGroup.name || ""} onChange={e => setEditingGroup(p => p ? { ...p, name: e.target.value } : p)}
+                  placeholder="e.g. Period 1 & 2" style={inputSx} />
+              </Field>
+              <Field label="Accent Color">
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {["#a78bfa", "#4f8ef7", "#00d4ff", "#22c55e", "#f5c842", "#ef4444", "#ec4899", "#f97316"].map(c => (
+                    <button key={c} type="button" onClick={() => setEditingGroup(p => p ? { ...p, color: c } : p)}
+                      style={{
+                        width: "32px", height: "32px", borderRadius: "8px", cursor: "pointer",
+                        background: c, border: editingGroup.color === c ? "3px solid white" : "2px solid transparent",
+                        boxShadow: editingGroup.color === c ? `0 0 12px ${c}60` : "none",
+                      }} />
+                  ))}
+                </div>
+              </Field>
+              <div>
+                <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px" }}>Select Cohorts</p>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {cohorts.map(c => {
+                    const on = (editingGroup.cohorts || []).includes(c);
+                    return (
+                      <button key={c} type="button"
+                        onClick={() => setEditingGroup(p => {
+                          if (!p) return p;
+                          const cur = p.cohorts || [];
+                          return { ...p, cohorts: on ? cur.filter(x => x !== c) : [...cur, c] };
+                        })}
+                        style={{
+                          padding: "8px 18px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+                          cursor: "pointer", transition: "all 0.15s", border: "1px solid",
+                          background: on ? `${editingGroup.color || "#a78bfa"}20` : "rgba(255,255,255,0.04)",
+                          borderColor: on ? `${editingGroup.color || "#a78bfa"}60` : "rgba(255,255,255,0.1)",
+                          color: on ? (editingGroup.color || "#a78bfa") : "rgba(255,255,255,0.4)",
+                        }}>{c}{on && " ✓"}</button>
+                    );
+                  })}
+                  {cohorts.length === 0 && (
+                    <p style={{ color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>No cohorts found — add players with cohort assignments first.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "24px" }}>
+              <button onClick={() => { playClick(); setGroupModal(false); }}
+                style={{ padding: "11px 24px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: "10px", color: "rgba(255,255,255,0.6)", fontWeight: 700, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => {
+                if (!editingGroup.name?.trim()) { playError(); return; }
+                const isNew = !editingGroup.id;
+                const saved: CohortGroup = {
+                  id: editingGroup.id || `cg_${Date.now()}`,
+                  name: editingGroup.name || "",
+                  cohorts: editingGroup.cohorts || [],
+                  color: editingGroup.color || "#a78bfa",
+                };
+                let next: CohortGroup[];
+                if (isNew) {
+                  next = [...cohortGroups, saved];
+                } else {
+                  next = cohortGroups.map(g => g.id === saved.id ? saved : g);
+                }
+                setCohortGroups(next);
+                mockCohortGroups.splice(0, mockCohortGroups.length, ...next);
+                playSuccess();
+                saveAndToast([saveCohortGroups], "Cohort group saved ✓");
+                setGroupModal(false);
+              }} style={{ padding: "11px 28px", background: `linear-gradient(135deg, ${editingGroup.color || "#a78bfa"}, #7c3aed)`,
+                  border: "none", borderRadius: "10px", color: "white", fontWeight: 800, cursor: "pointer",
+                  boxShadow: `0 0 20px ${editingGroup.color || "#a78bfa"}40`, fontSize: "14px" }}>
+                {editingGroup.id ? "Save Changes" : "Create Group"}
+              </button>
+            </div>
+          </div>
+        </ModalBG>
+      )}
 
       {/* ══════════════════ CHECKPOINT MODAL ══════════════════ */}
       {cpModal && (
@@ -1194,22 +1468,27 @@ export default function TaskManagement() {
                 </Field>
               </div>
 
-              {/* Status + Assign */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-                <Field label="Status">
-                  <select value={editingCP.status || "upcoming"} onChange={e => setEditingCP(p => ({ ...p, status: e.target.value as Checkpoint["status"] }))} style={{ ...inputSx, cursor: "pointer" }}>
-                    <option value="upcoming">Upcoming</option>
-                    <option value="active">Active</option>
-                    <option value="completed">Completed</option>
-                  </select>
-                </Field>
-                <Field label="Assign To">
-                  <select value={editingCP.assignTo || "all"} onChange={e => setEditingCP(p => ({ ...p, assignTo: e.target.value }))} style={{ ...inputSx, cursor: "pointer" }}>
-                    <option value="all">All Cohorts</option>
-                    {cohorts.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </Field>
-              </div>
+              {/* Status */}
+              <Field label="Status">
+                <select value={editingCP.status || "upcoming"} onChange={e => setEditingCP(p => ({ ...p, status: e.target.value as Checkpoint["status"] }))} style={{ ...inputSx, cursor: "pointer" }}>
+                  <option value="upcoming">Upcoming</option>
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </Field>
+              {/* Assign To — multi-cohort */}
+              <MultiCohortSelector
+                label="Assign To"
+                value={(() => {
+                  const v = (editingCP as any).assignTo ?? (editingCP as any).assignedTo;
+                  if (!v || v === "all") return "all";
+                  if (Array.isArray(v)) return v as string[];
+                  return [v]; // legacy single-string → wrap in array
+                })()}
+                onChange={v => setEditingCP(p => ({ ...p, assignTo: v }))}
+                cohorts={cohorts}
+                groups={mockCohortGroups}
+              />
 
               {/* Project selection — auto-includes project tasks */}
               <Field label={`Include Projects (${cpProjectIds.length} selected — auto-adds their tasks)`}>
@@ -1486,14 +1765,7 @@ export default function TaskManagement() {
                     min={0} style={inputSx} />
                 </Field>
               )}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "14px" }}>
-                <Field label="Cohort">
-                  <select value={editingTask.cohort || "all"} onChange={e => setEditingTask(p => ({ ...p, cohort: e.target.value }))}
-                    style={{ ...inputSx, cursor: "pointer" }}>
-                    <option value="all">All</option>
-                    {cohorts.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </Field>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px" }}>
                 <Field label="Status">
                   <select value={editingTask.status || "active"} onChange={e => setEditingTask(p => ({ ...p, status: e.target.value as Task["status"] }))}
                     style={{ ...inputSx, cursor: "pointer" }}>
@@ -1517,6 +1789,19 @@ export default function TaskManagement() {
                   </select>
                 </Field>
               </div>
+              {/* Cohort — multi-select */}
+              <MultiCohortSelector
+                label="Assign To Cohorts"
+                value={(() => {
+                  const v = editingTask.assignedTo ?? editingTask.cohort;
+                  if (!v || v === "all") return "all";
+                  if (Array.isArray(v)) return v as string[];
+                  return [v];
+                })()}
+                onChange={v => setEditingTask(p => ({ ...p, assignedTo: v, cohort: v === "all" ? "all" : (v as string[]).join(",") }))}
+                cohorts={cohorts}
+                groups={mockCohortGroups}
+              />
               {/* From Job indicator */}
               {(editingTask as any).fromJobId && (
                 <div style={{ padding: "8px 14px", borderRadius: "10px", background: "rgba(245,200,66,0.08)", border: "1px solid rgba(245,200,66,0.15)", fontSize: "12px", color: "#f5c842", fontWeight: 600 }}>
@@ -1605,12 +1890,15 @@ export default function TaskManagement() {
                     </select>
                   </Field>
                   <Field label="Cohort Visibility">
-                    <select value={editingProject.assignedTo === "all" ? "all" : (Array.isArray(editingProject.assignedTo) ? editingProject.assignedTo[0] : "all")}
-                      onChange={e => setEditingProject(p => ({ ...p, assignedTo: e.target.value === "all" ? "all" : [e.target.value] }))}
-                      style={{ ...inputSx, cursor: "pointer" }}>
-                      <option value="all">All Cohorts</option>
-                      {cohorts.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                    <div style={{ marginTop: "-8px" }}>
+                      <MultiCohortSelector
+                        label=""
+                        value={editingProject.assignedTo || "all"}
+                        onChange={v => setEditingProject(p => ({ ...p, assignedTo: v }))}
+                        cohorts={cohorts}
+                        groups={mockCohortGroups}
+                      />
+                    </div>
                   </Field>
                   <Field label="Repeatable?">
                     <select value={editingProject.repeatable ? "yes" : "no"} onChange={e => setEditingProject(p => ({ ...p, repeatable: e.target.value === "yes" }))}
@@ -1783,14 +2071,20 @@ export default function TaskManagement() {
                     min={0} style={inputSx} />
                 </Field>
               </div>
+              {/* Cohort — multi-select */}
+              <MultiCohortSelector
+                label="Assign To Cohorts"
+                value={(() => {
+                  const v = editingJob.assignedTo ?? editingJob.cohort;
+                  if (!v || v === "all") return "all";
+                  if (Array.isArray(v)) return v as string[];
+                  return [v];
+                })()}
+                onChange={v => setEditingJob(p => ({ ...p, assignedTo: v, cohort: v === "all" ? "all" : (v as string[]).join(",") }))}
+                cohorts={cohorts}
+                groups={mockCohortGroups}
+              />
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-                <Field label="Cohort">
-                  <select value={editingJob.cohort || "all"} onChange={e => setEditingJob(p => ({ ...p, cohort: e.target.value }))}
-                    style={{ ...inputSx, cursor: "pointer" }}>
-                    <option value="all">All</option>
-                    {cohorts.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </Field>
                 <Field label="Status">
                   <select value={editingJob.status || "open"} onChange={e => setEditingJob(p => ({ ...p, status: e.target.value as Job["status"] }))}
                     style={{ ...inputSx, cursor: "pointer" }}>

@@ -6,6 +6,7 @@ import {
   User, mockUsers, getCurrentRank,
   getBadgeBreakdown, getStatusScore, BadgeBreakdown,
   mockStartupStudios, mockStudioInvestments,
+  CohortGroup, mockCohortGroups,
 } from "../../lib/data";
 import { applyPlayerImages } from "../../lib/playerImages";
 import Link from "next/link";
@@ -108,7 +109,7 @@ export default function PlayerLeaderboard() {
   const [sortDir,      setSortDir]      = useState<"desc" | "asc">("desc");
   const [badgeFilter,  setBadgeFilter]  = useState<BadgeFilter>("all");
   const [tierFilter,   setTierFilter]   = useState<TierFilter>("all");
-  const [cohortFilter, setCohortFilter] = useState<string>("all");
+  const [cohortFilter, setCohortFilter] = useState<string[]>([]);
   const [studioFilter, setStudioFilter] = useState<string>("all");
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
@@ -130,7 +131,7 @@ export default function PlayerLeaderboard() {
     const b    = getBadgeBreakdown(p);
     const rank = getCurrentRank(p.totalXcoin, p);
     const tier = RANK_TIERS.find((t) => t.levels.includes(rank.level));
-    if (cohortFilter !== "all" && p.cohort !== cohortFilter) return false;
+    if (cohortFilter.length > 0 && !cohortFilter.includes(p.cohort)) return false;
     if (tierFilter   !== "all" && tier?.key !== tierFilter)  return false;
     if (badgeFilter  !== "all" && b[badgeFilter as BadgeKey] === 0) return false;
     if (studioFilter !== "all" && p.studioId !== studioFilter) return false;
@@ -471,15 +472,46 @@ export default function PlayerLeaderboard() {
             {cohorts.length > 0 && (
               <>
                 <div style={{ width: "1px", height: "16px", background: "rgba(255,255,255,0.08)" }} />
-                <ChipSelect<string>
-                  label="COHORT"
-                  value={cohortFilter}
-                  onChange={setCohortFilter}
-                  options={[
-                    { key: "all", label: "All cohorts" },
-                    ...cohorts.map((c) => ({ key: c, label: c })),
-                  ]}
-                />
+                <div style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.25)", whiteSpace: "nowrap" }}>COHORT</span>
+                  <button onClick={() => setCohortFilter([])}
+                    style={{
+                      padding: "3px 8px", borderRadius: "7px", fontSize: "11px", fontWeight: 700, cursor: "pointer", border: "1px solid",
+                      background: cohortFilter.length === 0 ? "rgba(167,139,250,0.1)" : "rgba(255,255,255,0.04)",
+                      borderColor: cohortFilter.length === 0 ? "rgba(167,139,250,0.4)" : "rgba(255,255,255,0.1)",
+                      color: cohortFilter.length === 0 ? "#a78bfa" : "rgba(255,255,255,0.45)",
+                    }}>All</button>
+                  {mockCohortGroups.map(g => {
+                    const allIn = g.cohorts.length > 0 && g.cohorts.every(c => cohortFilter.includes(c));
+                    const gc = g.color || "#a78bfa";
+                    return (
+                      <button key={g.id} onClick={() => {
+                        if (allIn) {
+                          setCohortFilter(prev => prev.filter(c => !g.cohorts.includes(c)));
+                        } else {
+                          setCohortFilter(prev => [...new Set([...prev, ...g.cohorts])]);
+                        }
+                      }} style={{
+                        padding: "3px 8px", borderRadius: "7px", fontSize: "11px", fontWeight: 700, cursor: "pointer", border: "1px solid",
+                        background: allIn ? `${gc}20` : "rgba(255,255,255,0.04)",
+                        borderColor: allIn ? `${gc}60` : "rgba(255,255,255,0.1)",
+                        color: allIn ? gc : "rgba(255,255,255,0.45)",
+                      }}>📁{g.name}{allIn && " ✓"}</button>
+                    );
+                  })}
+                  {cohorts.map(c => {
+                    const on = cohortFilter.includes(c);
+                    return (
+                      <button key={c} onClick={() => setCohortFilter(prev => on ? prev.filter(x => x !== c) : [...prev, c])}
+                        style={{
+                          padding: "3px 8px", borderRadius: "7px", fontSize: "11px", fontWeight: 700, cursor: "pointer", border: "1px solid",
+                          background: on ? "rgba(167,139,250,0.1)" : "rgba(255,255,255,0.04)",
+                          borderColor: on ? "rgba(167,139,250,0.4)" : "rgba(255,255,255,0.1)",
+                          color: on ? "#a78bfa" : "rgba(255,255,255,0.45)",
+                        }}>{c}{on && " ✓"}</button>
+                    );
+                  })}
+                </div>
               </>
             )}
           </div>
