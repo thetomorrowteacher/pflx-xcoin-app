@@ -116,16 +116,46 @@ export async function initStore(): Promise<void> {
             setProgress(65 + Math.round(((i + 1) / spliceOps.length) * 30), `Loading ${spliceOps[i][0]}...`);
           }
           console.log("[store] ✓ Loaded", Object.keys(all).length, "collections from Supabase");
-        } else if (everInitialized) {
-          // Data was loaded before but now Supabase returned empty — DON'T overwrite!
-          console.warn("[store] ⚠ Supabase returned empty but app was previously initialized — skipping seed to prevent data loss");
-          console.warn("[store] This likely means Supabase had a connection issue or the database was paused.");
-          setProgress(80, "Warning: cloud data may be missing");
-          _needsSeed = false;
         } else {
-          _needsSeed = true;
-          setProgress(80, "First launch — preparing data...");
-          console.log("[store] Supabase genuinely empty — will seed with default data");
+          // Supabase returned empty — try loading from bundled seed-data.json
+          console.warn("[store] ⚠ Supabase returned empty — loading from seed-data.json fallback...");
+          setProgress(70, "Loading backup data...");
+          try {
+            const seedRes = await fetch("/seed-data.json");
+            if (seedRes.ok) {
+              const seedAll = await seedRes.json() as Record<string, unknown[]>;
+              const seedSplice: [string, () => void][] = [
+                ["users",             () => { if (seedAll.users?.length)             D.mockUsers.splice(0, D.mockUsers.length, ...(seedAll.users as any[])); }],
+                ["checkpoints",       () => { if (seedAll.checkpoints?.length)       D.mockCheckpoints.splice(0, D.mockCheckpoints.length, ...(seedAll.checkpoints as any[])); }],
+                ["tasks",             () => { if (seedAll.tasks?.length)             D.mockTasks.splice(0, D.mockTasks.length, ...(seedAll.tasks as any[])); }],
+                ["jobs",              () => { if (seedAll.jobs?.length)              D.mockJobs.splice(0, D.mockJobs.length, ...(seedAll.jobs as any[])); }],
+                ["transactions",      () => { if (seedAll.transactions?.length)      D.mockTransactions.splice(0, D.mockTransactions.length, ...(seedAll.transactions as any[])); }],
+                ["modifiers",         () => { if (seedAll.modifiers?.length)         D.mockModifiers.splice(0, D.mockModifiers.length, ...(seedAll.modifiers as any[])); }],
+                ["playerModifiers",   () => { if (seedAll.playerModifiers?.length)   D.mockPlayerModifiers.splice(0, D.mockPlayerModifiers.length, ...(seedAll.playerModifiers as any[])); }],
+                ["pflxRanks",         () => { if (seedAll.pflxRanks?.length)         D.mockPflxRanks.splice(0, D.mockPflxRanks.length, ...(seedAll.pflxRanks as any[])); }],
+                ["gamePeriods",       () => { if (seedAll.gamePeriods?.length)       D.mockGamePeriods.splice(0, D.mockGamePeriods.length, ...(seedAll.gamePeriods as any[])); }],
+                ["submissions",       () => { if (seedAll.submissions?.length)       D.mockSubmissions.splice(0, D.mockSubmissions.length, ...(seedAll.submissions as any[])); }],
+                ["playerDeals",       () => { if (seedAll.playerDeals?.length)       D.mockPlayerDeals.splice(0, D.mockPlayerDeals.length, ...(seedAll.playerDeals as any[])); }],
+                ["startupStudios",    () => { if (seedAll.startupStudios?.length)    D.mockStartupStudios.splice(0, D.mockStartupStudios.length, ...(seedAll.startupStudios as any[])); }],
+                ["studioInvestments", () => { if (seedAll.studioInvestments?.length) D.mockStudioInvestments.splice(0, D.mockStudioInvestments.length, ...(seedAll.studioInvestments as any[])); }],
+                ["projects",          () => { if (seedAll.projects?.length)          D.mockProjects.splice(0, D.mockProjects.length, ...(seedAll.projects as any[])); }],
+                ["coinCategories",    () => { if (seedAll.coinCategories?.length)    D.COIN_CATEGORIES.splice(0, D.COIN_CATEGORIES.length, ...(seedAll.coinCategories as any[])); }],
+                ["trades",            () => { if (seedAll.trades?.length)            D.mockTrades.splice(0, D.mockTrades.length, ...(seedAll.trades as any[])); }],
+                ["investments",       () => { if (seedAll.investments?.length)       D.mockInvestments.splice(0, D.mockInvestments.length, ...(seedAll.investments as any[])); }],
+              ];
+              for (const [, fn] of seedSplice) fn();
+              console.log("[store] ✓ Loaded seed-data.json fallback with", Object.keys(seedAll).length, "collections");
+              // Push seed data to Supabase so next load is fast
+              _needsSeed = true;
+              setProgress(85, "Restoring data to cloud...");
+            } else {
+              console.warn("[store] seed-data.json fetch failed:", seedRes.status);
+              _needsSeed = !everInitialized;
+            }
+          } catch (seedErr) {
+            console.warn("[store] seed-data.json fallback failed:", seedErr);
+            _needsSeed = !everInitialized;
+          }
         }
 
         setProgress(100, "Ready");
