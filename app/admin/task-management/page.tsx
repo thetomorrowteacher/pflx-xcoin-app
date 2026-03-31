@@ -8,8 +8,9 @@ import {
   COIN_CATEGORIES, RewardCoin, getMockCohorts,
   isHostUser,
   CohortGroup, mockCohortGroups,
+  ProjectPitch, mockProjectPitches,
 } from "../../lib/data";
-import { saveCheckpoints, saveTasks, saveJobs, saveProjects, saveCohortGroups } from "../../lib/store";
+import { saveCheckpoints, saveTasks, saveJobs, saveProjects, saveCohortGroups, saveProjectPitches } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
 import { playClick, playNav, playSuccess, playError, playDelete, playModalOpen, playModalClose } from "../../lib/sounds";
 import { compressBannerImage } from "../../lib/imageUtils";
@@ -207,7 +208,7 @@ function MultiCohortSelector({
 export default function TaskManagement() {
   const router = useRouter();
   const [user, setUser]           = useState<User | null>(null);
-  const [tab, setTab]             = useState<"checkpoints" | "tasks" | "jobs" | "projects" | "cohort-groups">("checkpoints");
+  const [tab, setTab]             = useState<"checkpoints" | "tasks" | "jobs" | "projects" | "cohort-groups" | "pitches">("checkpoints");
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([...mockCheckpoints]);
   const [tasks, setTasks]         = useState<Task[]>([...mockTasks]);
   const [jobs, setJobs]           = useState<Job[]>([...mockJobs]);
@@ -257,6 +258,12 @@ export default function TaskManagement() {
   const [cohortGroups, setCohortGroups] = useState<CohortGroup[]>([...mockCohortGroups]);
   const [editingGroup, setEditingGroup] = useState<Partial<CohortGroup> | null>(null);
   const [groupModal, setGroupModal] = useState(false);
+
+  // Pitch review state
+  const [allPitches, setAllPitches] = useState<ProjectPitch[]>([...mockProjectPitches]);
+  const [reviewingPitch, setReviewingPitch] = useState<ProjectPitch | null>(null);
+  const [reviewNotes, setReviewNotes] = useState("");
+  const [pitchReviewModal, setPitchReviewModal] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
@@ -724,9 +731,9 @@ export default function TaskManagement() {
         <div style={{ display: "flex", gap: "4px", marginBottom: "28px",
           background: "rgba(255,255,255,0.03)", borderRadius: "12px",
           border: "1px solid rgba(255,255,255,0.06)", padding: "4px", width: "fit-content" }}>
-          {(["checkpoints", "tasks", "jobs", "projects", "cohort-groups"] as const).map(t => (
+          {(["checkpoints", "tasks", "jobs", "projects", "pitches", "cohort-groups"] as const).map(t => (
             <button key={t} onClick={() => { playNav(); setTab(t); }} style={tabBtnSx(tab === t)}>
-              {t === "checkpoints" ? "🏁 CHECKPOINTS" : t === "tasks" ? "✅ TASKS" : t === "jobs" ? "📋 JOB BOARD" : t === "projects" ? "🗂 PROJECTS" : "👥 COHORT GROUPS"}
+              {t === "checkpoints" ? "🏁 CHECKPOINTS" : t === "tasks" ? "✅ TASKS" : t === "jobs" ? "📋 JOB BOARD" : t === "projects" ? "🗂 PROJECTS" : t === "pitches" ? `💡 PITCHES${allPitches.filter(p => p.status === "submitted").length ? ` (${allPitches.filter(p => p.status === "submitted").length})` : ""}` : "👥 COHORT GROUPS"}
             </button>
           ))}
         </div>
@@ -1229,6 +1236,113 @@ export default function TaskManagement() {
             )}
           </div>
         )}
+        {/* ══════════════════ PITCHES TAB ══════════════════ */}
+        {tab === "pitches" && (() => {
+          const PATHWAYS_MAP: Record<string, { label: string; icon: string }> = {
+            "professional-entrepreneur": { label: "Professional Entrepreneur", icon: "📖" },
+            "content-creator": { label: "Content Creator", icon: "🎬" },
+            "digital-artist": { label: "Digital Artist", icon: "🎨" },
+            "3d-modeler": { label: "3D Modeler", icon: "🧊" },
+            "cs-ai-specialist": { label: "CS / AI Specialist", icon: "🤖" },
+            "sound-designer": { label: "Sound Designer", icon: "🎵" },
+            "game-designer": { label: "Game Designer", icon: "🎮" },
+          };
+          const pitchStatusColors: Record<string, { bg: string; border: string; text: string }> = {
+            draft:        { bg: "rgba(255,255,255,0.06)", border: "rgba(255,255,255,0.15)", text: "rgba(255,255,255,0.5)" },
+            submitted:    { bg: "rgba(79,142,247,0.12)",  border: "rgba(79,142,247,0.4)",   text: "#4f8ef7" },
+            under_review: { bg: "rgba(245,200,66,0.1)",   border: "rgba(245,200,66,0.4)",   text: "#f5c842" },
+            approved:     { bg: "rgba(34,197,94,0.12)",   border: "rgba(34,197,94,0.4)",    text: "#22c55e" },
+            rejected:     { bg: "rgba(239,68,68,0.12)",   border: "rgba(239,68,68,0.4)",    text: "#ef4444" },
+            live:         { bg: "rgba(167,139,250,0.12)", border: "rgba(167,139,250,0.4)",  text: "#a78bfa" },
+          };
+          const sorted = [...allPitches].sort((a, b) => {
+            const order: Record<string, number> = { submitted: 0, under_review: 1, approved: 2, live: 3, rejected: 4, draft: 5 };
+            return (order[a.status] ?? 9) - (order[b.status] ?? 9);
+          });
+          const submitted = allPitches.filter(p => p.status === "submitted").length;
+          return (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                <p style={{ margin: 0, color: "rgba(255,255,255,0.4)", fontSize: "13px" }}>
+                  {allPitches.length} pitch{allPitches.length !== 1 ? "es" : ""}{submitted > 0 ? ` · ${submitted} awaiting review` : ""}
+                </p>
+              </div>
+              {sorted.length === 0 ? (
+                <div style={{ ...cardSx, padding: "60px", textAlign: "center" }}>
+                  <div style={{ fontSize: "48px", marginBottom: "16px" }}>💡</div>
+                  <h3 style={{ color: "#f0f0ff", margin: "0 0 8px" }}>No Pitches Yet</h3>
+                  <p style={{ color: "rgba(255,255,255,0.35)", margin: 0, fontSize: "14px" }}>
+                    When players submit project pitches, they will appear here for review.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {sorted.map(pitch => {
+                    const pw = PATHWAYS_MAP[pitch.pathway];
+                    const sc = pitchStatusColors[pitch.status] || pitchStatusColors.draft;
+                    const creator = mockUsers.find(u => u.id === pitch.creatorId);
+                    return (
+                      <div key={pitch.id} style={{
+                        ...cardSx, padding: "20px", borderColor: sc.border,
+                        cursor: (pitch.status === "submitted" || pitch.status === "under_review") ? "pointer" : "default",
+                      }} onClick={() => {
+                        if (pitch.status === "submitted" || pitch.status === "under_review") {
+                          playModalOpen();
+                          setReviewingPitch(pitch);
+                          setReviewNotes(pitch.reviewNotes || "");
+                          setPitchReviewModal(true);
+                        }
+                      }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                              <span style={{
+                                padding: "3px 12px", borderRadius: "20px", fontSize: "10px", fontWeight: 700,
+                                background: sc.bg, border: `1px solid ${sc.border}`, color: sc.text,
+                                textTransform: "uppercase", letterSpacing: "0.06em",
+                              }}>{pitch.status.replace("_", " ")}</span>
+                              {pw && <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)" }}>{pw.icon} {pw.label}</span>}
+                              {creator && <span style={{ fontSize: "12px", color: "rgba(0,212,255,0.5)" }}>by {creator.brandName || creator.name}</span>}
+                            </div>
+                            <h3 style={{ margin: "0 0 4px", fontSize: "16px", fontWeight: 800, color: "#f0f0ff" }}>{pitch.title}</h3>
+                            <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
+                              {pitch.description.length > 150 ? pitch.description.slice(0, 150) + "..." : pitch.description}
+                            </p>
+                            <div style={{ display: "flex", gap: "16px", marginTop: "8px", fontSize: "12px", color: "rgba(255,255,255,0.3)" }}>
+                              <span>🏅 {pitch.badgeName}</span>
+                              <span>💎 {pitch.xcValue} XC</span>
+                              <span>📊 {pitch.residualPercent}% residual</span>
+                              {pitch.estimatedTime && <span>⏱ {pitch.estimatedTime}</span>}
+                              {pitch.mediaLinks.length > 0 && <span>🔗 {pitch.mediaLinks.length} link{pitch.mediaLinks.length !== 1 ? "s" : ""}</span>}
+                            </div>
+                          </div>
+                          {pitch.image && (
+                            <img src={pitch.image} alt="" style={{ width: "72px", height: "72px", borderRadius: "12px", objectFit: "cover", border: "1px solid rgba(255,255,255,0.1)" }} />
+                          )}
+                        </div>
+                        {pitch.status === "live" && (
+                          <div style={{ marginTop: "10px", display: "flex", gap: "16px", fontSize: "12px" }}>
+                            <span style={{ color: "#a78bfa", fontWeight: 700 }}>💰 {(pitch.totalResidualEarned || 0).toLocaleString()} XC paid out</span>
+                            <span style={{ color: "rgba(255,255,255,0.35)" }}>{pitch.completionCount || 0} completions</span>
+                          </div>
+                        )}
+                        {(pitch.status === "submitted" || pitch.status === "under_review") && (
+                          <div style={{ marginTop: "10px", display: "flex", gap: "8px" }}>
+                            <button onClick={(e) => { e.stopPropagation(); playModalOpen(); setReviewingPitch(pitch); setReviewNotes(""); setPitchReviewModal(true); }} style={{
+                              padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer",
+                              background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)", color: "#22c55e",
+                            }}>Review</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ══════════════════ COHORT GROUPS TAB ══════════════════ */}
         {tab === "cohort-groups" && (
           <div>
@@ -1383,6 +1497,108 @@ export default function TaskManagement() {
                   boxShadow: `0 0 20px ${editingGroup.color || "#a78bfa"}40`, fontSize: "14px" }}>
                 {editingGroup.id ? "Save Changes" : "Create Group"}
               </button>
+            </div>
+          </div>
+        </ModalBG>
+      )}
+
+      {/* ══════════════════ PITCH REVIEW MODAL ══════════════════ */}
+      {pitchReviewModal && reviewingPitch && (
+        <ModalBG onClose={() => { playClick(); setPitchReviewModal(false); }}>
+          <div style={{ padding: "32px" }}>
+            <h2 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: 900, color: "#f0f0ff" }}>
+              Review Pitch 💡
+            </h2>
+            <p style={{ margin: "0 0 24px", fontSize: "13px", color: "rgba(0,212,255,0.5)" }}>
+              by {mockUsers.find(u => u.id === reviewingPitch.creatorId)?.brandName || mockUsers.find(u => u.id === reviewingPitch.creatorId)?.name || "Unknown"}
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              {/* Pitch details (read-only) */}
+              <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <h3 style={{ margin: "0 0 6px", fontSize: "18px", fontWeight: 800, color: "#f0f0ff" }}>{reviewingPitch.title}</h3>
+                <p style={{ margin: "0 0 12px", fontSize: "13px", color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>{reviewingPitch.description}</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", fontSize: "12px" }}>
+                  <div><span style={{ color: "rgba(255,255,255,0.3)" }}>Pathway:</span> <span style={{ color: "#4f8ef7" }}>{reviewingPitch.pathway}</span></div>
+                  <div><span style={{ color: "rgba(255,255,255,0.3)" }}>Badge:</span> <span style={{ color: "#f5c842" }}>{reviewingPitch.badgeName}</span></div>
+                  <div><span style={{ color: "rgba(255,255,255,0.3)" }}>XC Value:</span> <span style={{ color: "#22c55e" }}>{reviewingPitch.xcValue}</span></div>
+                  <div><span style={{ color: "rgba(255,255,255,0.3)" }}>Residual:</span> <span style={{ color: "#a78bfa" }}>{reviewingPitch.residualPercent}%</span></div>
+                  <div><span style={{ color: "rgba(255,255,255,0.3)" }}>Est. Time:</span> <span style={{ color: "rgba(255,255,255,0.6)" }}>{reviewingPitch.estimatedTime || "—"}</span></div>
+                  <div><span style={{ color: "rgba(255,255,255,0.3)" }}>Per completion:</span> <span style={{ color: "#a78bfa" }}>{Math.round(reviewingPitch.xcValue * reviewingPitch.residualPercent / 100)} XC</span></div>
+                </div>
+                {reviewingPitch.courseUrl && (
+                  <p style={{ margin: "10px 0 0", fontSize: "12px" }}>
+                    <span style={{ color: "rgba(255,255,255,0.3)" }}>Course URL: </span>
+                    <a href={reviewingPitch.courseUrl} target="_blank" rel="noreferrer" style={{ color: "#4f8ef7" }}>{reviewingPitch.courseUrl}</a>
+                  </p>
+                )}
+                {reviewingPitch.mediaLinks.length > 0 && (
+                  <div style={{ marginTop: "10px" }}>
+                    <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.3)" }}>Media Links:</span>
+                    {reviewingPitch.mediaLinks.map((link, i) => (
+                      <a key={i} href={link} target="_blank" rel="noreferrer" style={{ display: "block", fontSize: "12px", color: "#4f8ef7", marginTop: "4px" }}>{link}</a>
+                    ))}
+                  </div>
+                )}
+                {reviewingPitch.image && (
+                  <img src={reviewingPitch.image} alt="" style={{ marginTop: "12px", maxWidth: "200px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)" }} />
+                )}
+              </div>
+
+              {/* Review notes */}
+              <Field label="Review Notes / Feedback">
+                <textarea value={reviewNotes} onChange={e => setReviewNotes(e.target.value)}
+                  placeholder="Add feedback for the player (required for rejection, optional for approval)..."
+                  rows={3} style={{ ...inputSx, resize: "vertical" }} />
+              </Field>
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "24px" }}>
+              <button onClick={() => { playClick(); setPitchReviewModal(false); }}
+                style={{ padding: "11px 24px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: "10px", color: "rgba(255,255,255,0.6)", fontWeight: 700, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => {
+                if (!reviewNotes.trim()) { playError(); return; }
+                // Reject
+                const updated: ProjectPitch = {
+                  ...reviewingPitch,
+                  status: "rejected",
+                  reviewedAt: new Date().toISOString(),
+                  reviewedBy: user?.id,
+                  reviewNotes: reviewNotes.trim(),
+                };
+                const next = allPitches.map(p => p.id === updated.id ? updated : p);
+                setAllPitches(next);
+                const idx = mockProjectPitches.findIndex(p => p.id === updated.id);
+                if (idx >= 0) mockProjectPitches[idx] = updated;
+                playError();
+                saveAndToast([saveProjectPitches], "Pitch rejected ✓");
+                setPitchReviewModal(false);
+              }} style={{ padding: "11px 22px", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)",
+                  borderRadius: "10px", color: "#ef4444", fontWeight: 700, cursor: "pointer" }}>Reject</button>
+              <button onClick={() => {
+                // Approve — generate a pathway node ID
+                const slugPrefix = reviewingPitch.pathway.slice(0, 2);
+                const nodeId = `${slugPrefix}-pitch-${Date.now()}`;
+                const updated: ProjectPitch = {
+                  ...reviewingPitch,
+                  status: "approved",
+                  reviewedAt: new Date().toISOString(),
+                  reviewedBy: user?.id,
+                  reviewNotes: reviewNotes.trim() || "Approved!",
+                  pathwayNodeId: nodeId,
+                };
+                const next = allPitches.map(p => p.id === updated.id ? updated : p);
+                setAllPitches(next);
+                const idx = mockProjectPitches.findIndex(p => p.id === updated.id);
+                if (idx >= 0) mockProjectPitches[idx] = updated;
+                playSuccess();
+                saveAndToast([saveProjectPitches], "Pitch approved — will appear on Pathway Portal ✓");
+                setPitchReviewModal(false);
+              }} style={{ padding: "11px 28px", background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                  border: "none", borderRadius: "10px", color: "white", fontWeight: 800, cursor: "pointer",
+                  boxShadow: "0 0 20px rgba(34,197,94,0.3)", fontSize: "14px" }}>Approve & Publish</button>
             </div>
           </div>
         </ModalBG>

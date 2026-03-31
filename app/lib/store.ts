@@ -111,6 +111,7 @@ export async function initStore(): Promise<void> {
             ["trades",            () => { if (all.trades?.length)            D.mockTrades.splice(0, D.mockTrades.length, ...all.trades); }],
             ["investments",       () => { if (all.investments?.length)       D.mockInvestments.splice(0, D.mockInvestments.length, ...all.investments); }],
             ["cohortGroups",      () => { if (all.cohortGroups?.length)      D.mockCohortGroups.splice(0, D.mockCohortGroups.length, ...all.cohortGroups); }],
+            ["projectPitches",    () => { if (all.projectPitches?.length)    D.mockProjectPitches.splice(0, D.mockProjectPitches.length, ...all.projectPitches); }],
           ];
           for (let i = 0; i < spliceOps.length; i++) {
             spliceOps[i][1]();
@@ -144,6 +145,7 @@ export async function initStore(): Promise<void> {
                 ["trades",            () => { if (seedAll.trades?.length)            D.mockTrades.splice(0, D.mockTrades.length, ...(seedAll.trades as any[])); }],
                 ["investments",       () => { if (seedAll.investments?.length)       D.mockInvestments.splice(0, D.mockInvestments.length, ...(seedAll.investments as any[])); }],
                 ["cohortGroups",      () => { if (seedAll.cohortGroups?.length)      D.mockCohortGroups.splice(0, D.mockCohortGroups.length, ...(seedAll.cohortGroups as any[])); }],
+                ["projectPitches",    () => { if (seedAll.projectPitches?.length)    D.mockProjectPitches.splice(0, D.mockProjectPitches.length, ...(seedAll.projectPitches as any[])); }],
               ];
               for (const [, fn] of seedSplice) fn();
               console.log("[store] ✓ Loaded seed-data.json fallback with", Object.keys(seedAll).length, "collections");
@@ -250,6 +252,9 @@ export function saveInvestments() {
 export function saveCohortGroups() {
   return saveData("cohortGroups", D.mockCohortGroups);
 }
+export function saveProjectPitches() {
+  return saveData("projectPitches", D.mockProjectPitches);
+}
 
 /**
  * Convenience: save everything at once (used after bulk operations).
@@ -274,5 +279,6 @@ export async function saveAll() {
     saveTrades(),
     saveInvestments(),
     saveCohortGroups(),
+    saveProjectPitches(),
   ]);
 }

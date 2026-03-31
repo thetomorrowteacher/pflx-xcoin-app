@@ -205,6 +205,38 @@ export interface CohortGroup {
 
 export let mockCohortGroups: CohortGroup[] = [];
 
+// ─── Project Pitches ───────────────────────────────────────────────
+// Players pitch projects/courses that become pathway nodes when approved.
+// Creators earn residual XC income when other players complete their nodes.
+export interface ProjectPitch {
+  id: string;
+  creatorId: string;            // Player who pitched the project
+  title: string;
+  description: string;
+  pathway: string;              // Which pathway this should belong to (slug)
+  badgeName: string;            // Name for the badge earned on completion
+  xcValue: number;              // XC reward for completing this node
+  mediaLinks: string[];         // Links to media (videos, demos, portfolios, etc.)
+  prerequisites: string[];      // Node IDs that must be completed first (optional)
+  estimatedTime: string;        // "2 hours", "1 week", etc.
+  courseUrl?: string;            // Link to the course/project content
+  image?: string;               // Pitch cover image (base64 or URL)
+  residualPercent: number;      // % of XC value paid to creator when others complete (10-15%)
+  // Workflow
+  status: "draft" | "submitted" | "under_review" | "approved" | "rejected" | "live";
+  submittedAt?: string;         // ISO date
+  reviewedAt?: string;          // ISO date
+  reviewedBy?: string;          // Host ID who reviewed
+  reviewNotes?: string;         // Host feedback on the pitch
+  // Portal integration
+  pathwayNodeId?: string;       // Generated node ID once live on the portal
+  // Residual tracking
+  totalResidualEarned?: number; // Cumulative XC earned from residuals
+  completionCount?: number;     // How many players have completed this node
+}
+
+export let mockProjectPitches: ProjectPitch[] = [];
+
 export interface Transaction {
   id: string;
   userId: string;
