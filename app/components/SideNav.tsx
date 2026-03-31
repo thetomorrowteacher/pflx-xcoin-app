@@ -63,6 +63,7 @@ const playerLinks = [
   { href: "/player/submit", label: "X-Tracker", icon: "🚀" },
   { href: "/player/task-management", label: "Task Management", icon: "📋" },
   { href: "/player/pitch", label: "Project Pitch", icon: "💡" },
+  { href: "/player/projects", label: "My Projects", icon: "🎬" },
   { href: "/player/marketplace", label: "Marketplace", icon: "🛒" },
   { href: "/player/wallet", label: "Wallet", icon: "🪙" },
   { href: "/player/options", label: "Options", icon: "⚙️" },

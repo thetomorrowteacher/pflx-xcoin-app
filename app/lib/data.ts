@@ -222,6 +222,19 @@ export interface ProjectPitch {
   courseUrl?: string;            // Link to the course/project content
   image?: string;               // Pitch cover image (base64 or URL)
   residualPercent: number;      // % of XC value paid to creator when others complete (10-15%)
+  // Enhanced pitch fields
+  coverArt?: string;            // 16:9 cover art / node thumbnail (base64 or URL)
+  badgeConcept?: string;        // Description of the digital badge concept / design idea
+  projectZeroTemplate?: string; // Completed Project Zero Template (base64 file or URL)
+  // Sponsorship & NFT
+  sponsorType?: "player" | "partner" | "none"; // Who sponsors this course
+  sponsorName?: string;         // Display name of the sponsor (partner org name or player name)
+  sponsorId?: string;           // Partner ID or player ID
+  entryFeeXC?: number;          // XC cost to enter/start this course (0 = free)
+  // NFT-like value system — completion count drives value
+  baseValue: number;            // Starting NFT value of the badge (= xcValue)
+  currentValue?: number;        // Dynamic value based on completions (rises with demand)
+  rarity?: "common" | "uncommon" | "rare" | "epic" | "legendary"; // Auto-calculated from completions
   // Workflow
   status: "draft" | "submitted" | "under_review" | "approved" | "rejected" | "live";
   submittedAt?: string;         // ISO date
@@ -230,21 +243,95 @@ export interface ProjectPitch {
   reviewNotes?: string;         // Host feedback on the pitch
   // Portal integration
   pathwayNodeId?: string;       // Generated node ID once live on the portal
+  // Project pipeline — when approved, auto-creates a Project + Jobs
+  generatedProjectId?: string;  // ID of the auto-generated Project in Task Management
+  generatedJobIds?: string[];   // IDs of the auto-generated Jobs
+  // Job selection from Executive Badges
+  selectedJobs?: { badgeName: string; description: string; xc: number; emoji?: string }[];
+  // Pre-production checklist
+  preProductionComplete?: boolean;
   // Residual tracking
   totalResidualEarned?: number; // Cumulative XC earned from residuals
   completionCount?: number;     // How many players have completed this node
 }
+
+// ─── NFT Value Calculation ──────────────────────────────────────
+// Completion count drives value: more completions = higher demand = higher value
+export function calculateNFTValue(baseValue: number, completionCount: number): number {
+  // Value increases logarithmically with completions
+  // 0 completions = baseValue, 10 = ~2x, 50 = ~3x, 200 = ~4x
+  if (completionCount <= 0) return baseValue;
+  const multiplier = 1 + Math.log10(1 + completionCount) * 0.6;
+  return Math.round(baseValue * multiplier);
+}
+
+// Auto-calculate rarity tier based on completion count
+export function calculateRarity(completionCount: number): "common" | "uncommon" | "rare" | "epic" | "legendary" {
+  if (completionCount >= 100) return "legendary";
+  if (completionCount >= 50) return "epic";
+  if (completionCount >= 20) return "rare";
+  if (completionCount >= 5) return "uncommon";
+  return "common";
+}
+
+// ─── Startup Studio Income Tax Rates by Evo Rank ────────────────
+// Higher rank = higher tax, but higher stake/share ceiling
+export function getStudioTaxRate(rankLevel: number): number {
+  // Returns decimal (e.g. 0.05 = 5%)
+  const rates: Record<number, number> = {
+    1: 0.03,   // Player: 3%
+    2: 0.05,   // Advanced Player: 5%
+    3: 0.07,   // Apprentice: 7%
+    4: 0.10,   // Manager/Head: 10%
+    5: 0.12,   // Director/Producer: 12%
+    6: 0.14,   // Mentor/Intern: 14%
+    7: 0.16,   // Associate: 16%
+    8: 0.18,   // Senior: 18%
+    9: 0.20,   // Chief: 20%
+    10: 0.22,  // Partner: 22%
+  };
+  return rates[rankLevel] || 0.05;
+}
+
+// Get Evo-rank share/stake percentage ceiling for portfolio display
+export function getEvoSharePercent(rankLevel: number): number {
+  // How much of their studio they can "own" via stakes
+  const shares: Record<number, number> = {
+    1: 2,     // 2%
+    2: 5,     // 5%
+    3: 8,     // 8%
+    4: 12,    // 12%
+    5: 18,    // 18%
+    6: 25,    // 25%
+    7: 32,    // 32%
+    8: 40,    // 40%
+    9: 48,    // 48%
+    10: 55,   // 55%
+  };
+  return shares[rankLevel] || 2;
+}
+
+// ─── Standard jobs auto-generated when a pitch becomes a project ─
+export const PITCH_AUTO_JOBS = [
+  { role: "Producer / Project Manager", emoji: "🎬", description: "Oversee the project from start to finish. Manage timeline, team coordination, and quality control." },
+  { role: "Lead Designer", emoji: "🎨", description: "Create visual assets, UI mockups, and design the overall look and feel of the course materials." },
+  { role: "Content Developer", emoji: "✍️", description: "Write course content, tutorials, and learning materials. Ensure clarity and depth." },
+  { role: "QA Tester", emoji: "🧪", description: "Test the course flow, check for errors, and provide feedback before launch." },
+];
 
 export let mockProjectPitches: ProjectPitch[] = [];
 
 export interface Transaction {
   id: string;
   userId: string;
-  type: "earned" | "spent" | "admin_grant" | "pflx_tax" | "investment_return" | "investment_stake";
+  type: "earned" | "spent" | "admin_grant" | "pflx_tax" | "investment_return" | "investment_stake" | "studio_tax" | "entry_fee" | "residual_income" | "nft_value";
   amount: number;
   currency: "xcoin" | "digitalBadge";
   description: string;
   createdAt: string;
+  // Tax tracking
+  taxDeducted?: number;     // XC auto-deducted as studio income tax
+  taxStudioId?: string;     // Which studio received the tax
 }
 
 // What game event triggers this modifier automatically
@@ -1207,6 +1294,11 @@ export interface StartupStudio {
   xcPool: number;          // Total XC in this studio's investment pool
   corporateTaxRate: number; // % deducted from pool each season (e.g. 0.1 = 10%)
   lastTaxAt?: string;
+  // Income tax treasury (auto-deducted from player XC earnings)
+  taxTreasury: number;       // Total XC collected from player income tax
+  totalTaxCollected?: number; // Lifetime tax collected (for stats)
+  // Entry fee income
+  entryFeeIncome?: number;   // XC received from course entry fee splits
   // Members (player IDs)
   members: string[];
   // Studio-level projects/jobs (IDs adopted by this studio)
@@ -1264,6 +1356,7 @@ export let mockStartupStudios: StartupStudio[] = [
     visualAesthetic: "Bold colors, symbolic design, cultural fusion",
     xcPool: 18400,
     corporateTaxRate: 0.10,
+    taxTreasury: 0,
     members: [],
     adoptedProjectIds: [],
     adoptedJobIds: [],
@@ -1281,6 +1374,7 @@ export let mockStartupStudios: StartupStudio[] = [
     visualAesthetic: "Colorful, whimsical, expressive, character-driven",
     xcPool: 22750,
     corporateTaxRate: 0.10,
+    taxTreasury: 0,
     members: [],
     adoptedProjectIds: [],
     adoptedJobIds: [],
@@ -1298,6 +1392,7 @@ export let mockStartupStudios: StartupStudio[] = [
     visualAesthetic: "Clean, minimal, functional, high-tech",
     xcPool: 31200,
     corporateTaxRate: 0.10,
+    taxTreasury: 0,
     members: [],
     adoptedProjectIds: [],
     adoptedJobIds: [],
@@ -1315,6 +1410,7 @@ export let mockStartupStudios: StartupStudio[] = [
     visualAesthetic: "Neon noir, glitchcore, cyberpunk, minimalist futurism",
     xcPool: 27600,
     corporateTaxRate: 0.10,
+    taxTreasury: 0,
     members: [],
     adoptedProjectIds: [],
     adoptedJobIds: [],
@@ -1503,4 +1599,84 @@ export function getStudioReturn(studioId: string, stakePercent: number): number 
   const studio = mockStartupStudios.find(s => s.id === studioId);
   if (!studio) return 0;
   return Math.floor((studio.xcPool * stakePercent) / 100 * 0.05); // 5% annual-ish return on staked portion
+}
+
+// ─── CENTRALIZED XC EARNING WITH AUTO STUDIO TAX ─────────────────
+// Call this whenever a player earns XC. It auto-deducts studio income tax.
+// Returns { netXC, taxDeducted, studioId } so caller can update UI / create transaction.
+export function earnXCWithTax(player: User, grossXC: number, description?: string): { netXC: number; taxDeducted: number; studioId: string | null } {
+  if (grossXC <= 0) return { netXC: 0, taxDeducted: 0, studioId: null };
+
+  const rankLevel = player.rank || 1;
+  const taxRate = getStudioTaxRate(rankLevel);
+  const studioId = player.studioId || null;
+
+  let taxDeducted = 0;
+  if (studioId) {
+    taxDeducted = Math.round(grossXC * taxRate);
+    // Deposit tax to studio treasury
+    const studio = mockStartupStudios.find(s => s.id === studioId);
+    if (studio) {
+      studio.taxTreasury = (studio.taxTreasury || 0) + taxDeducted;
+      studio.totalTaxCollected = (studio.totalTaxCollected || 0) + taxDeducted;
+    }
+    // Record studio tax transaction
+    if (taxDeducted > 0) {
+      mockTransactions.push({
+        id: `tx-tax-${Date.now()}-${player.id}`,
+        userId: player.id,
+        type: "studio_tax" as any,
+        amount: -taxDeducted,
+        currency: "xcoin",
+        description: `Studio Tax (${Math.round(taxRate * 100)}%) — ${description || "XC Earned"}`,
+        createdAt: new Date().toISOString().split("T")[0],
+        taxDeducted: taxDeducted,
+        taxStudioId: studioId,
+      });
+    }
+  }
+
+  const netXC = grossXC - taxDeducted;
+
+  // Update player balances
+  player.xcoin = (player.xcoin || 0) + netXC;
+  player.totalXcoin = (player.totalXcoin || 0) + netXC;
+
+  return { netXC, taxDeducted, studioId };
+}
+
+// ─── ENTRY FEE PROCESSING ─────────────────────────────────────────
+// Deduct entry fee from player, split between creator and studio
+export function processEntryFee(
+  player: User,
+  entryFeeXC: number,
+  creatorId: string,
+  creatorStudioId?: string
+): { playerPaid: number; creatorShare: number; studioShare: number } {
+  if (entryFeeXC <= 0 || player.xcoin < entryFeeXC) return { playerPaid: 0, creatorShare: 0, studioShare: 0 };
+
+  // Deduct from player
+  player.xcoin -= entryFeeXC;
+
+  // Split: 70% to creator, 30% to studio
+  const creatorShare = Math.round(entryFeeXC * 0.70);
+  const studioShare = entryFeeXC - creatorShare;
+
+  // Credit creator
+  const creator = mockUsers.find(u => u.id === creatorId);
+  if (creator) {
+    creator.xcoin = (creator.xcoin || 0) + creatorShare;
+    creator.totalXcoin = (creator.totalXcoin || 0) + creatorShare;
+  }
+
+  // Credit studio treasury
+  if (creatorStudioId) {
+    const studio = mockStartupStudios.find(s => s.id === creatorStudioId);
+    if (studio) {
+      studio.entryFeeIncome = (studio.entryFeeIncome || 0) + studioShare;
+      studio.xcPool = (studio.xcPool || 0) + studioShare;
+    }
+  }
+
+  return { playerPaid: entryFeeXC, creatorShare, studioShare };
 }

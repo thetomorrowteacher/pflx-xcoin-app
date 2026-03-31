@@ -2,9 +2,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
-import { User, Task, mockTasks, mockUsers, CoinSubmission, mockSubmissions, mockModifiers, mockTransactions, COIN_CATEGORIES, getCurrentRank } from "../../lib/data";
+import { User, Task, mockTasks, mockUsers, CoinSubmission, mockSubmissions, mockModifiers, mockTransactions, COIN_CATEGORIES, getCurrentRank, earnXCWithTax, mockStartupStudios } from "../../lib/data";
 import { playSuccess, playError, playTradeComplete, playInvest, playCashRegister } from "../../lib/sounds";
-import { saveUsers, saveTransactions, saveSubmissions, saveTasks, saveTrades, saveInvestments } from "../../lib/store";
+import { saveUsers, saveTransactions, saveSubmissions, saveTasks, saveTrades, saveInvestments, saveStartupStudios } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
 
 /* ── AI Analysis types ─────────────────────────────────────────────── */
@@ -73,20 +73,21 @@ export default function AdminApprovals() {
     const task = mockTasks[idx];
     (mockTasks[idx] as any).status = "approved";
 
-    // Award XC + badges to the submitting player
+    // Award XC + badges to the submitting player (with auto studio tax)
     const player = mockUsers.find(u => u.id === task.submittedBy);
     if (player) {
-      // Award XC from rewardCoins
       let xcAwarded = 0;
+      let totalTaxDeducted = 0;
       if (task.rewardCoins && task.rewardCoins.length > 0) {
         if (!player.badgeCounts) player.badgeCounts = { signature: 0, executive: 0, premium: 0, primary: 0 };
         task.rewardCoins.forEach(rc => {
           const coinDef = COIN_CATEGORIES.flatMap(c => c.coins).find(c => c.name === rc.coinName);
-          const xc = coinDef ? coinDef.xc * rc.amount : (task.xpValue || 0);
-          player.xcoin += xc;
-          player.totalXcoin += xc;
+          const grossXC = coinDef ? coinDef.xc * rc.amount : (task.xpValue || 0);
+          // Use earnXCWithTax — auto-deducts studio income tax
+          const { netXC, taxDeducted } = earnXCWithTax(player, grossXC, `Task: ${task.title} — ${rc.coinName}`);
           player.digitalBadges += rc.amount;
-          xcAwarded += xc;
+          xcAwarded += netXC;
+          totalTaxDeducted += taxDeducted;
           // Update per-type badge breakdown
           const category = COIN_CATEGORIES.find(cat => cat.coins.some(c => c.name === rc.coinName));
           if (category) {
@@ -98,29 +99,33 @@ export default function AdminApprovals() {
           }
           mockTransactions.push({
             id: `tx-${Date.now()}-${player.id}-${rc.coinName}`,
-            userId: player.id, type: "task_reward", amount: xc, currency: "xcoin",
-            description: `Task Approved: ${task.title} — ${rc.coinName}`,
+            userId: player.id, type: "task_reward", amount: netXC, currency: "xcoin",
+            description: `Task Approved: ${task.title} — ${rc.coinName}${taxDeducted > 0 ? ` (${taxDeducted} XC taxed)` : ""}`,
             createdAt: new Date().toISOString().split("T")[0],
+            taxDeducted: taxDeducted || undefined,
+            taxStudioId: player.studioId || undefined,
           });
         });
       } else if (task.xpValue) {
-        // Fallback: award xpValue directly if no rewardCoins
-        player.xcoin += task.xpValue;
-        player.totalXcoin += task.xpValue;
-        xcAwarded = task.xpValue;
+        // Fallback: award xpValue directly with tax
+        const { netXC, taxDeducted } = earnXCWithTax(player, task.xpValue, `Task: ${task.title}`);
+        xcAwarded = netXC;
+        totalTaxDeducted = taxDeducted;
         mockTransactions.push({
           id: `tx-${Date.now()}-${player.id}-xp`,
-          userId: player.id, type: "task_reward", amount: task.xpValue, currency: "xcoin",
-          description: `Task Approved: ${task.title}`,
+          userId: player.id, type: "task_reward", amount: netXC, currency: "xcoin",
+          description: `Task Approved: ${task.title}${taxDeducted > 0 ? ` (${taxDeducted} XC taxed)` : ""}`,
           createdAt: new Date().toISOString().split("T")[0],
+          taxDeducted: taxDeducted || undefined,
+          taxStudioId: player.studioId || undefined,
         });
       }
-      console.log(`[task-approve] Player "${player.brandName||player.name}": +${xcAwarded} XC, badges=`, player.badgeCounts);
+      console.log(`[task-approve] Player "${player.brandName||player.name}": +${xcAwarded} XC net (${totalTaxDeducted} taxed), badges=`, player.badgeCounts);
     }
 
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: "approved" as const } : t));
     playCashRegister();
-    saveAndToast([saveTasks, saveUsers, saveTransactions], "Task approved — saved to cloud ✓");
+    saveAndToast([saveTasks, saveUsers, saveTransactions, saveStartupStudios], "Task approved — saved to cloud ✓");
     showToast("Task approved! X-Coin awarded. 🎉", "success");
   };
 

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
 import {
   User, mockUsers, ProjectPitch, mockProjectPitches, isHostUser,
+  calculateNFTValue, calculateRarity, COIN_CATEGORIES,
 } from "../../lib/data";
 import { saveProjectPitches } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
@@ -79,6 +80,16 @@ export default function PlayerPitchPage() {
       estimatedTime: "",
       residualPercent: 12,
       status: "draft",
+      // Enhanced fields
+      coverArt: "",
+      badgeConcept: "",
+      projectZeroTemplate: "",
+      sponsorType: "player",
+      sponsorName: user.brandName || user.name,
+      entryFeeXC: 0,
+      baseValue: 500,
+      selectedJobs: [],
+      preProductionComplete: false,
     });
     setMediaLinks([""]);
     setEditModal(true);
@@ -101,6 +112,7 @@ export default function PlayerPitchPage() {
     const isNew = !editing.id;
     const cleanLinks = mediaLinks.filter(l => l.trim());
 
+    const xcVal = editing.xcValue || 500;
     const saved: ProjectPitch = {
       id: editing.id || `pitch_${Date.now()}`,
       creatorId: user.id,
@@ -108,13 +120,29 @@ export default function PlayerPitchPage() {
       description: editing.description || "",
       pathway: editing.pathway || "professional-entrepreneur",
       badgeName: editing.badgeName || "",
-      xcValue: editing.xcValue || 500,
+      xcValue: xcVal,
       mediaLinks: cleanLinks,
       prerequisites: editing.prerequisites || [],
       estimatedTime: editing.estimatedTime || "",
       courseUrl: editing.courseUrl || "",
       image: editing.image,
       residualPercent: Math.min(15, Math.max(10, editing.residualPercent || 12)),
+      // Enhanced fields
+      coverArt: editing.coverArt || "",
+      badgeConcept: editing.badgeConcept || "",
+      projectZeroTemplate: editing.projectZeroTemplate || "",
+      sponsorType: editing.sponsorType || "player",
+      sponsorName: editing.sponsorName || user.brandName || user.name,
+      sponsorId: user.id,
+      entryFeeXC: editing.entryFeeXC || 0,
+      // Job roles selected from Executive Badges
+      selectedJobs: editing.selectedJobs || [],
+      preProductionComplete: editing.preProductionComplete || false,
+      // NFT value system
+      baseValue: xcVal,
+      currentValue: calculateNFTValue(xcVal, editing.completionCount || 0),
+      rarity: calculateRarity(editing.completionCount || 0),
+      // Workflow
       status: submit ? "submitted" : "draft",
       submittedAt: submit ? new Date().toISOString() : editing.submittedAt,
       totalResidualEarned: editing.totalResidualEarned || 0,
@@ -245,11 +273,23 @@ export default function PlayerPitchPage() {
                       <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
                         {pitch.description.length > 120 ? pitch.description.slice(0, 120) + "..." : pitch.description}
                       </p>
-                      <div style={{ display: "flex", gap: "16px", marginTop: "8px", fontSize: "12px", color: "rgba(255,255,255,0.3)" }}>
+                      <div style={{ display: "flex", gap: "12px", marginTop: "8px", fontSize: "12px", color: "rgba(255,255,255,0.3)", flexWrap: "wrap" }}>
                         <span>🏅 {pitch.badgeName}</span>
                         <span>💎 {pitch.xcValue} XC</span>
                         <span>📊 {pitch.residualPercent}% residual</span>
                         {pitch.estimatedTime && <span>⏱ {pitch.estimatedTime}</span>}
+                        {(pitch.entryFeeXC || 0) > 0 && <span style={{ color: "#22c55e" }}>🎟 {pitch.entryFeeXC} XC entry</span>}
+                        {pitch.currentValue && pitch.currentValue > pitch.baseValue && (
+                          <span style={{ color: "#f59e0b" }}>📈 NFT: {pitch.currentValue} XC</span>
+                        )}
+                        {pitch.rarity && pitch.rarity !== "common" && (
+                          <span style={{ color: pitch.rarity === "legendary" ? "#f59e0b" : pitch.rarity === "epic" ? "#a78bfa" : pitch.rarity === "rare" ? "#3b82f6" : "#6ee7b7" }}>
+                            {pitch.rarity === "legendary" ? "🌟" : pitch.rarity === "epic" ? "💜" : pitch.rarity === "rare" ? "💙" : "💚"} {pitch.rarity.toUpperCase()}
+                          </span>
+                        )}
+                        {(pitch.selectedJobs || []).length > 0 && (
+                          <span style={{ color: "#a78bfa" }}>👥 {pitch.selectedJobs!.length} role{pitch.selectedJobs!.length !== 1 ? "s" : ""}</span>
+                        )}
                       </div>
                     </div>
                     {pitch.image && (
@@ -407,13 +447,186 @@ export default function PlayerPitchPage() {
                   </div>
                 </Field>
 
-                {/* Info box */}
+                {/* Cover Art 16:9 */}
+                <Field label="Cover Art / Node Thumbnail (16:9)">
+                  <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                    {editing.coverArt ? (
+                      <div style={{ position: "relative" }}>
+                        <img src={editing.coverArt} alt="" style={{ width: "160px", height: "90px", borderRadius: "10px", objectFit: "cover", border: "1px solid rgba(255,255,255,0.1)" }} />
+                        <button onClick={() => setEditing(p => ({ ...p, coverArt: undefined }))} style={{
+                          position: "absolute", top: -6, right: -6, width: "20px", height: "20px", borderRadius: "50%",
+                          background: "#ef4444", border: "none", color: "white", fontSize: "11px", cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>×</button>
+                      </div>
+                    ) : null}
+                    <button onClick={() => {
+                      const inp = document.createElement("input");
+                      inp.type = "file"; inp.accept = "image/*";
+                      inp.onchange = (e: any) => {
+                        const f = e.target.files?.[0]; if (!f) return;
+                        const r = new FileReader();
+                        r.onload = () => setEditing(p => ({ ...p, coverArt: r.result as string }));
+                        r.readAsDataURL(f);
+                      };
+                      inp.click();
+                    }} style={{
+                      padding: "10px 18px", borderRadius: "10px", fontSize: "12px", fontWeight: 700, cursor: "pointer",
+                      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)",
+                    }}>{editing.coverArt ? "Change" : "Upload 16:9 Cover Art"}</button>
+                  </div>
+                </Field>
+
+                {/* Badge Concept */}
+                <Field label="Digital Badge Concept">
+                  <textarea value={editing.badgeConcept || ""} onChange={e => setEditing(p => ({ ...p, badgeConcept: e.target.value }))}
+                    placeholder="Describe your badge design idea: colors, imagery, text, what it represents..."
+                    rows={3} style={{ ...inputSx, resize: "vertical" }} />
+                </Field>
+
+                {/* Job Roles from Executive Badges */}
+                <Field label="Required Job Roles (select from Executive Badges)">
+                  <div style={{
+                    display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px",
+                    maxHeight: "200px", overflowY: "auto", padding: "4px",
+                  }}>
+                    {(() => {
+                      const execCategory = COIN_CATEGORIES.find(c => c.name.includes("Executive"));
+                      if (!execCategory) return null;
+                      return execCategory.coins.map(coin => {
+                        const isSelected = (editing.selectedJobs || []).some(j => j.badgeName === coin.name);
+                        return (
+                          <button key={coin.name} onClick={() => {
+                            setEditing(prev => {
+                              const current = prev.selectedJobs || [];
+                              if (isSelected) {
+                                return { ...prev, selectedJobs: current.filter(j => j.badgeName !== coin.name) };
+                              } else {
+                                return { ...prev, selectedJobs: [...current, { badgeName: coin.name, description: coin.description, xc: coin.xc }] };
+                              }
+                            });
+                          }} style={{
+                            display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px",
+                            borderRadius: "10px", cursor: "pointer", fontSize: "12px", fontWeight: 600, textAlign: "left",
+                            background: isSelected ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.03)",
+                            border: `1px solid ${isSelected ? "rgba(167,139,250,0.4)" : "rgba(255,255,255,0.08)"}`,
+                            color: isSelected ? "#a78bfa" : "rgba(255,255,255,0.5)",
+                            transition: "all 0.15s ease",
+                          }}>
+                            <span style={{ fontSize: "16px" }}>{isSelected ? "✅" : "⬜"}</span>
+                            <div>
+                              <div>{coin.name}</div>
+                              <div style={{ fontSize: "10px", opacity: 0.6, marginTop: "2px" }}>{coin.xc} XC</div>
+                            </div>
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+                  {(editing.selectedJobs || []).length > 0 && (
+                    <p style={{ margin: "6px 0 0", fontSize: "10px", color: "rgba(167,139,250,0.6)" }}>
+                      {(editing.selectedJobs || []).length} role{(editing.selectedJobs || []).length !== 1 ? "s" : ""} selected — Total job XC: {(editing.selectedJobs || []).reduce((sum, j) => sum + j.xc, 0).toLocaleString()} XC
+                    </p>
+                  )}
+                </Field>
+
+                {/* Project Zero Template */}
+                <Field label="Project Zero Template (completed)">
+                  <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                    {editing.projectZeroTemplate ? (
+                      <span style={{ fontSize: "12px", color: "#22c55e" }}>Attached</span>
+                    ) : null}
+                    <button onClick={() => {
+                      const inp = document.createElement("input");
+                      inp.type = "file"; inp.accept = ".pdf,.doc,.docx,.png,.jpg,.jpeg";
+                      inp.onchange = (e: any) => {
+                        const f = e.target.files?.[0]; if (!f) return;
+                        const r = new FileReader();
+                        r.onload = () => setEditing(p => ({ ...p, projectZeroTemplate: r.result as string }));
+                        r.readAsDataURL(f);
+                      };
+                      inp.click();
+                    }} style={{
+                      padding: "10px 18px", borderRadius: "10px", fontSize: "12px", fontWeight: 700, cursor: "pointer",
+                      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)",
+                    }}>{editing.projectZeroTemplate ? "Replace File" : "Upload Template"}</button>
+                    {editing.projectZeroTemplate && (
+                      <button onClick={() => setEditing(p => ({ ...p, projectZeroTemplate: "" }))} style={{
+                        background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "12px",
+                      }}>Remove</button>
+                    )}
+                  </div>
+                </Field>
+
+                {/* Entry Fee */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <Field label="XC Entry Fee (0 = free)">
+                    <input type="number" value={editing.entryFeeXC || 0} onChange={e => setEditing(p => ({ ...p, entryFeeXC: parseInt(e.target.value) || 0 }))}
+                      min={0} max={10000} style={inputSx} />
+                    <p style={{ margin: "2px 0 0", fontSize: "9px", color: "rgba(255,255,255,0.25)" }}>XC players pay to enter (split: you + studio)</p>
+                  </Field>
+                  <Field label="Sponsor Type">
+                    <select value={editing.sponsorType || "player"} onChange={e => setEditing(p => ({ ...p, sponsorType: e.target.value as any }))}
+                      style={{ ...inputSx, cursor: "pointer" }}>
+                      <option value="player">Player (you)</option>
+                      <option value="partner">Outside Partner</option>
+                      <option value="none">No Sponsor</option>
+                    </select>
+                  </Field>
+                </div>
+
+                {editing.sponsorType === "partner" && (
+                  <Field label="Partner / Sponsor Name">
+                    <input value={editing.sponsorName || ""} onChange={e => setEditing(p => ({ ...p, sponsorName: e.target.value }))}
+                      placeholder="e.g. Adobe, Google, Local Business Name" style={inputSx} />
+                  </Field>
+                )}
+
+                {/* Pre-Production Checklist */}
+                {(() => {
+                  const checks = [
+                    { label: "Title & Description", ok: !!(editing.title?.trim() && editing.description?.trim()) },
+                    { label: "Target Pathway", ok: !!editing.pathway },
+                    { label: "Badge Name", ok: !!editing.badgeName?.trim() },
+                    { label: "Cover Art (16:9)", ok: !!editing.coverArt },
+                    { label: "Badge Concept", ok: !!(editing.badgeConcept?.trim()) },
+                    { label: "Job Roles Selected", ok: (editing.selectedJobs || []).length >= 1 },
+                    { label: "Project Zero Template", ok: !!editing.projectZeroTemplate },
+                  ];
+                  const allDone = checks.every(c => c.ok);
+                  return (
+                    <div style={{
+                      padding: "14px 16px", borderRadius: "12px",
+                      background: allDone ? "rgba(34,197,94,0.06)" : "rgba(245,158,11,0.06)",
+                      border: `1px solid ${allDone ? "rgba(34,197,94,0.2)" : "rgba(245,158,11,0.15)"}`,
+                    }}>
+                      <div style={{ fontSize: "11px", fontWeight: 700, color: allDone ? "#22c55e" : "#f59e0b", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "10px" }}>
+                        {allDone ? "✅ Pre-Production Complete" : "📋 Pre-Production Checklist"}
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 16px" }}>
+                        {checks.map(c => (
+                          <div key={c.label} style={{ fontSize: "11px", color: c.ok ? "rgba(34,197,94,0.8)" : "rgba(255,255,255,0.35)" }}>
+                            {c.ok ? "✓" : "○"} {c.label}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* NFT Info box */}
                 <div style={{
                   padding: "12px 16px", borderRadius: "10px",
-                  background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.15)",
+                  background: "linear-gradient(135deg, rgba(167,139,250,0.06), rgba(245,158,11,0.06))", border: "1px solid rgba(167,139,250,0.15)",
                   fontSize: "12px", color: "rgba(255,255,255,0.5)", lineHeight: 1.6,
                 }}>
-                  <strong style={{ color: "#a78bfa" }}>How it works:</strong> Submit your pitch and the host will review it. Once approved, your project becomes a node on the Pathway Portal. Every time another player completes your course, you earn <strong style={{ color: "#a78bfa" }}>{editing.residualPercent || 12}% of {editing.xcValue || 500} XC = {Math.round((editing.xcValue || 500) * (editing.residualPercent || 12) / 100)} XC</strong> as residual income.
+                  <strong style={{ color: "#f59e0b" }}>NFT Value System:</strong> Your course badge starts at <strong style={{ color: "#a78bfa" }}>{editing.xcValue || 500} XC</strong> base value. As more players complete it, the badge value rises automatically. You earn <strong style={{ color: "#a78bfa" }}>{editing.residualPercent || 12}% = {Math.round((editing.xcValue || 500) * (editing.residualPercent || 12) / 100)} XC</strong> residual per completion, forever.
+                  {(editing.entryFeeXC || 0) > 0 && (
+                    <><br/>Entry fee: <strong style={{ color: "#22c55e" }}>{editing.entryFeeXC} XC</strong> split between you and your Startup Studio.</>
+                  )}
+                  {(editing.selectedJobs || []).length > 0 && (
+                    <><br/>Jobs: <strong style={{ color: "#a78bfa" }}>{(editing.selectedJobs || []).length} roles</strong> will be auto-created as tasks when approved.</>
+                  )}
                 </div>
               </div>
 

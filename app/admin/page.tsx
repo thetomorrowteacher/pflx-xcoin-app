@@ -2,9 +2,9 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../components/SideNav";
-import { User, mockTasks, mockUsers, mockModifiers, mockTransactions, COIN_CATEGORIES, isHostUser } from "../lib/data";
+import { User, mockTasks, mockUsers, mockModifiers, mockTransactions, COIN_CATEGORIES, isHostUser, earnXCWithTax } from "../lib/data";
 import { applyPlayerImages } from "../lib/playerImages";
-import { saveUsers, saveTransactions } from "../lib/store";
+import { saveUsers, saveTransactions, saveStartupStudios } from "../lib/store";
 import { saveAndToast } from "../lib/saveToast";
 import { playReward, playBadge, playCoin, playCoinShower, playTax, playError, playClick, playNav, playToggle } from "../lib/sounds";
 
@@ -414,13 +414,14 @@ export default function AdminDashboard() {
       grantPlayerIds.forEach(pid => {
         const target = mockUsers.find(u => u.id === pid);
         if (!target) return;
-        target.xcoin += amt; target.totalXcoin += amt;
+        const { netXC, taxDeducted } = earnXCWithTax(target, amt, grantNote || "Admin XC Grant");
         mockTransactions.push({ id: `tx-${Date.now()}-${pid}`, userId: pid, type: "admin_grant",
-          amount: amt, currency: "xcoin", description: grantNote || "Admin XC Grant", createdAt: now });
+          amount: netXC, currency: "xcoin", description: `${grantNote || "Admin XC Grant"}${taxDeducted > 0 ? ` (${taxDeducted} XC taxed)` : ""}`, createdAt: now,
+          taxDeducted: taxDeducted || undefined, taxStudioId: target.studioId || undefined });
       });
       console.log(`[xc-grant] Granted ${amt} XC to ${grantPlayerIds.length} player(s), ${mockTransactions.length} total txns`);
       amt >= 1000 ? playCoinShower() : playCoin();
-      saveAndToast([saveUsers, saveTransactions], "XC granted — saved to cloud ✓");
+      saveAndToast([saveUsers, saveTransactions, saveStartupStudios], "XC granted — saved to cloud ✓");
       showToast(`+${amt.toLocaleString()} XC granted to ${grantPlayerIds.length} player(s).`, "success");
     } else {
       const validItems = grantItems.filter(gi => gi.coinName && parseInt(gi.amount) > 0);
@@ -444,7 +445,7 @@ export default function AdminDashboard() {
             else if (catName.includes("executive")) target.badgeCounts.executive += amt;
             else if (catName.includes("signature")) target.badgeCounts.signature += amt;
           }
-          if (coinDef) { target.xcoin += coinDef.xc * amt; target.totalXcoin += coinDef.xc * amt; }
+          if (coinDef) { earnXCWithTax(target, coinDef.xc * amt, `Badge: ${gi.coinName}`); }
           mockTransactions.push({ id: `tx-${Date.now()}-${pid}-${gi.coinName}-${totalAwarded}`,
             userId: pid, type: "admin_grant", amount: amt, currency: "xcoin",
             description: grantNote || `Badge Awarded: ${gi.coinName}`, createdAt: now });
@@ -458,7 +459,7 @@ export default function AdminDashboard() {
       });
       console.log(`[badge-grant] mockUsers has ${mockUsers.length} users, mockTransactions has ${mockTransactions.length} txns`);
       playBadge();
-      saveAndToast([saveUsers, saveTransactions], "Badges saved to cloud ✓");
+      saveAndToast([saveUsers, saveTransactions, saveStartupStudios], "Badges saved to cloud ✓");
       forceUpdate();
       showToast(`${totalAwarded} badge(s) across ${validItems.length} type(s) to ${grantPlayerIds.length} player(s).`, "success");
     }

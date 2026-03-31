@@ -9,6 +9,7 @@ import {
   isHostUser,
   CohortGroup, mockCohortGroups,
   ProjectPitch, mockProjectPitches,
+  PITCH_AUTO_JOBS, calculateNFTValue, calculateRarity,
 } from "../../lib/data";
 import { saveCheckpoints, saveTasks, saveJobs, saveProjects, saveCohortGroups, saveProjectPitches } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
@@ -1578,23 +1579,73 @@ export default function TaskManagement() {
               }} style={{ padding: "11px 22px", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)",
                   borderRadius: "10px", color: "#ef4444", fontWeight: 700, cursor: "pointer" }}>Reject</button>
               <button onClick={() => {
-                // Approve — generate a pathway node ID
+                // Approve — generate a pathway node ID + auto-create Project + Jobs
                 const slugPrefix = reviewingPitch.pathway.slice(0, 2);
                 const nodeId = `${slugPrefix}-pitch-${Date.now()}`;
+                const now = new Date().toISOString();
+                const projectId = `proj-pitch-${Date.now()}`;
+
+                // Auto-generate Jobs from pitch's selected Executive Badge roles (or fallback to defaults)
+                const generatedJobIds: string[] = [];
+                const jobSources = (reviewingPitch.selectedJobs && reviewingPitch.selectedJobs.length > 0)
+                  ? reviewingPitch.selectedJobs.map(j => ({ role: j.badgeName, description: j.description, xc: j.xc }))
+                  : PITCH_AUTO_JOBS.map(j => ({ role: j.role, description: j.description, xc: Math.round(reviewingPitch.xcValue * 0.15) }));
+                jobSources.forEach((jt, i) => {
+                  const jobId = `job-pitch-${Date.now()}-${i}`;
+                  generatedJobIds.push(jobId);
+                  const newJob: Job = {
+                    id: jobId,
+                    title: `${jt.role} — ${reviewingPitch.title}`,
+                    description: jt.description,
+                    rewardCoins: [],
+                    xcReward: jt.xc,
+                    slots: 1,
+                    filledSlots: 0,
+                    status: "open",
+                    createdBy: reviewingPitch.creatorId,
+                    createdAt: now,
+                    applicants: [],
+                    approved: [],
+                    assignedTo: "all",
+                    maxHires: 1,
+                    rewardBadges: [{ name: jt.role, xc: jt.xc }],
+                  };
+                  mockJobs.push(newJob);
+                });
+
+                // Auto-generate Project
+                const newProject: Project = {
+                  id: projectId,
+                  title: reviewingPitch.title,
+                  description: reviewingPitch.description,
+                  status: "active",
+                  taskIds: [],
+                  jobIds: generatedJobIds,
+                  createdBy: reviewingPitch.creatorId,
+                  createdAt: now,
+                  assignedTo: "all",
+                  xcRewardPool: reviewingPitch.xcValue,
+                  image: reviewingPitch.coverArt || reviewingPitch.image,
+                  link: reviewingPitch.courseUrl,
+                };
+                mockProjects.push(newProject);
+
                 const updated: ProjectPitch = {
                   ...reviewingPitch,
                   status: "approved",
-                  reviewedAt: new Date().toISOString(),
+                  reviewedAt: now,
                   reviewedBy: user?.id,
                   reviewNotes: reviewNotes.trim() || "Approved!",
                   pathwayNodeId: nodeId,
+                  generatedProjectId: projectId,
+                  generatedJobIds: generatedJobIds,
                 };
                 const next = allPitches.map(p => p.id === updated.id ? updated : p);
                 setAllPitches(next);
                 const idx = mockProjectPitches.findIndex(p => p.id === updated.id);
                 if (idx >= 0) mockProjectPitches[idx] = updated;
                 playSuccess();
-                saveAndToast([saveProjectPitches], "Pitch approved — will appear on Pathway Portal ✓");
+                saveAndToast([saveProjectPitches, saveProjects, saveJobs], "Pitch approved — Project + " + generatedJobIds.length + " Jobs created ✓");
                 setPitchReviewModal(false);
               }} style={{ padding: "11px 28px", background: "linear-gradient(135deg, #22c55e, #16a34a)",
                   border: "none", borderRadius: "10px", color: "white", fontWeight: 800, cursor: "pointer",

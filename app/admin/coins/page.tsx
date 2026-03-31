@@ -11,12 +11,13 @@ import {
   mockSubmissions,
   CoinSubmission,
   mockStartupStudios,
-  StartupStudio
+  StartupStudio,
+  earnXCWithTax
 } from "../../lib/data";
 import { applyPlayerImages } from "../../lib/playerImages";
 import { playReward, playSuccess, playClick, playDelete } from "../../lib/sounds";
 import { updatePlayerStats } from "../../lib/playerStats";
-import { saveCoinCategories, saveUsers, saveSubmissions } from "../../lib/store";
+import { saveCoinCategories, saveUsers, saveSubmissions, saveStartupStudios } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
 import { compressImage } from "../../lib/imageUtils";
 
@@ -123,8 +124,8 @@ export default function ManageCoinsPage() {
     if (targetPlayer) {
       const totalXcReward = coin.xc * amount;
       targetPlayer.digitalBadges += amount; // +X badges
-      targetPlayer.xcoin += totalXcReward;
-      targetPlayer.totalXcoin += totalXcReward;
+      // Use earnXCWithTax — auto-deducts studio income tax
+      const { netXC, taxDeducted } = earnXCWithTax(targetPlayer, totalXcReward, `Badge Grant: ${coin.name}`);
 
       // Add to submissions history as pre-approved
       mockSubmissions.push({
@@ -149,7 +150,7 @@ export default function ManageCoinsPage() {
 
       // Save to Supabase
       playReward();
-      saveAndToast([saveUsers, saveSubmissions], `${amount}x ${coin.name} granted — saved to cloud ✓`);
+      saveAndToast([saveUsers, saveSubmissions, saveStartupStudios], `${amount}x ${coin.name} granted — saved to cloud ✓`);
     }
     setGrantTarget(null);
   };

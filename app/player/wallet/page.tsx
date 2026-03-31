@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
-import { User, mockTransactions, Transaction, mockSubmissions, COIN_CATEGORIES, Coin } from "../../lib/data";
+import { User, mockTransactions, Transaction, mockSubmissions, COIN_CATEGORIES, Coin, getCurrentRank, getStudioTaxRate, getEvoSharePercent, mockStartupStudios, mockProjectPitches, calculateNFTValue, calculateRarity } from "../../lib/data";
 
 export default function PlayerWallet() {
   const router = useRouter();
@@ -27,14 +27,29 @@ export default function PlayerWallet() {
     badgeCounts[s.coinType] = (badgeCounts[s.coinType] || 0) + s.amount;
   });
 
-  const typeIcon: Record<Transaction["type"], string> = {
+  const typeIcon: Record<string, string> = {
     earned: "✅",
     spent: "💸",
     admin_grant: "🎁",
     pflx_tax: "🚫",
     investment_return: "📈",
-    investment_stake: "🤝"
+    investment_stake: "🤝",
+    task_reward: "🎯",
+    studio_tax: "🏛️",
+    entry_fee: "🎟️",
+    residual_income: "💰",
+    nft_value: "🔮",
   };
+
+  // Evo Ranking Portfolio data
+  const currentRank = getCurrentRank(user.totalXcoin, user);
+  const taxRate = getStudioTaxRate(user.rank || 1);
+  const sharePercent = getEvoSharePercent(user.rank || 1);
+  const myStudio = mockStartupStudios.find(s => s.id === user.studioId);
+  const myTaxPaid = myTxns.filter(t => (t as any).type === "studio_tax").reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const myPitches = mockProjectPitches.filter(p => p.creatorId === user.id);
+  const totalResidual = myPitches.reduce((sum, p) => sum + (p.totalResidualEarned || 0), 0);
+  const portfolioValue = Math.round(user.totalXcoin * (sharePercent / 100));
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#06090d" }}>
@@ -74,6 +89,113 @@ export default function PlayerWallet() {
             </div>
           </div>
         </div>
+
+        {/* Evo Ranking & Stakes/Shares Portfolio */}
+        <section style={{ marginBottom: "32px" }}>
+          <h2 style={{
+            margin: "0 0 16px", fontSize: "18px", fontWeight: 700, color: "#a78bfa",
+            textShadow: "0 0 15px rgba(167,139,250,0.5)",
+            textTransform: "uppercase", letterSpacing: "0.1em"
+          }}>📊 EVO RANKING PORTFOLIO</h2>
+
+          <div style={{
+            background: "linear-gradient(135deg, rgba(167,139,250,0.08), rgba(0,212,255,0.04))",
+            border: "1px solid rgba(167,139,250,0.25)", borderRadius: "16px",
+            padding: "24px", marginBottom: "16px",
+          }}>
+            {/* Rank Display */}
+            <div style={{ display: "flex", alignItems: "center", gap: "20px", marginBottom: "20px" }}>
+              <div style={{
+                width: "72px", height: "72px", borderRadius: "16px",
+                background: "linear-gradient(135deg, rgba(167,139,250,0.2), rgba(0,212,255,0.2))",
+                border: "2px solid rgba(167,139,250,0.4)", display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "32px", boxShadow: "0 0 20px rgba(167,139,250,0.2)",
+              }}>
+                {currentRank.icon}
+              </div>
+              <div>
+                <div style={{ fontSize: "20px", fontWeight: 900, color: "#f0f0ff" }}>{currentRank.name}</div>
+                <div style={{ fontSize: "12px", color: "rgba(167,139,250,0.6)", fontWeight: 600 }}>
+                  Level {currentRank.level} — {user.totalXcoin.toLocaleString()} XC Lifetime
+                </div>
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" }}>
+              <div style={{
+                padding: "16px", borderRadius: "12px", textAlign: "center",
+                background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.12)",
+              }}>
+                <div style={{ fontSize: "22px", fontWeight: 900, color: "#a78bfa" }}>{Math.round(taxRate * 100)}%</div>
+                <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", fontWeight: 700, textTransform: "uppercase", marginTop: "4px" }}>Studio Tax Rate</div>
+              </div>
+              <div style={{
+                padding: "16px", borderRadius: "12px", textAlign: "center",
+                background: "rgba(0,212,255,0.06)", border: "1px solid rgba(0,212,255,0.12)",
+              }}>
+                <div style={{ fontSize: "22px", fontWeight: 900, color: "#00d4ff" }}>{sharePercent}%</div>
+                <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", fontWeight: 700, textTransform: "uppercase", marginTop: "4px" }}>Stake/Shares</div>
+              </div>
+              <div style={{
+                padding: "16px", borderRadius: "12px", textAlign: "center",
+                background: "rgba(245,200,66,0.06)", border: "1px solid rgba(245,200,66,0.12)",
+              }}>
+                <div style={{ fontSize: "22px", fontWeight: 900, color: "#f5c842" }}>{portfolioValue.toLocaleString()}</div>
+                <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", fontWeight: 700, textTransform: "uppercase", marginTop: "4px" }}>Portfolio Value</div>
+              </div>
+              <div style={{
+                padding: "16px", borderRadius: "12px", textAlign: "center",
+                background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.12)",
+              }}>
+                <div style={{ fontSize: "22px", fontWeight: 900, color: "#22c55e" }}>{totalResidual.toLocaleString()}</div>
+                <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", fontWeight: 700, textTransform: "uppercase", marginTop: "4px" }}>Residual Income</div>
+              </div>
+            </div>
+
+            {/* Studio info */}
+            {myStudio && (
+              <div style={{
+                marginTop: "16px", padding: "12px 16px", borderRadius: "10px",
+                background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+              }}>
+                <div>
+                  <span style={{ fontSize: "16px", marginRight: "8px" }}>{myStudio.icon}</span>
+                  <span style={{ fontSize: "13px", fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>{myStudio.name}</span>
+                </div>
+                <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>
+                  Tax Paid: {myTaxPaid.toLocaleString()} XC
+                </div>
+              </div>
+            )}
+
+            {/* Producer Stats */}
+            {myPitches.length > 0 && (
+              <div style={{
+                marginTop: "12px", padding: "12px 16px", borderRadius: "10px",
+                background: "rgba(34,197,94,0.04)", border: "1px solid rgba(34,197,94,0.1)",
+              }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "rgba(34,197,94,0.7)", textTransform: "uppercase", marginBottom: "6px" }}>
+                  Producer Income
+                </div>
+                <div style={{ display: "flex", gap: "20px", fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>
+                  <span>{myPitches.length} pitched project{myPitches.length !== 1 ? "s" : ""}</span>
+                  <span>{myPitches.filter(p => p.status === "approved" || p.status === "live").length} approved/live</span>
+                  <span>{myPitches.reduce((sum, p) => sum + (p.completionCount || 0), 0)} total completions</span>
+                  <span style={{ color: "#22c55e", fontWeight: 700 }}>{totalResidual.toLocaleString()} XC residual</span>
+                </div>
+              </div>
+            )}
+
+            {/* Evo Rank Progression hint */}
+            <div style={{
+              marginTop: "12px", fontSize: "11px", color: "rgba(255,255,255,0.25)", lineHeight: 1.6,
+            }}>
+              Higher Evo ranks unlock higher stake/share percentages but also pay higher studio tax. Build your portfolio value by earning XC, pitching projects, and earning residual income.
+            </div>
+          </div>
+        </section>
 
         {/* Badge Collection Section */}
         <section style={{ marginBottom: "40px" }}>
@@ -202,8 +324,8 @@ export default function PlayerWallet() {
                       color: t.currency === "digitalBadge" ? "#f5c842" : "#a78bfa",
                       textShadow: t.currency === "digitalBadge" ? "0 0 8px rgba(245,200,66,0.4)" : "0 0 8px rgba(167,139,250,0.4)"
                     }}>
-                      {t.type === "spent" || t.type === "pflx_tax" ? "-" : "+"}
-                      {t.currency === "digitalBadge" ? `${t.amount} Digital Badge(s)` : `${t.amount} XC`}
+                      {t.type === "spent" || t.type === "pflx_tax" || (t as any).type === "studio_tax" ? "-" : "+"}
+                      {t.currency === "digitalBadge" ? `${t.amount} Digital Badge(s)` : `${Math.abs(t.amount)} XC`}
                     </p>
                   </div>
                 </div>
