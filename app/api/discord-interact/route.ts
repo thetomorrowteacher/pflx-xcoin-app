@@ -6,6 +6,45 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ""
 );
 
+// ─── Ed25519 Signature Verification (Discord requirement) ────────
+// Uses Web Crypto API (available in Vercel Edge & Node 18+)
+async function verifyDiscordSignature(
+  rawBody: string,
+  signature: string,
+  timestamp: string,
+  publicKey: string
+): Promise<boolean> {
+  try {
+    const encoder = new TextEncoder();
+    const message = encoder.encode(timestamp + rawBody);
+
+    // Import the public key
+    const keyData = hexToUint8Array(publicKey);
+    const cryptoKey = await crypto.subtle.importKey(
+      "raw",
+      keyData,
+      { name: "Ed25519" },
+      false,
+      ["verify"]
+    );
+
+    // Verify the signature
+    const sig = hexToUint8Array(signature);
+    return await crypto.subtle.verify("Ed25519", cryptoKey, sig, message);
+  } catch (e) {
+    console.error("[Discord] Signature verification error:", e);
+    return false;
+  }
+}
+
+function hexToUint8Array(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  }
+  return bytes;
+}
+
 // Discord Interaction Types
 const PING = 1;
 const APPLICATION_COMMAND = 2;
@@ -201,7 +240,24 @@ async function handleStats() {
 // ─── Main POST handler (Discord sends interactions here) ─────────
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const rawBody = await req.text();
+    const signature = req.headers.get("x-signature-ed25519") || "";
+    const timestamp = req.headers.get("x-signature-timestamp") || "";
+
+    // Load the Discord public key from Supabase settings
+    const { data: settingsRow } = await supabase
+      .from("app_data").select("data").eq("key", "notificationSettings").single();
+    const publicKey = settingsRow?.data?.discordPublicKey || "";
+
+    // Verify the request signature (required by Discord)
+    if (publicKey && signature && timestamp) {
+      const isValid = await verifyDiscordSignature(rawBody, signature, timestamp, publicKey);
+      if (!isValid) {
+        return new Response("Invalid request signature", { status: 401 });
+      }
+    }
+
+    const body = JSON.parse(rawBody);
 
     // Discord sends a PING to verify the endpoint
     if (body.type === PING) {

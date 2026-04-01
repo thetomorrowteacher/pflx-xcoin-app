@@ -35,6 +35,7 @@ export default function AdminSettings() {
   const [slackWebhookUrl, setSlackWebhookUrl] = useState("");
   const [discordWebhookUrl, setDiscordWebhookUrl] = useState("");
   const [discordBotToken, setDiscordBotToken] = useState("");
+  const [discordPublicKey, setDiscordPublicKey] = useState("");
   const [discordGuildId, setDiscordGuildId] = useState("");
   const [discordChannelId, setDiscordChannelId] = useState("");
   const [slackChannel, setSlackChannel] = useState("#pflx-xcoin-feed");
@@ -69,6 +70,7 @@ export default function AdminSettings() {
       if (cfg.slackWebhookUrl) setSlackWebhookUrl(cfg.slackWebhookUrl);
       if (cfg.discordWebhookUrl) setDiscordWebhookUrl(cfg.discordWebhookUrl);
       if (cfg.discordBotToken) setDiscordBotToken(cfg.discordBotToken);
+      if (cfg.discordPublicKey) setDiscordPublicKey(cfg.discordPublicKey);
       if (cfg.discordGuildId) setDiscordGuildId(cfg.discordGuildId);
       if (cfg.discordChannelId) setDiscordChannelId(cfg.discordChannelId);
       if (cfg.slackChannel) setSlackChannel(cfg.slackChannel);
@@ -84,7 +86,7 @@ export default function AdminSettings() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          slackWebhookUrl, discordWebhookUrl, discordBotToken,
+          slackWebhookUrl, discordWebhookUrl, discordBotToken, discordPublicKey,
           discordGuildId, discordChannelId, slackChannel,
           mentionAdmins, enabledEvents,
         }),
@@ -979,6 +981,18 @@ export default function AdminSettings() {
                 onChange={e => setDiscordBotToken(e.target.value)}
                 style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(167,139,250,0.15)", color: "white", fontSize: "13px", fontFamily: "monospace", outline: "none", boxSizing: "border-box" }}
               />
+            </div>
+
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(167,139,250,0.7)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "6px" }}>Public Key (required for slash commands)</label>
+              <input
+                type="text"
+                placeholder="Your Discord app public key..."
+                value={discordPublicKey}
+                onChange={e => setDiscordPublicKey(e.target.value)}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(167,139,250,0.15)", color: "white", fontSize: "13px", fontFamily: "monospace", outline: "none", boxSizing: "border-box" }}
+              />
+              <p style={{ margin: "6px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>Discord Developer Portal → Your App → General Information → PUBLIC KEY</p>
             </div>
 
             <div style={{ display: "flex", gap: "10px", marginBottom: "14px" }}>
