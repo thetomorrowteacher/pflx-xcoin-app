@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import nacl from "tweetnacl";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://hyxiagexyptzvetqjmnj.supabase.co",
@@ -7,42 +8,29 @@ const supabase = createClient(
 );
 
 // ─── Ed25519 Signature Verification (Discord requirement) ────────
-// Uses Web Crypto API (available in Vercel Edge & Node 18+)
-async function verifyDiscordSignature(
-  rawBody: string,
-  signature: string,
-  timestamp: string,
-  publicKey: string
-): Promise<boolean> {
-  try {
-    const encoder = new TextEncoder();
-    const message = encoder.encode(timestamp + rawBody);
-
-    // Import the public key
-    const keyData = hexToUint8Array(publicKey);
-    const cryptoKey = await crypto.subtle.importKey(
-      "raw",
-      keyData,
-      { name: "Ed25519" },
-      false,
-      ["verify"]
-    );
-
-    // Verify the signature
-    const sig = hexToUint8Array(signature);
-    return await crypto.subtle.verify("Ed25519", cryptoKey, sig, message);
-  } catch (e) {
-    console.error("[Discord] Signature verification error:", e);
-    return false;
-  }
-}
-
 function hexToUint8Array(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
   }
   return bytes;
+}
+
+function verifyDiscordSignature(
+  rawBody: string,
+  signature: string,
+  timestamp: string,
+  publicKey: string
+): boolean {
+  try {
+    const sig = hexToUint8Array(signature);
+    const key = hexToUint8Array(publicKey);
+    const msg = new TextEncoder().encode(timestamp + rawBody);
+    return nacl.sign.detached.verify(msg, sig, key);
+  } catch (e) {
+    console.error("[Discord] Signature verification error:", e);
+    return false;
+  }
 }
 
 // Discord Interaction Types
@@ -250,11 +238,15 @@ export async function POST(req: Request) {
     const publicKey = settingsRow?.data?.discordPublicKey || "";
 
     // Verify the request signature (required by Discord)
-    if (publicKey && signature && timestamp) {
-      const isValid = await verifyDiscordSignature(rawBody, signature, timestamp, publicKey);
-      if (!isValid) {
-        return new Response("Invalid request signature", { status: 401 });
-      }
+    if (!publicKey) {
+      console.error("[Discord] No public key configured — cannot verify signature");
+      return new Response("Server not configured for Discord interactions", { status: 401 });
+    }
+
+    const isValid = verifyDiscordSignature(rawBody, signature, timestamp, publicKey);
+    if (!isValid) {
+      console.error("[Discord] Invalid signature — rejecting request");
+      return new Response("Invalid request signature", { status: 401 });
     }
 
     const body = JSON.parse(rawBody);
