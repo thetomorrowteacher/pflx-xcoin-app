@@ -6,6 +6,7 @@ import { User, Task, mockTasks, mockUsers, CoinSubmission, mockSubmissions, mock
 import { playSuccess, playError, playTradeComplete, playInvest, playCashRegister } from "../../lib/sounds";
 import { saveUsers, saveTransactions, saveSubmissions, saveTasks, saveTrades, saveInvestments, saveStartupStudios } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
+import { notifyTaskApproved } from "../../lib/notifications";
 
 /* ── AI Analysis types ─────────────────────────────────────────────── */
 interface AIAnalysis {
@@ -127,6 +128,11 @@ export default function AdminApprovals() {
     playCashRegister();
     saveAndToast([saveTasks, saveUsers, saveTransactions, saveStartupStudios], "Task approved — saved to cloud ✓");
     showToast("Task approved! X-Coin awarded. 🎉", "success");
+
+    // Send notification to Slack/Discord
+    if (player) {
+      notifyTaskApproved(player.brandName || player.name, task.title, xcAwarded).catch(() => {});
+    }
   };
 
   /* Opens the reject modal — auto-generates AI feedback if analysis exists */

@@ -10,6 +10,7 @@ import { saveProjectPitches } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
 import { playClick, playSuccess, playError, playModalOpen, playModalClose } from "../../lib/sounds";
 import { applyPlayerImages } from "../../lib/playerImages";
+import { notifyPitchSubmitted } from "../../lib/notifications";
 
 const PATHWAYS = [
   { slug: "professional-entrepreneur", label: "Professional Entrepreneur", icon: "📖" },
@@ -162,6 +163,10 @@ export default function PlayerPitchPage() {
     setPitches(next);
     playSuccess();
     saveAndToast([saveProjectPitches], submit ? "Pitch submitted for review ✓" : "Draft saved ✓");
+    // Notify Slack/Discord on submission
+    if (submit && user) {
+      notifyPitchSubmitted(user.brandName || user.name, saved.title, saved.pathway).catch(() => {});
+    }
     setEditModal(false);
   };
 

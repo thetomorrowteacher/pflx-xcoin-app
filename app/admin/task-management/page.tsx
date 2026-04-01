@@ -13,6 +13,7 @@ import {
 } from "../../lib/data";
 import { saveCheckpoints, saveTasks, saveJobs, saveProjects, saveCohortGroups, saveProjectPitches } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
+import { notifyPitchApproved, notifyPitchSubmitted, notifyJobHired } from "../../lib/notifications";
 import { playClick, playNav, playSuccess, playError, playDelete, playModalOpen, playModalClose } from "../../lib/sounds";
 import { compressBannerImage } from "../../lib/imageUtils";
 
@@ -535,6 +536,10 @@ export default function TaskManagement() {
 
     playSuccess();
     saveAndToast([saveJobs, saveTasks], `${mockUsers.find(u => u.id === playerId)?.brandName || "Player"} hired — task created ✓`);
+    // Notify Slack/Discord
+    const hiredPlayer = mockUsers.find(u => u.id === playerId);
+    const parentProject = mockProjects.find(p => p.jobIds?.includes(jobId));
+    notifyJobHired(hiredPlayer?.brandName || hiredPlayer?.name || "Unknown", job.title, parentProject?.title || "Direct Job").catch(() => {});
   };
 
   const handleSaveJob = () => {
@@ -1646,6 +1651,9 @@ export default function TaskManagement() {
                 if (idx >= 0) mockProjectPitches[idx] = updated;
                 playSuccess();
                 saveAndToast([saveProjectPitches, saveProjects, saveJobs], "Pitch approved — Project + " + generatedJobIds.length + " Jobs created ✓");
+                // Notify Slack/Discord
+                const pitchCreator = mockUsers.find(u => u.id === reviewingPitch.creatorId);
+                notifyPitchApproved(pitchCreator?.brandName || pitchCreator?.name || "Unknown", reviewingPitch.title, generatedJobIds.length).catch(() => {});
                 setPitchReviewModal(false);
               }} style={{ padding: "11px 28px", background: "linear-gradient(135deg, #22c55e, #16a34a)",
                   border: "none", borderRadius: "10px", color: "white", fontWeight: 800, cursor: "pointer",

@@ -6,6 +6,7 @@ import { User, mockTasks, mockUsers, mockModifiers, mockTransactions, COIN_CATEG
 import { applyPlayerImages } from "../lib/playerImages";
 import { saveUsers, saveTransactions, saveStartupStudios } from "../lib/store";
 import { saveAndToast } from "../lib/saveToast";
+import { notifyXCAward, notifyBadgeAwarded } from "../lib/notifications";
 import { playReward, playBadge, playCoin, playCoinShower, playTax, playError, playClick, playNav, playToggle } from "../lib/sounds";
 
 // ── Multi-select player picker ────────────────────────────────────────────────
@@ -423,6 +424,11 @@ export default function AdminDashboard() {
       amt >= 1000 ? playCoinShower() : playCoin();
       saveAndToast([saveUsers, saveTransactions, saveStartupStudios], "XC granted — saved to cloud ✓");
       showToast(`+${amt.toLocaleString()} XC granted to ${grantPlayerIds.length} player(s).`, "success");
+      // Notify Slack/Discord
+      grantPlayerIds.forEach(pid => {
+        const t = mockUsers.find(u => u.id === pid);
+        if (t) notifyXCAward(t.brandName || t.name, amt, grantNote || "Admin XC Grant").catch(() => {});
+      });
     } else {
       const validItems = grantItems.filter(gi => gi.coinName && parseInt(gi.amount) > 0);
       if (validItems.length === 0) { playError(); showToast("Add at least one badge.", "error"); return; }
@@ -462,6 +468,14 @@ export default function AdminDashboard() {
       saveAndToast([saveUsers, saveTransactions, saveStartupStudios], "Badges saved to cloud ✓");
       forceUpdate();
       showToast(`${totalAwarded} badge(s) across ${validItems.length} type(s) to ${grantPlayerIds.length} player(s).`, "success");
+      // Notify Slack/Discord for badge grants
+      grantPlayerIds.forEach(pid => {
+        const t = mockUsers.find(u => u.id === pid);
+        if (t) validItems.forEach(gi => {
+          const coinDef = COIN_CATEGORIES.flatMap(c => c.coins).find(c => c.name === gi.coinName);
+          notifyBadgeAwarded(t.brandName || t.name, gi.coinName, coinDef?.xc || 0).catch(() => {});
+        });
+      });
     }
     forceUpdate();
     setGrantPlayerIds([]); setGrantXpAmount(""); setGrantNote("");

@@ -12,7 +12,7 @@ import { compressImage, compressBannerImage } from "../../lib/imageUtils";
 export default function AdminSettings() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<"seasons" | "ranks" | "sound" | "onboarding">("seasons");
+  const [activeTab, setActiveTab] = useState<"seasons" | "ranks" | "sound" | "onboarding" | "integrations">("seasons");
   const [onboardingFineXC, setOnboardingFineXC] = useState(() => {
     if (typeof window !== "undefined") {
       return parseInt(localStorage.getItem("pflx_onboarding_fine") || "10");
@@ -29,6 +29,97 @@ export default function AdminSettings() {
 
   const [ranks, setRanks] = useState<PFLXRank[]>(mockPflxRanks);
   const [periods, setPeriods] = useState<GamePeriod[]>(mockGamePeriods);
+
+  // ── Integration settings state ─────────────────────────────────────────────
+  const [intLoading, setIntLoading] = useState(false);
+  const [slackWebhookUrl, setSlackWebhookUrl] = useState("");
+  const [discordWebhookUrl, setDiscordWebhookUrl] = useState("");
+  const [discordBotToken, setDiscordBotToken] = useState("");
+  const [discordGuildId, setDiscordGuildId] = useState("");
+  const [discordChannelId, setDiscordChannelId] = useState("");
+  const [slackChannel, setSlackChannel] = useState("#pflx-xcoin-feed");
+  const [mentionAdmins, setMentionAdmins] = useState(true);
+  const [enabledEvents, setEnabledEvents] = useState<string[]>([
+    "pitch_submitted", "pitch_approved", "pitch_rejected",
+    "xc_awarded", "task_approved", "job_hired",
+    "badge_awarded", "rank_up",
+  ]);
+  const [intSaved, setIntSaved] = useState(false);
+
+  const ALL_EVENTS = [
+    { id: "pitch_submitted", label: "Pitch Submitted", emoji: "💡" },
+    { id: "pitch_approved", label: "Pitch Approved", emoji: "✅" },
+    { id: "pitch_rejected", label: "Pitch Rejected", emoji: "❌" },
+    { id: "xc_awarded", label: "XC Awarded", emoji: "⚡" },
+    { id: "job_posted", label: "Job Posted", emoji: "📋" },
+    { id: "job_hired", label: "Player Hired", emoji: "🤝" },
+    { id: "task_approved", label: "Task Approved", emoji: "🎯" },
+    { id: "task_rejected", label: "Task Rejected", emoji: "🔄" },
+    { id: "badge_awarded", label: "Badge Awarded", emoji: "🏅" },
+    { id: "rank_up", label: "Rank Up", emoji: "📈" },
+    { id: "studio_tax", label: "Studio Tax", emoji: "🏛️" },
+    { id: "entry_fee_paid", label: "Entry Fee Paid", emoji: "🎟️" },
+    { id: "residual_earned", label: "Residual Earned", emoji: "💰" },
+    { id: "leaderboard_update", label: "Leaderboard Update", emoji: "🏆" },
+  ];
+
+  // Load integration settings on mount
+  useEffect(() => {
+    fetch("/api/notify-settings").then(r => r.json()).then(cfg => {
+      if (cfg.slackWebhookUrl) setSlackWebhookUrl(cfg.slackWebhookUrl);
+      if (cfg.discordWebhookUrl) setDiscordWebhookUrl(cfg.discordWebhookUrl);
+      if (cfg.discordBotToken) setDiscordBotToken(cfg.discordBotToken);
+      if (cfg.discordGuildId) setDiscordGuildId(cfg.discordGuildId);
+      if (cfg.discordChannelId) setDiscordChannelId(cfg.discordChannelId);
+      if (cfg.slackChannel) setSlackChannel(cfg.slackChannel);
+      if (cfg.mentionAdmins !== undefined) setMentionAdmins(cfg.mentionAdmins);
+      if (cfg.enabledEvents?.length) setEnabledEvents(cfg.enabledEvents);
+    }).catch(() => {});
+  }, []);
+
+  const saveIntegrationSettings = async () => {
+    setIntLoading(true);
+    try {
+      const res = await fetch("/api/notify-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slackWebhookUrl, discordWebhookUrl, discordBotToken,
+          discordGuildId, discordChannelId, slackChannel,
+          mentionAdmins, enabledEvents,
+        }),
+      });
+      if (res.ok) {
+        playSuccess && playSuccess();
+        showToast("Integration settings saved!", "success");
+        setIntSaved(true);
+        setTimeout(() => setIntSaved(false), 3000);
+      } else throw new Error();
+    } catch {
+      playError && playError();
+      showToast("Failed to save integration settings", "error");
+    }
+    setIntLoading(false);
+  };
+
+  const testWebhook = async (platform: "slack" | "discord") => {
+    const url = platform === "slack" ? slackWebhookUrl : discordWebhookUrl;
+    if (!url) { showToast(`No ${platform} webhook URL configured`, "error"); return; }
+    try {
+      const payload = platform === "slack"
+        ? { blocks: [{ type: "header", text: { type: "plain_text", text: "🧪 PFLX Test Notification", emoji: true } }, { type: "section", text: { type: "mrkdwn", text: "If you see this, your Slack integration is working! 🎉" } }, { type: "context", elements: [{ type: "mrkdwn", text: `PFLX X-Coin System • ${new Date().toLocaleString()}` }] }] }
+        : { embeds: [{ title: "🧪 PFLX Test Notification", description: "If you see this, your Discord integration is working! 🎉", color: 0x00d4ff, footer: { text: "PFLX X-Coin System" }, timestamp: new Date().toISOString() }] };
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (res.ok) { playReward && playReward(); showToast(`${platform === "slack" ? "Slack" : "Discord"} test sent!`, "success"); }
+      else throw new Error();
+    } catch {
+      showToast(`${platform === "slack" ? "Slack" : "Discord"} webhook failed — check URL`, "error");
+    }
+  };
+
+  const toggleEvent = (eventId: string) => {
+    setEnabledEvents(prev => prev.includes(eventId) ? prev.filter(e => e !== eventId) : [...prev, eventId]);
+  };
 
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
@@ -158,13 +249,13 @@ export default function AdminSettings() {
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
             filter: "drop-shadow(0 0 10px rgba(0,212,255,0.4))"
           }}>⚙️ SETTINGS</h1>
-          <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.1em" }}>[ MANAGE GAME SEASONS, RANKINGS & SOUND ]</p>
+          <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.1em" }}>[ MANAGE SEASONS, RANKINGS, SOUND & INTEGRATIONS ]</p>
         </div>
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: "8px", marginBottom: "32px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "16px" }}>
-          {(["seasons", "ranks", "sound", "onboarding"] as const).map(tab => {
-            const tabColors: Record<string, string> = { seasons: "#f5c842", ranks: "#4f8ef7", sound: "#22c55e", onboarding: "#f472b6" };
+          {(["seasons", "ranks", "sound", "onboarding", "integrations"] as const).map(tab => {
+            const tabColors: Record<string, string> = { seasons: "#f5c842", ranks: "#4f8ef7", sound: "#22c55e", onboarding: "#f472b6", integrations: "#00d4ff" };
             const isActive = activeTab === tab;
             return (
               <button
@@ -178,7 +269,7 @@ export default function AdminSettings() {
                   borderBottom: isActive ? `2px solid ${tabColors[tab]}` : "2px solid transparent",
                 }}
               >
-                {tab === "seasons" ? "🗓️ Seasons" : tab === "ranks" ? "⚡ Evolution Rankings" : tab === "sound" ? "🔊 Sound Settings" : "🧬 Onboarding"}
+                {tab === "seasons" ? "🗓️ Seasons" : tab === "ranks" ? "⚡ Evolution Rankings" : tab === "sound" ? "🔊 Sound Settings" : tab === "onboarding" ? "🧬 Onboarding" : "🔗 Integrations"}
               </button>
             );
           })}
@@ -799,6 +890,228 @@ export default function AdminSettings() {
           >
             Save Onboarding Settings
           </button>
+        </div>
+      )}
+
+      {/* ── INTEGRATIONS TAB ── */}
+      {activeTab === "integrations" && (
+        <div style={{ maxWidth: "720px" }}>
+          {/* Info callout */}
+          <div style={{
+            background: "rgba(0,212,255,0.04)", border: "1px solid rgba(0,212,255,0.15)",
+            borderRadius: "14px", padding: "16px 20px", marginBottom: "28px",
+            display: "flex", alignItems: "flex-start", gap: "12px",
+          }}>
+            <span style={{ fontSize: "22px" }}>🔗</span>
+            <div>
+              <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: 1.7 }}>
+                Connect Slack and Discord to receive real-time notifications when players earn XC, pitches are submitted, tasks are approved, and more. Players can also use Discord slash commands to check their balance and view the leaderboard.
+              </p>
+            </div>
+          </div>
+
+          {/* ── Slack Section ── */}
+          <div style={{ background: "rgba(0,212,255,0.03)", border: "1px solid rgba(0,212,255,0.12)", borderRadius: "16px", padding: "24px", marginBottom: "20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
+              <span style={{ fontSize: "24px" }}>💬</span>
+              <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 800, color: "#00d4ff" }}>Slack Integration</h3>
+              {slackWebhookUrl && <span style={{ marginLeft: "auto", fontSize: "11px", padding: "3px 10px", borderRadius: "8px", background: "rgba(34,197,94,0.12)", color: "#22c55e", fontWeight: 700 }}>CONNECTED</span>}
+            </div>
+
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(0,212,255,0.7)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "6px" }}>Webhook URL</label>
+              <input
+                type="url"
+                placeholder="https://hooks.slack.com/services/..."
+                value={slackWebhookUrl}
+                onChange={e => setSlackWebhookUrl(e.target.value)}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(0,212,255,0.15)", color: "white", fontSize: "13px", fontFamily: "monospace", outline: "none", boxSizing: "border-box" }}
+              />
+              <p style={{ margin: "6px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>Create at: Slack App → Incoming Webhooks → Add New Webhook to Workspace</p>
+            </div>
+
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(0,212,255,0.7)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "6px" }}>Channel Override</label>
+              <input
+                type="text"
+                placeholder="#pflx-xcoin-feed"
+                value={slackChannel}
+                onChange={e => setSlackChannel(e.target.value)}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(0,212,255,0.15)", color: "white", fontSize: "13px", outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+
+            <button
+              onClick={() => testWebhook("slack")}
+              disabled={!slackWebhookUrl}
+              style={{ padding: "8px 20px", borderRadius: "8px", border: "1px solid rgba(0,212,255,0.3)", background: "rgba(0,212,255,0.08)", color: "#00d4ff", fontSize: "12px", fontWeight: 700, cursor: slackWebhookUrl ? "pointer" : "not-allowed", opacity: slackWebhookUrl ? 1 : 0.4 }}
+            >
+              🧪 Send Test Notification
+            </button>
+          </div>
+
+          {/* ── Discord Section ── */}
+          <div style={{ background: "rgba(167,139,250,0.03)", border: "1px solid rgba(167,139,250,0.12)", borderRadius: "16px", padding: "24px", marginBottom: "20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
+              <span style={{ fontSize: "24px" }}>🎮</span>
+              <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 800, color: "#a78bfa" }}>Discord Integration</h3>
+              {discordWebhookUrl && <span style={{ marginLeft: "auto", fontSize: "11px", padding: "3px 10px", borderRadius: "8px", background: "rgba(34,197,94,0.12)", color: "#22c55e", fontWeight: 700 }}>CONNECTED</span>}
+            </div>
+
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(167,139,250,0.7)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "6px" }}>Webhook URL (for notifications)</label>
+              <input
+                type="url"
+                placeholder="https://discord.com/api/webhooks/..."
+                value={discordWebhookUrl}
+                onChange={e => setDiscordWebhookUrl(e.target.value)}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(167,139,250,0.15)", color: "white", fontSize: "13px", fontFamily: "monospace", outline: "none", boxSizing: "border-box" }}
+              />
+              <p style={{ margin: "6px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>Server Settings → Integrations → Webhooks → New Webhook</p>
+            </div>
+
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(167,139,250,0.7)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "6px" }}>Bot Token (for slash commands)</label>
+              <input
+                type="password"
+                placeholder="Your Discord bot token..."
+                value={discordBotToken}
+                onChange={e => setDiscordBotToken(e.target.value)}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(167,139,250,0.15)", color: "white", fontSize: "13px", fontFamily: "monospace", outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", marginBottom: "14px" }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(167,139,250,0.7)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "6px" }}>Guild (Server) ID</label>
+                <input
+                  type="text"
+                  placeholder="123456789..."
+                  value={discordGuildId}
+                  onChange={e => setDiscordGuildId(e.target.value)}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(167,139,250,0.15)", color: "white", fontSize: "13px", fontFamily: "monospace", outline: "none", boxSizing: "border-box" }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(167,139,250,0.7)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "6px" }}>Channel ID</label>
+                <input
+                  type="text"
+                  placeholder="123456789..."
+                  value={discordChannelId}
+                  onChange={e => setDiscordChannelId(e.target.value)}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(167,139,250,0.15)", color: "white", fontSize: "13px", fontFamily: "monospace", outline: "none", boxSizing: "border-box" }}
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={() => testWebhook("discord")}
+              disabled={!discordWebhookUrl}
+              style={{ padding: "8px 20px", borderRadius: "8px", border: "1px solid rgba(167,139,250,0.3)", background: "rgba(167,139,250,0.08)", color: "#a78bfa", fontSize: "12px", fontWeight: 700, cursor: discordWebhookUrl ? "pointer" : "not-allowed", opacity: discordWebhookUrl ? 1 : 0.4 }}
+            >
+              🧪 Send Test Notification
+            </button>
+
+            {/* Slash commands info */}
+            <div style={{ marginTop: "16px", padding: "12px 16px", background: "rgba(167,139,250,0.05)", borderRadius: "10px", border: "1px solid rgba(167,139,250,0.1)" }}>
+              <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Discord Slash Commands Available</p>
+              <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", lineHeight: 1.8 }}>
+                <code style={{ color: "#a78bfa" }}>/balance</code> — Check XC wallet &nbsp;|&nbsp;
+                <code style={{ color: "#a78bfa" }}>/leaderboard</code> — Top 10 &nbsp;|&nbsp;
+                <code style={{ color: "#a78bfa" }}>/jobs</code> — Open jobs &nbsp;|&nbsp;
+                <code style={{ color: "#a78bfa" }}>/pitches</code> — Live projects &nbsp;|&nbsp;
+                <code style={{ color: "#a78bfa" }}>/stats</code> — Economy stats
+              </div>
+              <p style={{ margin: "8px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.2)" }}>Set Interactions Endpoint URL in Discord Developer Portal to: <code style={{ color: "rgba(167,139,250,0.6)" }}>https://your-app.vercel.app/api/discord-interact</code></p>
+            </div>
+          </div>
+
+          {/* ── Notification Events ── */}
+          <div style={{ background: "rgba(245,200,66,0.03)", border: "1px solid rgba(245,200,66,0.12)", borderRadius: "16px", padding: "24px", marginBottom: "20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+              <span style={{ fontSize: "20px" }}>📣</span>
+              <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 800, color: "#f5c842" }}>Notification Events</h3>
+              <button
+                onClick={() => {
+                  if (enabledEvents.length === ALL_EVENTS.length) setEnabledEvents([]);
+                  else setEnabledEvents(ALL_EVENTS.map(e => e.id));
+                }}
+                style={{ marginLeft: "auto", fontSize: "11px", padding: "4px 12px", borderRadius: "6px", border: "1px solid rgba(245,200,66,0.2)", background: "transparent", color: "#f5c842", cursor: "pointer", fontWeight: 600 }}
+              >
+                {enabledEvents.length === ALL_EVENTS.length ? "Deselect All" : "Select All"}
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              {ALL_EVENTS.map(evt => {
+                const active = enabledEvents.includes(evt.id);
+                return (
+                  <button
+                    key={evt.id}
+                    onClick={() => { playClick && playClick(); toggleEvent(evt.id); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "8px",
+                      padding: "10px 14px", borderRadius: "10px", cursor: "pointer",
+                      background: active ? "rgba(245,200,66,0.08)" : "rgba(255,255,255,0.02)",
+                      border: active ? "1px solid rgba(245,200,66,0.25)" : "1px solid rgba(255,255,255,0.06)",
+                      color: active ? "#f5c842" : "rgba(255,255,255,0.3)",
+                      fontSize: "12px", fontWeight: 600, transition: "all 0.2s", textAlign: "left",
+                    }}
+                  >
+                    <span style={{ fontSize: "16px" }}>{evt.emoji}</span>
+                    <span>{evt.label}</span>
+                    {active && <span style={{ marginLeft: "auto", fontSize: "10px", color: "#22c55e" }}>ON</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Mention admins toggle */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "rgba(255,255,255,0.02)", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)", marginTop: "14px" }}>
+              <div>
+                <p style={{ margin: 0, fontSize: "13px", fontWeight: 700, color: "#f5c842" }}>Mention Admins</p>
+                <p style={{ margin: "2px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>@mention admin role in Slack/Discord for important events</p>
+              </div>
+              <button
+                onClick={() => { setMentionAdmins(!mentionAdmins); playToggle && playToggle(); }}
+                style={{
+                  width: "48px", height: "26px", borderRadius: "13px", border: "none", cursor: "pointer",
+                  background: mentionAdmins ? "#f5c842" : "rgba(255,255,255,0.1)",
+                  position: "relative", transition: "all 0.2s",
+                }}
+              >
+                <div style={{
+                  width: "20px", height: "20px", borderRadius: "50%", background: "#fff",
+                  position: "absolute", top: "3px", transition: "left 0.2s",
+                  left: mentionAdmins ? "25px" : "3px",
+                }} />
+              </button>
+            </div>
+          </div>
+
+          {/* Save button */}
+          <button
+            onClick={saveIntegrationSettings}
+            disabled={intLoading}
+            style={{
+              width: "100%", padding: "14px", borderRadius: "12px", border: "none",
+              background: intSaved ? "linear-gradient(90deg, #22c55e, #00d4ff)" : "linear-gradient(90deg, #00d4ff, #a78bfa)",
+              color: "#fff", fontSize: "14px", fontWeight: 800, letterSpacing: "0.06em",
+              cursor: intLoading ? "wait" : "pointer", opacity: intLoading ? 0.6 : 1,
+            }}
+          >
+            {intLoading ? "Saving..." : intSaved ? "Saved!" : "Save Integration Settings"}
+          </button>
+
+          {/* Setup Guide */}
+          <div style={{ marginTop: "24px", padding: "18px 20px", background: "rgba(255,255,255,0.02)", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <h4 style={{ margin: "0 0 12px", fontSize: "14px", fontWeight: 800, color: "rgba(255,255,255,0.5)" }}>Quick Setup Guide</h4>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", lineHeight: 2 }}>
+              <p style={{ margin: "0 0 4px" }}><strong style={{ color: "#00d4ff" }}>Slack:</strong> 1) Create a Slack App → 2) Enable Incoming Webhooks → 3) Add to your workspace → 4) Paste the webhook URL above</p>
+              <p style={{ margin: "0 0 4px" }}><strong style={{ color: "#a78bfa" }}>Discord Webhooks:</strong> 1) Server Settings → Integrations → Webhooks → 2) New Webhook → 3) Copy URL → 4) Paste above</p>
+              <p style={{ margin: 0 }}><strong style={{ color: "#a78bfa" }}>Discord Bot:</strong> 1) Create app at discord.com/developers → 2) Add Bot → 3) Copy token → 4) Set Interactions Endpoint to your Vercel URL + /api/discord-interact → 5) Invite bot to server</p>
+            </div>
+          </div>
         </div>
       )}
     </div>

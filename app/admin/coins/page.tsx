@@ -20,6 +20,7 @@ import { updatePlayerStats } from "../../lib/playerStats";
 import { saveCoinCategories, saveUsers, saveSubmissions, saveStartupStudios } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
 import { compressImage } from "../../lib/imageUtils";
+import { notifyBadgeAwarded } from "../../lib/notifications";
 
 
 export default function ManageCoinsPage() {
@@ -151,6 +152,8 @@ export default function ManageCoinsPage() {
       // Save to Supabase
       playReward();
       saveAndToast([saveUsers, saveSubmissions, saveStartupStudios], `${amount}x ${coin.name} granted — saved to cloud ✓`);
+      // Notify Slack/Discord
+      notifyBadgeAwarded(targetPlayer.brandName || targetPlayer.name, coin.name, coin.xc).catch(() => {});
     }
     setGrantTarget(null);
   };
