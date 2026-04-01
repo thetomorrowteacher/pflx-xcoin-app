@@ -556,6 +556,9 @@ export interface CoinSubmission {
   submittedAt: string;
   reviewedAt?: string;
   feedback?: string;
+  source?: "player" | "xbot";
+  confidence?: "high" | "medium";
+  platform?: "discord" | "slack";
 }
 
 export interface Coin {

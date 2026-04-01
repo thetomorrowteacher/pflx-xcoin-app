@@ -135,6 +135,58 @@ export default function AdminApprovals() {
     }
   };
 
+  /* ── Coin/Badge Submission Approve/Reject ─────────────────────────── */
+  const handleApproveCoinSubmission = (subId: string) => {
+    const sub = mockSubmissions.find(s => s.id === subId);
+    if (!sub) return;
+    sub.status = "approved";
+    sub.reviewedAt = new Date().toISOString();
+    sub.feedback = "Approved by admin";
+
+    // Award XC to the player
+    const player = mockUsers.find(u => u.id === sub.playerId);
+    if (player) {
+      const coinDef = COIN_CATEGORIES.flatMap(c => c.coins).find(c => c.name === sub.coinType);
+      const grossXC = coinDef ? coinDef.xc * sub.amount : 100;
+      const { netXC, taxDeducted } = earnXCWithTax(player, grossXC, `Badge: ${sub.coinType}`);
+      player.digitalBadges += sub.amount;
+      if (!player.badgeCounts) player.badgeCounts = { signature: 0, executive: 0, premium: 0, primary: 0 };
+      const category = COIN_CATEGORIES.find(cat => cat.coins.some(c => c.name === sub.coinType));
+      if (category) {
+        const catName = category.name.toLowerCase();
+        if (catName.includes("primary")) player.badgeCounts.primary += sub.amount;
+        else if (catName.includes("premium")) player.badgeCounts.premium += sub.amount;
+        else if (catName.includes("executive")) player.badgeCounts.executive += sub.amount;
+        else if (catName.includes("signature")) player.badgeCounts.signature += sub.amount;
+      }
+      mockTransactions.push({
+        id: `tx-${Date.now()}-${player.id}-${sub.coinType}`,
+        userId: player.id, type: "task_reward", amount: netXC, currency: "xcoin",
+        description: `Badge Awarded: ${sub.coinType}${sub.source === "xbot" ? " (X-Bot)" : ""}${taxDeducted > 0 ? ` (${taxDeducted} XC taxed)` : ""}`,
+        createdAt: new Date().toISOString().split("T")[0],
+        taxDeducted: taxDeducted || undefined,
+        taxStudioId: player.studioId || undefined,
+      });
+    }
+
+    setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, status: "approved" as const } : s));
+    playCashRegister();
+    saveAndToast([saveSubmissions, saveUsers, saveTransactions, saveStartupStudios], "Badge approved — saved to cloud ✓");
+    showToast("Badge approved! XC awarded. 🎉", "success");
+  };
+
+  const handleRejectCoinSubmission = (subId: string) => {
+    const sub = mockSubmissions.find(s => s.id === subId);
+    if (!sub) return;
+    sub.status = "rejected";
+    sub.reviewedAt = new Date().toISOString();
+    sub.feedback = "Rejected by admin";
+    setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, status: "rejected" as const } : s));
+    playError();
+    saveAndToast([saveSubmissions], "Badge submission rejected — saved to cloud ✓");
+    showToast("Badge submission rejected.", "error");
+  };
+
   /* Opens the reject modal — auto-generates AI feedback if analysis exists */
   const openRejectModal = async (taskId: string) => {
     const ai = analyses[taskId];
@@ -625,6 +677,124 @@ export default function AdminApprovals() {
                         </div>
                       </div>
                     )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Section: Pending Coin / Badge Awards */}
+        <div style={{ marginBottom: "40px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
+            <h2 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#f5c842" }}>🪙 Pending Badge Awards</h2>
+            {pendingCoins.length > 0 && (
+              <span style={{
+                padding: "2px 8px", borderRadius: "100px", fontSize: "12px", fontWeight: 700,
+                background: "rgba(245,200,66,0.15)", color: "#f5c842",
+                border: "1px solid rgba(245,200,66,0.25)"
+              }}>{pendingCoins.length}</span>
+            )}
+          </div>
+
+          {pendingCoins.length === 0 ? (
+            <div style={{
+              background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.08)",
+              borderRadius: "16px", padding: "32px", textAlign: "center",
+              color: "rgba(255,255,255,0.2)", fontSize: "14px"
+            }}>No pending badge awards</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {pendingCoins.map((sub) => {
+                const player = players.find(p => p.id === sub.playerId);
+                const isXBot = sub.source === "xbot" || sub.reason?.includes("[X-Bot]");
+                const coinDef = COIN_CATEGORIES.flatMap(c => c.coins).find(c => c.name === sub.coinType);
+                const xcValue = coinDef ? coinDef.xc * sub.amount : 0;
+                return (
+                  <div key={sub.id} style={{
+                    background: "rgba(22,22,31,0.9)",
+                    border: isXBot ? "1px solid rgba(0,212,255,0.2)" : "1px solid rgba(245,200,66,0.15)",
+                    borderRadius: "16px", padding: "20px",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px", flexWrap: "wrap" }}>
+                          {/* X-Bot badge */}
+                          {isXBot && (
+                            <span style={{
+                              padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+                              background: "rgba(0,212,255,0.12)", color: "#00d4ff",
+                              border: "1px solid rgba(0,212,255,0.25)",
+                              display: "flex", alignItems: "center", gap: "4px"
+                            }}>
+                              <span style={{ fontSize: "13px" }}>🤖</span> X-Bot
+                            </span>
+                          )}
+                          {/* Confidence level */}
+                          {isXBot && sub.confidence && (
+                            <span style={{
+                              padding: "2px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 600,
+                              background: sub.confidence === "high" ? "rgba(34,197,94,0.1)" : "rgba(245,200,66,0.1)",
+                              color: sub.confidence === "high" ? "#22c55e" : "#f5c842",
+                              border: `1px solid ${sub.confidence === "high" ? "rgba(34,197,94,0.2)" : "rgba(245,200,66,0.2)"}`,
+                              textTransform: "uppercase", letterSpacing: "0.05em"
+                            }}>
+                              {sub.confidence} confidence
+                            </span>
+                          )}
+                          {/* Platform tag */}
+                          {isXBot && sub.platform && (
+                            <span style={{
+                              padding: "2px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 600,
+                              background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.35)",
+                              border: "1px solid rgba(255,255,255,0.08)"
+                            }}>
+                              {sub.platform === "discord" ? "💬" : "📢"} {sub.platform}
+                            </span>
+                          )}
+                          {!isXBot && (
+                            <span style={{
+                              padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 600,
+                              background: "rgba(139,92,246,0.12)", color: "#8b5cf6",
+                              border: "1px solid rgba(139,92,246,0.2)"
+                            }}>Player Submission</span>
+                          )}
+                          <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>submitted {sub.submittedAt?.split("T")[0]}</span>
+                        </div>
+                        <p style={{ margin: "0 0 4px", fontSize: "15px", fontWeight: 700, color: "#f0f0ff" }}>
+                          {sub.amount}x {sub.coinType}
+                        </p>
+                        <p style={{ margin: "0 0 4px", fontSize: "12px", color: "rgba(255,255,255,0.3)" }}>
+                          Player: <span style={{ color: "#f0f0ff", fontWeight: 600 }}>{player?.brandName || player?.name || "Unknown"}</span>
+                        </p>
+                        <p style={{ margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.4)", fontStyle: "italic" }}>
+                          {sub.reason?.replace("[X-Bot] ", "")}
+                        </p>
+                        {sub.evidenceUrl && (
+                          <p style={{ margin: "4px 0 0", fontSize: "11px", color: "rgba(0,212,255,0.5)" }}>
+                            Evidence: {sub.evidenceUrl}
+                          </p>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <div style={{ textAlign: "right", marginRight: "8px" }}>
+                          <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#f5c842" }}>⚡ +{xcValue}</p>
+                          <p style={{ margin: 0, fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>XC reward</p>
+                        </div>
+                        <button onClick={() => handleRejectCoinSubmission(sub.id)} style={{
+                          padding: "8px 16px", borderRadius: "8px",
+                          background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)",
+                          color: "#ef4444", fontSize: "13px", fontWeight: 600, cursor: "pointer"
+                        }}>✕</button>
+                        <button onClick={() => handleApproveCoinSubmission(sub.id)} style={{
+                          padding: "8px 16px", borderRadius: "8px",
+                          background: isXBot ? "rgba(0,212,255,0.15)" : "rgba(245,200,66,0.15)",
+                          border: isXBot ? "1px solid rgba(0,212,255,0.3)" : "1px solid rgba(245,200,66,0.3)",
+                          color: isXBot ? "#00d4ff" : "#f5c842",
+                          fontSize: "13px", fontWeight: 600, cursor: "pointer"
+                        }}>Approve</button>
+                      </div>
+                    </div>
                   </div>
                 );
               })}

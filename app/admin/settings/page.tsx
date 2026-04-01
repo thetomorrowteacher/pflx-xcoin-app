@@ -38,6 +38,12 @@ export default function AdminSettings() {
   const [discordPublicKey, setDiscordPublicKey] = useState("");
   const [discordGuildId, setDiscordGuildId] = useState("");
   const [discordChannelId, setDiscordChannelId] = useState("");
+  const [discordScanChannelId, setDiscordScanChannelId] = useState("");
+  const [slackBotToken, setSlackBotToken] = useState("");
+  const [slackScanChannelId, setSlackScanChannelId] = useState("");
+  const [scanAutoApprove, setScanAutoApprove] = useState(false);
+  const [scanRunning, setScanRunning] = useState(false);
+  const [lastScanResult, setLastScanResult] = useState<string | null>(null);
   const [slackChannel, setSlackChannel] = useState("#pflx-xcoin-feed");
   const [mentionAdmins, setMentionAdmins] = useState(true);
   const [enabledEvents, setEnabledEvents] = useState<string[]>([
@@ -71,6 +77,10 @@ export default function AdminSettings() {
       if (cfg.discordWebhookUrl) setDiscordWebhookUrl(cfg.discordWebhookUrl);
       if (cfg.discordBotToken) setDiscordBotToken(cfg.discordBotToken);
       if (cfg.discordPublicKey) setDiscordPublicKey(cfg.discordPublicKey);
+      if (cfg.discordScanChannelId) setDiscordScanChannelId(cfg.discordScanChannelId);
+      if (cfg.slackBotToken) setSlackBotToken(cfg.slackBotToken);
+      if (cfg.slackScanChannelId) setSlackScanChannelId(cfg.slackScanChannelId);
+      if (cfg.scanAutoApprove !== undefined) setScanAutoApprove(cfg.scanAutoApprove);
       if (cfg.discordGuildId) setDiscordGuildId(cfg.discordGuildId);
       if (cfg.discordChannelId) setDiscordChannelId(cfg.discordChannelId);
       if (cfg.slackChannel) setSlackChannel(cfg.slackChannel);
@@ -89,6 +99,7 @@ export default function AdminSettings() {
           slackWebhookUrl, discordWebhookUrl, discordBotToken, discordPublicKey,
           discordGuildId, discordChannelId, slackChannel,
           mentionAdmins, enabledEvents,
+          discordScanChannelId, slackBotToken, slackScanChannelId, scanAutoApprove,
         }),
       });
       if (res.ok) {
@@ -121,6 +132,33 @@ export default function AdminSettings() {
 
   const toggleEvent = (eventId: string) => {
     setEnabledEvents(prev => prev.includes(eventId) ? prev.filter(e => e !== eventId) : [...prev, eventId]);
+  };
+
+  const runManualScan = async () => {
+    setScanRunning(true);
+    setLastScanResult(null);
+    try {
+      const res = await fetch("/api/scan-comms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "both" }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        playReward && playReward();
+        setLastScanResult(result.message);
+        showToast(`Scan complete! ${result.recommendations?.length || 0} awards found.`, "success");
+      } else {
+        playError && playError();
+        setLastScanResult("Scan failed — check console for details.");
+        showToast("Scan failed", "error");
+      }
+    } catch {
+      playError && playError();
+      setLastScanResult("Scan failed — network error.");
+      showToast("Scan failed", "error");
+    }
+    setScanRunning(false);
   };
 
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
@@ -1100,6 +1138,107 @@ export default function AdminSettings() {
                   left: mentionAdmins ? "25px" : "3px",
                 }} />
               </button>
+            </div>
+          </div>
+
+          {/* ── X-Bot AI Scanner ── */}
+          <div style={{ background: "rgba(34,197,94,0.03)", border: "1px solid rgba(34,197,94,0.12)", borderRadius: "16px", padding: "24px", marginBottom: "20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
+              <span style={{ fontSize: "24px" }}>🤖</span>
+              <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 800, color: "#22c55e" }}>X-Bot AI Scanner</h3>
+              <span style={{ marginLeft: "auto", fontSize: "11px", padding: "3px 10px", borderRadius: "8px", background: "rgba(34,197,94,0.12)", color: "#22c55e", fontWeight: 700 }}>AUTO-SCAN EVERY 4H</span>
+            </div>
+
+            <p style={{ margin: "0 0 16px", fontSize: "12px", color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
+              X-Bot monitors Discord and Slack messages, uses AI to identify positive behaviors, and automatically submits Primary Badge awards. Configure which channels to scan and whether awards need your approval.
+            </p>
+
+            {/* Auto-approve toggle */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "rgba(255,255,255,0.02)", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)", marginBottom: "14px" }}>
+              <div>
+                <p style={{ margin: 0, fontSize: "13px", fontWeight: 700, color: "#22c55e" }}>Auto-Approve Awards</p>
+                <p style={{ margin: "2px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>OFF = awards go to Approvals for review &nbsp;|&nbsp; ON = X-Bot grants XC + badges immediately</p>
+              </div>
+              <button
+                onClick={() => { setScanAutoApprove(!scanAutoApprove); playToggle && playToggle(); }}
+                style={{
+                  width: "48px", height: "26px", borderRadius: "13px", border: "none", cursor: "pointer",
+                  background: scanAutoApprove ? "#22c55e" : "rgba(255,255,255,0.1)",
+                  position: "relative", transition: "all 0.2s",
+                }}
+              >
+                <div style={{
+                  width: "20px", height: "20px", borderRadius: "50%", background: "#fff",
+                  position: "absolute", top: "3px", transition: "left 0.2s",
+                  left: scanAutoApprove ? "25px" : "3px",
+                }} />
+              </button>
+            </div>
+
+            {/* Discord scan channel */}
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(34,197,94,0.7)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "6px" }}>Discord Scan Channel ID</label>
+              <input
+                type="text"
+                placeholder="Channel ID where students communicate..."
+                value={discordScanChannelId}
+                onChange={e => setDiscordScanChannelId(e.target.value)}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(34,197,94,0.15)", color: "white", fontSize: "13px", fontFamily: "monospace", outline: "none", boxSizing: "border-box" }}
+              />
+              <p style={{ margin: "6px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>Right-click a channel → Copy Channel ID (enable Developer Mode in Discord settings)</p>
+            </div>
+
+            {/* Slack bot token + scan channel */}
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(34,197,94,0.7)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "6px" }}>Slack Bot Token (for reading messages)</label>
+              <input
+                type="password"
+                placeholder="xoxb-..."
+                value={slackBotToken}
+                onChange={e => setSlackBotToken(e.target.value)}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(34,197,94,0.15)", color: "white", fontSize: "13px", fontFamily: "monospace", outline: "none", boxSizing: "border-box" }}
+              />
+              <p style={{ margin: "6px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>Slack App → OAuth & Permissions → Bot User OAuth Token (needs channels:history, users:read scopes)</p>
+            </div>
+
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(34,197,94,0.7)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "6px" }}>Slack Scan Channel ID</label>
+              <input
+                type="text"
+                placeholder="C0123456789..."
+                value={slackScanChannelId}
+                onChange={e => setSlackScanChannelId(e.target.value)}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(34,197,94,0.15)", color: "white", fontSize: "13px", fontFamily: "monospace", outline: "none", boxSizing: "border-box" }}
+              />
+              <p style={{ margin: "6px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>Right-click channel in Slack → View channel details → Copy Channel ID at bottom</p>
+            </div>
+
+            {/* Manual scan button */}
+            <button
+              onClick={runManualScan}
+              disabled={scanRunning}
+              style={{
+                width: "100%", padding: "12px", borderRadius: "10px", border: "none",
+                background: scanRunning ? "rgba(34,197,94,0.1)" : "linear-gradient(135deg, #22c55e, #16a34a)",
+                color: scanRunning ? "#22c55e" : "#fff", fontSize: "13px", fontWeight: 800,
+                cursor: scanRunning ? "wait" : "pointer", letterSpacing: "0.06em",
+              }}
+            >
+              {scanRunning ? "🔍 Scanning communications..." : "🤖 Run X-Bot Scan Now"}
+            </button>
+
+            {lastScanResult && (
+              <div style={{ marginTop: "10px", padding: "10px 14px", borderRadius: "8px", background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)", fontSize: "12px", color: "#22c55e", lineHeight: 1.6 }}>
+                {lastScanResult}
+              </div>
+            )}
+
+            {/* Badges X-Bot looks for */}
+            <div style={{ marginTop: "14px", padding: "12px 16px", background: "rgba(34,197,94,0.04)", borderRadius: "10px", border: "1px solid rgba(34,197,94,0.08)" }}>
+              <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "#22c55e", textTransform: "uppercase", letterSpacing: "0.1em" }}>Primary Badges X-Bot Awards</p>
+              <p style={{ margin: 0, fontSize: "11px", color: "rgba(255,255,255,0.35)", lineHeight: 1.8 }}>
+                Self Directed Player (200 XC) &bull; Strategic Organizer &bull; Entrepreneurial Spirit &bull; Professional Communicator &bull; Critical Thinker &bull; Master Collaborator &bull; Innovative Creator &bull; Resilient Learner &bull; Growth Mindset &bull; Peer Supporter &bull; Emerging Leader &bull; and 9 more (100 XC each)
+              </p>
             </div>
           </div>
 
