@@ -267,6 +267,12 @@ export default function TaskManagement() {
   const [reviewNotes, setReviewNotes] = useState("");
   const [pitchReviewModal, setPitchReviewModal] = useState(false);
 
+  // X-Bot DarkCampus channels for notification targeting
+  const [dcChannels, setDcChannels] = useState<{ id: string; name: string; platform: string }[]>([]);
+  const [jobXbotChannels, setJobXbotChannels] = useState<string[]>([]);
+  const [projXbotChannels, setProjXbotChannels] = useState<string[]>([]);
+  const [pitchXbotChannels, setPitchXbotChannels] = useState<string[]>([]);
+
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
     if (!stored) { router.push("/"); return; }
@@ -274,6 +280,23 @@ export default function TaskManagement() {
     if (!isHostUser(u)) { router.push("/player/dashboard"); return; }
     setUser(u);
   }, [router]);
+
+  // Fetch DarkCampus channels for X-Bot notification targeting
+  useEffect(() => {
+    const dcUrl = process.env.NEXT_PUBLIC_DARKCAMPUS_URL || "https://pflx-darkcampus.vercel.app";
+    fetch(`${dcUrl}/api/channels`)
+      .then(res => res.ok ? res.json() : { channels: [] })
+      .then(data => {
+        if (data.channels && Array.isArray(data.channels)) {
+          setDcChannels(data.channels.map((ch: any) => ({
+            id: ch.id,
+            name: ch.displayName || ch.name || ch.id,
+            platform: ch.platform || "pflx",
+          })));
+        }
+      })
+      .catch(() => {/* silent — channels just won't be available */});
+  }, []);
 
   if (!user) return null;
 
@@ -482,6 +505,7 @@ export default function TaskManagement() {
     setJobBadges([]);
     setJobBadgeSearch("");
     setJobBadgeDropdown(false);
+    setJobXbotChannels([]);
     setJobModal(true);
   };
 
@@ -491,6 +515,7 @@ export default function TaskManagement() {
     setJobBadges((job as any).rewardBadges ?? []);
     setJobBadgeSearch("");
     setJobBadgeDropdown(false);
+    setJobXbotChannels(job.xbotChannels || []);
     setJobModal(true);
   };
 
@@ -562,6 +587,7 @@ export default function TaskManagement() {
       applicants: editingJob.applicants || [],
       approved: editingJob.approved || [],
       rewardBadges: jobBadges,
+      xbotChannels: jobXbotChannels,
     } as Job;
     if (isNew) { setJobs(prev => [...prev, saved]); mockJobs.push(saved); }
     else {
@@ -571,8 +597,8 @@ export default function TaskManagement() {
     }
     playSuccess();
     saveAndToast([saveJobs], "Job saved to cloud ✓");
-    // Notify DarkCampus Terminal when a new job is posted
-    if (isNew) {
+    // Notify DarkCampus channels when a new job is posted (if X-Bot channels selected)
+    if (isNew && jobXbotChannels.length > 0) {
       notifyDarkCampus({
         type: "job",
         title: saved.title,
@@ -580,6 +606,7 @@ export default function TaskManagement() {
         postedBy: user?.brandName || user?.name || "Host",
         xc: saved.xcReward,
         badges: saved.rewardBadges?.map((b: any) => b.name || b),
+        channels: jobXbotChannels,
       }).catch(() => {});
     }
     setJobModal(false);
@@ -595,6 +622,7 @@ export default function TaskManagement() {
     setProjBadges([]);
     setProjBadgeSearch("");
     setProjBadgeDropdown(false);
+    setProjXbotChannels([]);
     setProjectModal(true);
   };
 
@@ -606,6 +634,7 @@ export default function TaskManagement() {
     setProjBadges((p as any).rewardBadges ?? []);
     setProjBadgeSearch("");
     setProjBadgeDropdown(false);
+    setProjXbotChannels(p.xbotChannels || []);
     setProjectModal(true);
   };
 
@@ -628,6 +657,7 @@ export default function TaskManagement() {
       accessMode: editingProject.accessMode || "open",
       closedPlayerIds: editingProject.closedPlayerIds || [],
       repeatable: editingProject.repeatable || false,
+      xbotChannels: projXbotChannels,
     };
     if (isNew) { setProjects(prev => [...prev, saved]); mockProjects.push(saved); }
     else {
@@ -637,6 +667,18 @@ export default function TaskManagement() {
     }
     playSuccess();
     saveAndToast([saveProjects], "Project saved to cloud ✓");
+    // Notify DarkCampus channels when a new project is created (if X-Bot channels selected)
+    if (isNew && projXbotChannels.length > 0) {
+      notifyDarkCampus({
+        type: "project",
+        title: saved.title,
+        description: saved.description?.slice(0, 120),
+        postedBy: user?.brandName || user?.name || "Host",
+        xc: saved.xcRewardPool,
+        badges: saved.rewardBadges?.map((b: any) => b.name || b),
+        channels: projXbotChannels,
+      }).catch(() => {});
+    }
     setProjectModal(false);
   };
 
@@ -1307,6 +1349,7 @@ export default function TaskManagement() {
                           playModalOpen();
                           setReviewingPitch(pitch);
                           setReviewNotes(pitch.reviewNotes || "");
+                          setPitchXbotChannels([]);
                           setPitchReviewModal(true);
                         }
                       }}>
@@ -1345,7 +1388,7 @@ export default function TaskManagement() {
                         )}
                         {(pitch.status === "submitted" || pitch.status === "under_review") && (
                           <div style={{ marginTop: "10px", display: "flex", gap: "8px" }}>
-                            <button onClick={(e) => { e.stopPropagation(); playModalOpen(); setReviewingPitch(pitch); setReviewNotes(""); setPitchReviewModal(true); }} style={{
+                            <button onClick={(e) => { e.stopPropagation(); playModalOpen(); setReviewingPitch(pitch); setReviewNotes(""); setPitchXbotChannels([]); setPitchReviewModal(true); }} style={{
                               padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer",
                               background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)", color: "#22c55e",
                             }}>Review</button>
@@ -1570,6 +1613,47 @@ export default function TaskManagement() {
               </Field>
             </div>
 
+            {/* X-Bot Notification Channels for approved pitch */}
+            <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(6,214,160,0.05)", border: "1px solid rgba(6,214,160,0.15)", marginTop: "16px" }}>
+              <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: "#06d6a0", letterSpacing: "0.08em", textTransform: "uppercase" }}>🤖 X-BOT NOTIFICATION CHANNELS (ON APPROVE)</p>
+              <p style={{ margin: "0 0 12px", fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>
+                If approved, X-Bot will announce this project on the selected DarkCampus channels. Message will state to navigate to Task Management in the X-Coin app to apply.
+              </p>
+              {dcChannels.length === 0 ? (
+                <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>No DarkCampus channels available</p>
+              ) : (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {dcChannels.map(ch => {
+                    const selected = pitchXbotChannels.includes(ch.id);
+                    const platformColor = ch.platform === "discord" ? "#5865f2" : ch.platform === "slack" ? "#e01e5a" : "#06d6a0";
+                    return (
+                      <button key={ch.id} onClick={() => {
+                        playClick();
+                        setPitchXbotChannels(prev => selected ? prev.filter(id => id !== ch.id) : [...prev, ch.id]);
+                      }} style={{
+                        padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer",
+                        background: selected ? `rgba(${ch.platform === "discord" ? "88,101,242" : ch.platform === "slack" ? "224,30,90" : "6,214,160"},0.15)` : "rgba(255,255,255,0.04)",
+                        border: `1px solid ${selected ? platformColor : "rgba(255,255,255,0.08)"}`,
+                        color: selected ? platformColor : "rgba(255,255,255,0.4)",
+                        transition: "all 0.15s ease",
+                      }}>
+                        <span style={{ fontSize: "9px", fontWeight: 800, marginRight: "6px", padding: "1px 4px", borderRadius: "3px",
+                          background: `${platformColor}22`, color: platformColor }}>
+                          {ch.platform === "discord" ? "DC" : ch.platform === "slack" ? "SL" : "PX"}
+                        </span>
+                        #{ch.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {pitchXbotChannels.length > 0 && (
+                <p style={{ margin: "8px 0 0", fontSize: "10px", color: "#06d6a0" }}>
+                  ✓ {pitchXbotChannels.length} channel{pitchXbotChannels.length > 1 ? "s" : ""} selected
+                </p>
+              )}
+            </div>
+
             {/* Action buttons */}
             <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "24px" }}>
               <button onClick={() => { playClick(); setPitchReviewModal(false); }}
@@ -1665,14 +1749,17 @@ export default function TaskManagement() {
                 // Notify Slack/Discord
                 const pitchCreator = mockUsers.find(u => u.id === reviewingPitch.creatorId);
                 notifyPitchApproved(pitchCreator?.brandName || pitchCreator?.name || "Unknown", reviewingPitch.title, generatedJobIds.length).catch(() => {});
-                // Notify DarkCampus Terminal about new project
-                notifyDarkCampus({
-                  type: "project",
-                  title: reviewingPitch.title,
-                  description: reviewingPitch.description?.slice(0, 120),
-                  postedBy: pitchCreator?.brandName || pitchCreator?.name || "Unknown",
-                  xc: reviewingPitch.xcRewardPool,
-                }).catch(() => {});
+                // Notify DarkCampus channels about new project (if channels selected)
+                if (pitchXbotChannels.length > 0) {
+                  notifyDarkCampus({
+                    type: "project",
+                    title: reviewingPitch.title,
+                    description: reviewingPitch.description?.slice(0, 120),
+                    postedBy: pitchCreator?.brandName || pitchCreator?.name || "Unknown",
+                    xc: reviewingPitch.xcRewardPool,
+                    channels: pitchXbotChannels,
+                  }).catch(() => {});
+                }
                 setPitchReviewModal(false);
               }} style={{ padding: "11px 28px", background: "linear-gradient(135deg, #22c55e, #16a34a)",
                   border: "none", borderRadius: "10px", color: "white", fontWeight: 800, cursor: "pointer",
@@ -2310,6 +2397,47 @@ export default function TaskManagement() {
                   })}
                 </div>
               </Field>
+
+              {/* ── X-Bot Notification Channels ── */}
+              <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(6,214,160,0.05)", border: "1px solid rgba(6,214,160,0.15)" }}>
+                <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: "#06d6a0", letterSpacing: "0.08em", textTransform: "uppercase" }}>🤖 X-BOT NOTIFICATION CHANNELS</p>
+                <p style={{ margin: "0 0 12px", fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>
+                  Select DarkCampus channels where X-Bot will announce this project. Message will state to navigate to Task Management in the X-Coin app to apply.
+                </p>
+                {dcChannels.length === 0 ? (
+                  <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>No DarkCampus channels available — check connection</p>
+                ) : (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                    {dcChannels.map(ch => {
+                      const selected = projXbotChannels.includes(ch.id);
+                      const platformColor = ch.platform === "discord" ? "#5865f2" : ch.platform === "slack" ? "#e01e5a" : "#06d6a0";
+                      return (
+                        <button key={ch.id} onClick={() => {
+                          playClick();
+                          setProjXbotChannels(prev => selected ? prev.filter(id => id !== ch.id) : [...prev, ch.id]);
+                        }} style={{
+                          padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer",
+                          background: selected ? `rgba(${ch.platform === "discord" ? "88,101,242" : ch.platform === "slack" ? "224,30,90" : "6,214,160"},0.15)` : "rgba(255,255,255,0.04)",
+                          border: `1px solid ${selected ? platformColor : "rgba(255,255,255,0.08)"}`,
+                          color: selected ? platformColor : "rgba(255,255,255,0.4)",
+                          transition: "all 0.15s ease",
+                        }}>
+                          <span style={{ fontSize: "9px", fontWeight: 800, marginRight: "6px", padding: "1px 4px", borderRadius: "3px",
+                            background: `${platformColor}22`, color: platformColor }}>
+                            {ch.platform === "discord" ? "DC" : ch.platform === "slack" ? "SL" : "PX"}
+                          </span>
+                          #{ch.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {projXbotChannels.length > 0 && (
+                  <p style={{ margin: "8px 0 0", fontSize: "10px", color: "#06d6a0" }}>
+                    ✓ {projXbotChannels.length} channel{projXbotChannels.length > 1 ? "s" : ""} selected — X-Bot will post when this project is created
+                  </p>
+                )}
+              </div>
             </div>
 
             <div style={{ display: "flex", gap: "12px", justifyContent: "space-between", marginTop: "24px" }}>
@@ -2515,6 +2643,47 @@ export default function TaskManagement() {
                 <input value={editingJob.link || ""} onChange={e => setEditingJob(p => ({ ...p, link: e.target.value }))}
                   placeholder="https://docs.google.com/... or any URL" style={inputSx} />
               </Field>
+
+              {/* ── X-Bot Notification Channels ── */}
+              <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(6,214,160,0.05)", border: "1px solid rgba(6,214,160,0.15)" }}>
+                <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 700, color: "#06d6a0", letterSpacing: "0.08em", textTransform: "uppercase" }}>🤖 X-BOT NOTIFICATION CHANNELS</p>
+                <p style={{ margin: "0 0 12px", fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>
+                  Select DarkCampus channels where X-Bot will announce this job. Message will state to navigate to Task Management in the X-Coin app to apply.
+                </p>
+                {dcChannels.length === 0 ? (
+                  <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>No DarkCampus channels available — check connection</p>
+                ) : (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                    {dcChannels.map(ch => {
+                      const selected = jobXbotChannels.includes(ch.id);
+                      const platformColor = ch.platform === "discord" ? "#5865f2" : ch.platform === "slack" ? "#e01e5a" : "#06d6a0";
+                      return (
+                        <button key={ch.id} onClick={() => {
+                          playClick();
+                          setJobXbotChannels(prev => selected ? prev.filter(id => id !== ch.id) : [...prev, ch.id]);
+                        }} style={{
+                          padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer",
+                          background: selected ? `rgba(${ch.platform === "discord" ? "88,101,242" : ch.platform === "slack" ? "224,30,90" : "6,214,160"},0.15)` : "rgba(255,255,255,0.04)",
+                          border: `1px solid ${selected ? platformColor : "rgba(255,255,255,0.08)"}`,
+                          color: selected ? platformColor : "rgba(255,255,255,0.4)",
+                          transition: "all 0.15s ease",
+                        }}>
+                          <span style={{ fontSize: "9px", fontWeight: 800, marginRight: "6px", padding: "1px 4px", borderRadius: "3px",
+                            background: `${platformColor}22`, color: platformColor }}>
+                            {ch.platform === "discord" ? "DC" : ch.platform === "slack" ? "SL" : "PX"}
+                          </span>
+                          #{ch.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {jobXbotChannels.length > 0 && (
+                  <p style={{ margin: "8px 0 0", fontSize: "10px", color: "#06d6a0" }}>
+                    ✓ {jobXbotChannels.length} channel{jobXbotChannels.length > 1 ? "s" : ""} selected — X-Bot will post when this job is created
+                  </p>
+                )}
+              </div>
             </div>
             <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "24px" }}>
               <button onClick={() => { playClick(); setJobModal(false); }}

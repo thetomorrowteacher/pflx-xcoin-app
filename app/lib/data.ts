@@ -32,7 +32,7 @@ export interface User {
   studioStakeXC?: number;        // XC the player has staked in their studio
   studioStakePercent?: number;   // % stake they hold in studio pool
   diagnosticResult?: DiagnosticResult; // Stored diagnostic results
-  workEthicMode?: "high" | "medium" | "low"; // Controls Gemini suggestion chunking
+  workEthicMode?: "high" | "medium" | "low"; // Controls X-Bot suggestion chunking
 }
 
 
@@ -180,6 +180,8 @@ export interface Job {
   intervalType?: "daily" | "weekly" | "biweekly" | "monthly"; // How often tasks are prompted
   roundId?: string; // Which checkpoint this job belongs to (when directly assigned)
   requirement?: "required" | "available"; // required = mandatory (in checkpoint), available = optional
+  // X-Bot notification channels (DarkCampus channel IDs to notify when posted)
+  xbotChannels?: string[];
 }
 
 // Helper: check if a task/job is visible to a given player
@@ -1342,6 +1344,8 @@ export interface Project {
   accessMode?: "open" | "closed"; // open = anyone can complete anytime, repeatable; closed = selected players only
   closedPlayerIds?: string[];     // Player IDs restricted to (when closed)
   repeatable?: boolean;           // Can players complete this project multiple times?
+  // X-Bot notification channels (DarkCampus channel IDs to notify when posted)
+  xbotChannels?: string[];
 }
 
 // ─── Mock Startup Studios ────────────────────────────────────────

@@ -313,16 +313,26 @@ export async function notifyDarkCampus(opts: {
   xc?: number;
   badges?: string[];
   url?: string;
+  channels?: string[]; // DarkCampus channel IDs to notify (empty = Terminal only)
 }): Promise<boolean> {
   try {
     const bridgeUrl = typeof window !== "undefined"
       ? "/api/pflx-bridge"
       : (process.env.NEXT_PUBLIC_BRIDGE_URL || "/api/pflx-bridge");
 
+    // Append apply message to description
+    const applyNote = "\n\n→ Navigate to Task Management in the X-Coin app to apply.";
+    const fullDescription = (opts.description || "") + applyNote;
+
     const res = await fetch(bridgeUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "notify_darkcampus", ...opts }),
+      body: JSON.stringify({
+        action: "notify_darkcampus",
+        ...opts,
+        description: fullDescription,
+        channels: opts.channels || [],
+      }),
     });
     if (!res.ok) {
       console.warn("[PFLX Notify] DarkCampus notification failed:", res.status);
