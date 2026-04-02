@@ -300,3 +300,38 @@ export function notifyRankUp(playerName: string, newRank: string, level: number)
     color: "#f59e0b",
   });
 }
+
+// ─── DarkCampus X-Bot Notification ───────────────────────────────
+// Sends a notification to DarkCampus #Terminal via the PFLX Bridge API.
+// X-Bot will post it on Terminal and bridge to Discord/Slack #missioncontrol.
+
+export async function notifyDarkCampus(opts: {
+  type: "job" | "project" | "task" | "checkpoint";
+  title: string;
+  description?: string;
+  postedBy?: string;
+  xc?: number;
+  badges?: string[];
+  url?: string;
+}): Promise<boolean> {
+  try {
+    const bridgeUrl = typeof window !== "undefined"
+      ? "/api/pflx-bridge"
+      : (process.env.NEXT_PUBLIC_BRIDGE_URL || "/api/pflx-bridge");
+
+    const res = await fetch(bridgeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "notify_darkcampus", ...opts }),
+    });
+    if (!res.ok) {
+      console.warn("[PFLX Notify] DarkCampus notification failed:", res.status);
+      return false;
+    }
+    const data = await res.json();
+    return data.success === true;
+  } catch (err) {
+    console.warn("[PFLX Notify] DarkCampus notification error:", err);
+    return false;
+  }
+}

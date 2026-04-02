@@ -161,6 +161,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, newXC, delta }, { headers: CORS });
     }
 
+    // ── Notify DarkCampus (X-Bot notification on #Terminal) ────────
+    if (action === "notify_darkcampus") {
+      const { type, title, description, postedBy, xc, badges, url } = body;
+      if (!type || !title) {
+        return NextResponse.json({ error: "Missing type or title" }, { status: 400, headers: CORS });
+      }
+
+      const dcUrl = process.env.DARKCAMPUS_URL || "https://pflx-darkcampus.vercel.app";
+      try {
+        const res = await fetch(`${dcUrl}/api/xbot-notify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type, title, description, postedBy, xc, badges, url }),
+        });
+        const data = await res.json();
+        return NextResponse.json({ success: data.success, bridgedTo: data.bridgedTo }, { headers: CORS });
+      } catch (err) {
+        console.error("[pflx-bridge] DarkCampus notify error:", err);
+        return NextResponse.json({ success: false, error: "DarkCampus unreachable" }, { headers: CORS });
+      }
+    }
+
     return NextResponse.json({ error: "Unknown action" }, { status: 400, headers: CORS });
   } catch (err) {
     console.error("[pflx-bridge] POST error:", err);

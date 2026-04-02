@@ -13,7 +13,7 @@ import {
 } from "../../lib/data";
 import { saveCheckpoints, saveTasks, saveJobs, saveProjects, saveCohortGroups, saveProjectPitches } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
-import { notifyPitchApproved, notifyPitchSubmitted, notifyJobHired } from "../../lib/notifications";
+import { notifyPitchApproved, notifyPitchSubmitted, notifyJobHired, notifyDarkCampus } from "../../lib/notifications";
 import { playClick, playNav, playSuccess, playError, playDelete, playModalOpen, playModalClose } from "../../lib/sounds";
 import { compressBannerImage } from "../../lib/imageUtils";
 
@@ -571,6 +571,17 @@ export default function TaskManagement() {
     }
     playSuccess();
     saveAndToast([saveJobs], "Job saved to cloud ✓");
+    // Notify DarkCampus Terminal when a new job is posted
+    if (isNew) {
+      notifyDarkCampus({
+        type: "job",
+        title: saved.title,
+        description: saved.description?.slice(0, 120),
+        postedBy: user?.brandName || user?.name || "Host",
+        xc: saved.xcReward,
+        badges: saved.rewardBadges?.map((b: any) => b.name || b),
+      }).catch(() => {});
+    }
     setJobModal(false);
   };
 
@@ -1654,6 +1665,14 @@ export default function TaskManagement() {
                 // Notify Slack/Discord
                 const pitchCreator = mockUsers.find(u => u.id === reviewingPitch.creatorId);
                 notifyPitchApproved(pitchCreator?.brandName || pitchCreator?.name || "Unknown", reviewingPitch.title, generatedJobIds.length).catch(() => {});
+                // Notify DarkCampus Terminal about new project
+                notifyDarkCampus({
+                  type: "project",
+                  title: reviewingPitch.title,
+                  description: reviewingPitch.description?.slice(0, 120),
+                  postedBy: pitchCreator?.brandName || pitchCreator?.name || "Unknown",
+                  xc: reviewingPitch.xcRewardPool,
+                }).catch(() => {});
                 setPitchReviewModal(false);
               }} style={{ padding: "11px 28px", background: "linear-gradient(135deg, #22c55e, #16a34a)",
                   border: "none", borderRadius: "10px", color: "white", fontWeight: 800, cursor: "pointer",
