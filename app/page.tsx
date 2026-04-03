@@ -27,6 +27,44 @@ export default function Home() {
   const [claimSuccess, setClaimSuccess] = useState(false);
   const [tempPin, setTempPin] = useState("");
 
+  // ═══ PFLX SSO AUTO-LOGIN ═══
+  // When embedded in the PFLX Overlay, URL params bypass the login screen
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sso = params.get("sso");
+    const brand = params.get("brand");
+    const ssoPin = params.get("pin");
+    if (sso === "pflx" && brand) {
+      const user = mockUsers.find(
+        u => (u.brandName || "").toLowerCase() === brand.toLowerCase()
+      );
+      if (user) {
+        // Validate PIN if provided, otherwise trust SSO
+        const correctPin = user.pin ?? (user.role === "admin" ? "0000" : "1234");
+        if (!ssoPin || ssoPin === correctPin) {
+          localStorage.setItem("pflx_user", JSON.stringify(user));
+          localStorage.setItem("pflx_keep_signed_in", "true");
+          if (isHostUser(user)) {
+            router.push("/admin");
+          } else if (!user.onboardingComplete) {
+            router.push("/player");
+          } else {
+            router.push("/player");
+          }
+          return;
+        }
+      }
+    }
+    // Also check existing session (keep-signed-in)
+    const existing = localStorage.getItem("pflx_user");
+    const stay = localStorage.getItem("pflx_keep_signed_in");
+    if (existing && stay) {
+      const u = JSON.parse(existing);
+      if (isHostUser(u)) { router.push("/admin"); }
+      else { router.push("/player"); }
+    }
+  }, [router]);
+
   const players = mockUsers.filter(u => u.role === "player" && !u.isHost);
   const hosts = mockUsers.filter(u => isHostUser(u));
   const selectedUser = mockUsers.find(u => u.id === selectedId) ?? null;
