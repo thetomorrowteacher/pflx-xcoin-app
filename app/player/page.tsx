@@ -96,7 +96,7 @@ export default function PlayerHome() {
     }
   }, [router]);
 
-  // Fetch Gemini daily report
+  // Fetch X-Bot daily report
   const fetchDailyReport = useCallback(async (u: User) => {
     setReportLoading(true);
     setReportError("");
@@ -114,7 +114,7 @@ export default function PlayerHome() {
       ).join("\n");
       const cpSummary = activeCP ? `Active Checkpoint: "${activeCP.name}" (ends ${activeCP.endDate})` : "No active checkpoint";
 
-      const prompt = `You are a PFLX game assistant. Generate a brief daily report for player "${u.brandName || u.name}".
+      const prompt = `You are X-Bot, the PFLX game assistant. Generate a brief daily report for player "${u.brandName || u.name}".
 
 Work Ethic Mode: ${mode.toUpperCase()}
 ${mode === "high" ? "Give detailed micro-tasks, aggressive action items, and tight deadlines. Be intense and motivating." : mode === "low" ? "Give high-level guidance, relaxed suggestions, focus on big picture. Be encouraging." : "Give balanced, actionable suggestions with weekly milestones."}
@@ -283,7 +283,7 @@ Return ONLY valid JSON with this exact format (no markdown, no code blocks):
                 <div>
                   <div style={{ fontSize: "14px", fontWeight: 900, color: "#f0f0ff", letterSpacing: "0.04em" }}>DAILY BRIEFING</div>
                   <div style={{ fontSize: "10px", color: "rgba(167,139,250,0.6)", letterSpacing: "0.08em" }}>
-                    POWERED BY GEMINI · {(user.workEthicMode || "medium").toUpperCase()} MODE
+                    POWERED BY X-BOT · {(user.workEthicMode || "medium").toUpperCase()} MODE
                   </div>
                 </div>
               </div>

@@ -14,7 +14,7 @@ interface AnalysisResult {
   signals: string[];
   flags: string[];
   summary: string;
-  source: "heuristic" | "claude";
+  source: "heuristic" | "xbot";
 }
 
 interface ReviewCard {
@@ -84,7 +84,7 @@ function SubmissionCard({ card, onApprove, onReject }: { card: ReviewCard; onApp
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
           <ScoreBadge score={analysis.score} rec={analysis.recommendation} />
           <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)", fontStyle: "italic" }}>
-            {analysis.source === "claude" ? "🤖 Claude AI" : "📊 Heuristic"}
+            {analysis.source === "xbot" ? "🤖 X-Bot" : "📊 Heuristic"}
           </span>
         </div>
         <p style={{ margin: "0 0 8px", color: "rgba(255,255,255,0.6)", lineHeight: 1.5 }}>{analysis.summary}</p>
@@ -294,16 +294,16 @@ function buildTextResponse(input: string, router: ReturnType<typeof useRouter>):
     const h=new Date().getHours();
     const g=h<12?"Good morning":h<17?"Good afternoon":"Good evening";
     const overdueTotal = mockTasks.filter(t => t.status === "open" && t.dueDate && new Date(t.dueDate) < new Date()).length;
-    let greeting = `${g}! I'm your PFLX assistant. ${pending.length} submission${pending.length!==1?"s":""} waiting for review.`;
+    let greeting = `${g}! I'm X-Bot, your PFLX assistant. ${pending.length} submission${pending.length!==1?"s":""} waiting for review.`;
     if (overdueTotal > 0) greeting += ` ⚠️ ${overdueTotal} tasks are overdue across your players.`;
     greeting += ` Say "analyze submissions" for AI recommendations, "at-risk" to check struggling players, or "help" for all commands!`;
     return greeting;
   }
-  // ── Default — signal to call Gemini ──────────────────────────────────
-  return null; // null = no regex match, use Gemini AI
+  // ── Default — signal to call X-Bot AI ────────────────────────────────
+  return null; // null = no regex match, use X-Bot AI
 }
 
-// ─── Gather host context for Gemini ──────────────────────────────────────────
+// ─── Gather host context for X-Bot ──────────────────────────────────────────
 function gatherHostContext() {
   const players = mockUsers.filter(u => u.role === "player");
   const pending = mockTasks.filter(t => t.status === "submitted");
@@ -344,7 +344,7 @@ export default function AIAssistant() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([{
     id:"welcome", role:"assistant", time: new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
-    text:`Hey! I'm your PFLX AI assistant. I can analyze pending submissions and give you approve/reject recommendations — just say "analyze submissions". I also support voice control 🎤`,
+    text:`Hey! I'm X-Bot, your PFLX assistant. I can analyze pending submissions and give you approve/reject recommendations — just say "analyze submissions". I also support voice control 🎤`,
   }]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -398,7 +398,7 @@ export default function AIAssistant() {
     const voiceSnippet = `${task.title}: score ${analysis.score}, recommendation: ${analysis.recommendation}.`;
     addMessage({
       role:"assistant",
-      text: analysis.source==="claude" ? "🤖 Claude AI analysis complete:" : "📊 Analysis complete:",
+      text: analysis.source==="xbot" ? "🤖 X-Bot analysis complete:" : "📊 Analysis complete:",
       card:{ type:"submission_review", task, playerName:player?.name??"Unknown", analysis },
     });
     if(voiceOn) speak(voiceSnippet);
@@ -449,7 +449,7 @@ export default function AIAssistant() {
       return;
     }
 
-    // No local match — call Gemini AI
+    // No local match — call X-Bot AI
     setIsTyping(true);
     try {
       const context = gatherHostContext();
@@ -471,13 +471,13 @@ export default function AIAssistant() {
       if (errData.error === "rate_limited") {
         addMessage({role:"assistant",text:`I'm getting a lot of requests right now! Give me about 30 seconds and try again. In the meantime, try "analyze submissions", "at-risk", or "help" for quick answers.`});
       } else if (errData.error === "api_key_invalid") {
-        addMessage({role:"assistant",text:`My AI connection needs to be reconfigured. Please check the Gemini API key in your environment settings. You can still use "analyze submissions", "at-risk", or "help" for quick answers!`});
+        addMessage({role:"assistant",text:`X-Bot's AI connection needs to be reconfigured. Please check the API key in your environment settings. You can still use "analyze submissions", "at-risk", or "help" for quick answers!`});
       } else {
         addMessage({role:"assistant",text:`I hit a temporary issue — try again in a moment! You can also use "analyze submissions", "at-risk", or "help" for quick answers.`});
       }
       return;
     } catch (err) {
-      console.error("[AIAssistant] Gemini call failed:", err);
+      console.error("[X-Bot] AI call failed:", err);
     }
     // Fallback (network error)
     setIsTyping(false);
@@ -523,12 +523,12 @@ export default function AIAssistant() {
           <div style={{padding:"16px 20px",background:"linear-gradient(135deg,rgba(79,142,247,0.12),rgba(139,92,246,0.12))",borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",gap:"12px"}}>
             <div style={{width:"36px",height:"36px",borderRadius:"10px",background:"linear-gradient(135deg,#4f8ef7,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"18px",flexShrink:0}}>🤖</div>
             <div style={{flex:1}}>
-              <div style={{fontSize:"14px",fontWeight:700,color:"#f0f0ff"}}>PFLX AI Assistant</div>
+              <div style={{fontSize:"14px",fontWeight:700,color:"#f0f0ff"}}>PFLX X-Bot</div>
               <div style={{fontSize:"11px",color:"rgba(255,255,255,0.4)",display:"flex",alignItems:"center",gap:"5px"}}>
                 <span style={{width:"6px",height:"6px",borderRadius:"50%",background:"#22c55e",display:"inline-block"}}/>
                 {pendingCount>0?`${pendingCount} pending review`:"All clear"}
                 {" · "}
-                <span style={{color:"rgba(79,142,247,0.7)"}}>AI-powered</span>
+                <span style={{color:"rgba(79,142,247,0.7)"}}>X-Bot powered</span>
               </div>
             </div>
             {voiceSupported&&(

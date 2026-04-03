@@ -109,7 +109,7 @@ async function fetchSlackMessages(channelId: string, slackToken: string, limit =
   }
 }
 
-// ─── AI Analysis via Gemini ──────────────────────────────────────
+// ─── X-Bot AI Analysis ──────────────────────────────────────────
 async function analyzeMessagesWithAI(messages: any[], users: any[]): Promise<any[]> {
   if (messages.length === 0) return [];
 

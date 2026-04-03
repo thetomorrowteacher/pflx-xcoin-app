@@ -121,7 +121,7 @@ export default function ProducerProjectsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: `You are a project management AI assistant for a gamified education platform called PFLX. Analyze this project and give brief, actionable recommendations (3-4 bullet points max).
+          message: `You are X-Bot, the PFLX project management assistant. Analyze this project and give brief, actionable recommendations (3-4 bullet points max).
 
 Project: "${project.title}"
 Description: "${project.description}"

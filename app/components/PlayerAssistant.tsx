@@ -358,11 +358,11 @@ function buildResponse(input: string, player: User, router: ReturnType<typeof us
     return `🎮 Here's what I can help with:\n\n📌 Guidance & Strategy:\n• "Prioritize" / "What should I do?" — smart priority ranking\n• "How do I level up?" — earning strategies\n• "How do I submit?" — submission walkthrough\n• "How does XC work?" — economy explained\n\n📊 Your Data:\n• "My stats" — XP, level, rank, position\n• "My tasks" — open tasks\n• "Deadlines" — due soon or overdue\n• "My jobs" — active jobs\n• "Submissions" — pending approvals\n• "Leaderboard" — top players\n• "Wallet" — transactions\n\n🎯 Actions:\n• "Motivate me" — a boost 🔥\n• "Go to [page]" — navigate\n\nYou can also tap the mic and speak!`;
   }
 
-  // ── Default — signal to call Gemini ─────────────────────────────────
-  return null; // null = no regex match, use Gemini AI
+  // ── Default — signal to call X-Bot AI ───────────────────────────────
+  return null; // null = no regex match, use X-Bot AI
 }
 
-// ─── Gather player context for Gemini ────────────────────────────────────────
+// ─── Gather player context for X-Bot ────────────────────────────────────────
 function gatherPlayerContext(player: User) {
   const myTasks = mockTasks.filter(
     t => isAssignedToPlayer(t.assignedTo, player.id, player.cohort) && t.status === "open"
@@ -437,7 +437,7 @@ export default function PlayerAssistant() {
         t => isAssignedToPlayer(t.assignedTo, player.id, player.cohort) && t.status === "open"
       ).length;
       const pending = mockTasks.filter(t => t.submittedBy === player.id && t.status === "pending").length;
-      let welcome = `Hey ${player.name.split(" ")[0]}! 👋 I'm your PFLX game assistant.\n\n⚡ ${player.xcoin.toLocaleString()} XC · Level ${level} · 🪙 ${player.digitalBadges} Digital Badges`;
+      let welcome = `Hey ${player.name.split(" ")[0]}! 👋 I'm X-Bot, your PFLX game assistant.\n\n⚡ ${player.xcoin.toLocaleString()} XC · Level ${level} · 🪙 ${player.digitalBadges} Digital Badges`;
       if (openTasks > 0) welcome += `\n📋 ${openTasks} open task${openTasks !== 1 ? "s" : ""} waiting`;
       if (pending > 0) welcome += `\n⏳ ${pending} submission${pending !== 1 ? "s" : ""} pending review`;
       welcome += `\n\nAsk me anything or say "help"!`;
@@ -468,7 +468,7 @@ export default function PlayerAssistant() {
       return;
     }
 
-    // No local match — call Gemini AI
+    // No local match — call X-Bot AI
     try {
       const context = gatherPlayerContext(player);
       const res = await fetch("/api/gemini", {
@@ -494,7 +494,7 @@ export default function PlayerAssistant() {
       }
       return;
     } catch (err) {
-      console.error("[PlayerAssistant] Gemini call failed:", err);
+      console.error("[X-Bot] Player AI call failed:", err);
     }
 
     // Fallback (network error)
@@ -558,7 +558,7 @@ export default function PlayerAssistant() {
         )}
         <button
           onClick={() => setOpen(o => !o)}
-          title="PFLX Game Assistant"
+          title="PFLX X-Bot"
           style={{
             width: "56px", height: "56px", borderRadius: "50%", border: "none", cursor: "pointer",
             background: open ? `${ACCENT}` : `linear-gradient(135deg, #7c3aed, ${GOLD})`,

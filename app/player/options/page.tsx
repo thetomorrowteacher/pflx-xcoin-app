@@ -374,7 +374,7 @@ export default function PlayerOptions() {
               <div style={{ padding: "24px 28px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                 <h2 style={{ margin: "0 0 6px", fontSize: "18px", fontWeight: 900, color: "#f0f0ff" }}>⚡ Work Ethic Mode</h2>
                 <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>
-                  Choose how intensely your AI assistant chunks out suggestions and task breakdowns. Higher modes mean more detailed daily plans and tighter deadlines.
+                  Choose how intensely X-Bot chunks out suggestions and task breakdowns. Higher modes mean more detailed daily plans and tighter deadlines.
                 </p>
               </div>
               <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: "14px" }}>

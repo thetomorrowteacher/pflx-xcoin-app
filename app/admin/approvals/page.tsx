@@ -15,7 +15,7 @@ interface AIAnalysis {
   signals: string[];
   flags: string[];
   summary: string;
-  source: "claude" | "heuristic";
+  source: "xbot" | "heuristic";
 }
 
 export default function AdminApprovals() {
@@ -200,7 +200,7 @@ export default function AdminApprovals() {
     }
     setRejectModal({ taskId, feedback: draft, generating: false });
 
-    // If no AI analysis yet, auto-generate feedback via Gemini
+    // If no AI analysis yet, auto-generate feedback via X-Bot
     if (!ai) {
       setRejectModal(prev => prev ? { ...prev, generating: true } : null);
       try {

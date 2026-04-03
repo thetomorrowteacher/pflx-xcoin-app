@@ -85,10 +85,10 @@ export async function POST(req: NextRequest) {
     };
   }
 
-  // ── Claude AI analysis (requires ANTHROPIC_API_KEY in .env) ───────────────
+  // ── X-Bot AI analysis (requires ANTHROPIC_API_KEY in .env) ───────────────
   if (apiKey) {
     try {
-      const prompt = `You are a classroom teacher's AI assistant reviewing a student task submission.
+      const prompt = `You are X-Bot, the PFLX classroom assistant reviewing a student task submission.
 
 TASK: "${task.title}"
 Description: "${task.description}"
@@ -110,7 +110,7 @@ Analyze this submission and respond with a JSON object in exactly this format:
   "signals": [<list of positive indicators>],
   "flags": [<list of concerns>],
   "summary": "<1-2 sentence assessment>",
-  "source": "claude"
+  "source": "xbot"
 }
 
 Be concise and practical. Focus on whether there is credible evidence of completed work.`;

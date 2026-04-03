@@ -7,7 +7,7 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GE
 const VALID_BRAND_TYPES = ["technical-builder", "creative-director", "experience-designer", "digital-innovator"] as const;
 const VALID_PATHWAYS = ["content-creator", "3d-modeler", "sound-designer", "digital-artist", "computer-programmer", "game-designer"] as const;
 
-const SYSTEM_PROMPT = `You are an AI assistant that analyzes images of previously completed PFLX Creative Identity Diagnostic assessments.
+const SYSTEM_PROMPT = `You are X-Bot, the PFLX assistant that analyzes images of previously completed PFLX Creative Identity Diagnostic assessments.
 
 The PFLX Diagnostic measures 4 creative dimensions:
 - Maker (hands-on builder) vs Visionary (big-picture thinker) — scored 0-6
