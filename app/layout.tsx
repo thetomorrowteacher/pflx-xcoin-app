@@ -3,6 +3,7 @@ import "./globals.css";
 import Ticker from "./components/Ticker";
 import StoreProvider from "./components/StoreProvider";
 import FullscreenToggle from "./components/FullscreenToggle";
+import PflxBridge from "./components/PflxBridge";
 
 export const metadata: Metadata = {
   title: "PFLX X-Coin",
@@ -21,6 +22,7 @@ export default function RootLayout({
           {children}
           <Ticker />
           <FullscreenToggle />
+          <PflxBridge />
         </StoreProvider>
       </body>
     </html>

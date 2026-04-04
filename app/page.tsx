@@ -39,18 +39,35 @@ export default function Home() {
         u => (u.brandName || "").toLowerCase() === brand.toLowerCase()
       );
       if (user) {
+        const autoselect = params.get("autoselect") === "true";
         // Validate PIN if provided, otherwise trust SSO
         const correctPin = user.pin ?? (user.role === "admin" ? "0000" : "1234");
         if (!ssoPin || ssoPin === correctPin) {
+          // SSO from PFLX Overlay — mark onboarding complete (handled by overlay login)
+          user.onboardingComplete = true;
+          user.pinChanged = true;
+          // Sync SSO data (XC, cohort, role) from overlay
+          const ssoXC = params.get("xc");
+          const ssoCohort = params.get("cohort");
+          const ssoRole = params.get("role");
+          if (ssoXC) user.xcoin = parseInt(ssoXC) || user.xcoin;
+          if (ssoCohort && ssoCohort !== "N/A") user.cohort = ssoCohort;
           localStorage.setItem("pflx_user", JSON.stringify(user));
           localStorage.setItem("pflx_keep_signed_in", "true");
+          localStorage.setItem("pflx_sso_active", "true");
+          console.log("[X-Coin] SSO auto-login for:", user.brandName || user.name);
           if (isHostUser(user)) {
             router.push("/admin");
-          } else if (!user.onboardingComplete) {
-            router.push("/player");
           } else {
             router.push("/player");
           }
+          return;
+        }
+        // Auto-select mode: pre-select player and show PIN entry only
+        if (autoselect) {
+          setSelectedId(user.id);
+          setStep("pin");
+          console.log("[X-Coin] Auto-selected player for PIN entry:", user.brandName || user.name);
           return;
         }
       }
