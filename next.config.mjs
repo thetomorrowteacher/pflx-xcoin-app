@@ -14,7 +14,7 @@ const nextConfig = {
   env: {
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || "AIzaSyCOSOIT40FLTNk5_8LTmX_rEiPs56amn7I",
   },
-  // Allow iframe embedding in PFLX Overlay
+  // Allow iframe embedding in PFLX Platform
   async headers() {
     return [
       {

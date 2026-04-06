@@ -5,11 +5,32 @@ import SideNav from "../../components/SideNav";
 import { User, mockUsers, mockSubmissions, COIN_CATEGORIES, getCurrentRank, getRankProgress, getRankRequirements, getXCProgress, mockStartupStudios, mockPflxRanks } from "../../lib/data";
 import { applyPlayerImages, savePlayerImage } from "../../lib/playerImages";
 
+interface Project {
+  id: string;
+  title: string;
+  description: string;
+  link: string;
+  tags: string[];
+  createdAt: string;
+}
+
 export default function PlayerProfile({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Projects state
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [editingProject, setEditingProject] = useState<string | null>(null);
+  const [showAddProject, setShowAddProject] = useState(false);
+  const [published, setPublished] = useState(false);
+
+  // Form state for adding/editing projects
+  const [formTitle, setFormTitle] = useState("");
+  const [formDescription, setFormDescription] = useState("");
+  const [formLink, setFormLink] = useState("");
+  const [formTags, setFormTags] = useState("");
 
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
@@ -25,6 +46,89 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
     }
     setProfileUser(foundUser);
   }, [params.id, router]);
+
+  // Load projects and published state
+  useEffect(() => {
+    if (!profileUser) return;
+    const projectsKey = `pflx_portfolio_projects_${profileUser.id}`;
+    const publishedKey = `pflx_portfolio_published_${profileUser.id}`;
+
+    const stored = localStorage.getItem(projectsKey);
+    if (stored) {
+      setProjects(JSON.parse(stored));
+    }
+
+    const pub = localStorage.getItem(publishedKey);
+    setPublished(pub === "true");
+  }, [profileUser]);
+
+  const saveProjects = (updatedProjects: Project[]) => {
+    if (!profileUser) return;
+    setProjects(updatedProjects);
+    localStorage.setItem(`pflx_portfolio_projects_${profileUser.id}`, JSON.stringify(updatedProjects));
+  };
+
+  const handleSaveProject = () => {
+    if (!formTitle.trim() || !formDescription.trim() || !formLink.trim()) return;
+
+    const tags = formTags.split(",").map(t => t.trim()).filter(t => t.length > 0);
+
+    if (editingProject) {
+      const updated = projects.map(p =>
+        p.id === editingProject
+          ? { ...p, title: formTitle, description: formDescription, link: formLink, tags }
+          : p
+      );
+      saveProjects(updated);
+    } else {
+      const newProject: Project = {
+        id: `project_${Date.now()}`,
+        title: formTitle,
+        description: formDescription,
+        link: formLink,
+        tags,
+        createdAt: new Date().toISOString(),
+      };
+      saveProjects([...projects, newProject]);
+    }
+
+    setFormTitle("");
+    setFormDescription("");
+    setFormLink("");
+    setFormTags("");
+    setEditingProject(null);
+    setShowAddProject(false);
+  };
+
+  const handleDeleteProject = (id: string) => {
+    const updated = projects.filter(p => p.id !== id);
+    saveProjects(updated);
+  };
+
+  const handleEditProject = (project: Project) => {
+    setEditingProject(project.id);
+    setFormTitle(project.title);
+    setFormDescription(project.description);
+    setFormLink(project.link);
+    setFormTags(project.tags.join(", "));
+    setShowAddProject(true);
+  };
+
+  const handleCancelEdit = () => {
+    setFormTitle("");
+    setFormDescription("");
+    setFormLink("");
+    setFormTags("");
+    setEditingProject(null);
+    setShowAddProject(false);
+  };
+
+  const togglePublished = () => {
+    if (!profileUser) return;
+    const newPublished = !published;
+    setPublished(newPublished);
+    localStorage.setItem(`pflx_portfolio_published_${profileUser.id}`, String(newPublished));
+  };
 
   if (!currentUser || !profileUser) return null;
 
@@ -150,8 +254,8 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
 
         <div className="cv-container" style={{ width: "100%", maxWidth: "900px", margin: "0 auto", background: "#12121c", borderRadius: "24px", padding: "40px", border: "1px solid rgba(255,255,255,0.05)", position: "relative" }}>
           
-          <div className="no-print" style={{ display: "flex", gap: "12px", position: "absolute", top: "40px", right: "40px" }}>
-            <button 
+          <div className="no-print" style={{ display: "flex", gap: "12px", position: "absolute", top: "40px", right: "40px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button
               onClick={() => window.print()}
               style={{
                 background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", padding: "10px 20px",
@@ -160,6 +264,80 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
             >
               📄 Download PDF / CV
             </button>
+
+            {canEdit && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <button
+                  onClick={togglePublished}
+                  style={{
+                    background: published
+                      ? "rgba(255,255,255,0.1)"
+                      : "linear-gradient(135deg, rgba(34,197,94,0.3), rgba(0,212,255,0.2))",
+                    border: published
+                      ? "1px solid rgba(255,255,255,0.2)"
+                      : "1px solid rgba(34,197,94,0.4)",
+                    padding: "10px 20px",
+                    borderRadius: "10px",
+                    color: "white",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px"
+                  }}
+                >
+                  {published ? "🔒 Unpublish" : "🌐 Publish Portfolio"}
+                </button>
+
+                {published && (
+                  <div style={{
+                    background: "rgba(0,212,255,0.1)",
+                    border: "1px solid rgba(0,212,255,0.3)",
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontSize: "12px",
+                  }}>
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${typeof window !== "undefined" ? window.location.origin : ""}/portfolio/${profileUser.id}`}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "#00d4ff",
+                        flex: 1,
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        outline: "none",
+                        fontFamily: "monospace",
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        const url = `${window.location.origin}/portfolio/${profileUser.id}`;
+                        navigator.clipboard.writeText(url);
+                      }}
+                      style={{
+                        background: "rgba(0,212,255,0.2)",
+                        border: "1px solid rgba(0,212,255,0.4)",
+                        color: "#00d4ff",
+                        padding: "4px 8px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div style={{ display: "flex", alignItems: "flex-start", gap: "32px", marginBottom: "40px" }}>
@@ -577,6 +755,279 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
                 </div>
               );
             })}
+          </div>
+
+          {/* ── Project Portfolio ──────────────────────────────────────── */}
+          <div style={{ marginTop: "40px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", paddingBottom: "12px", borderBottom: "1px solid rgba(0,212,255,0.2)" }}>
+              <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: "#f0f0ff", letterSpacing: "0.04em" }}>PROJECT PORTFOLIO</h2>
+              <span style={{ marginLeft: "auto", padding: "3px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: 800, background: "rgba(0,212,255,0.12)", border: "1px solid rgba(0,212,255,0.3)", color: "#00d4ff" }}>
+                {projects.length} project{projects.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            {canEdit && !showAddProject && (
+              <button
+                onClick={() => setShowAddProject(true)}
+                style={{
+                  marginBottom: "16px",
+                  padding: "10px 20px",
+                  background: "linear-gradient(135deg, rgba(0,212,255,0.2), rgba(34,197,94,0.15))",
+                  border: "1px solid rgba(0,212,255,0.3)",
+                  borderRadius: "10px",
+                  color: "#00d4ff",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                + Add Project
+              </button>
+            )}
+
+            {showAddProject && (
+              <div className="cv-card" style={{
+                marginBottom: "16px",
+                background: "rgba(0,212,255,0.05)",
+                border: "1px solid rgba(0,212,255,0.2)",
+                borderRadius: "16px",
+                padding: "20px",
+              }}>
+                <div style={{ marginBottom: "12px" }}>
+                  <label style={{ fontSize: "12px", fontWeight: 700, color: "rgba(0,212,255,0.7)", display: "block", marginBottom: "6px" }}>PROJECT TITLE</label>
+                  <input
+                    type="text"
+                    placeholder="Enter project title"
+                    value={formTitle}
+                    onChange={(e) => setFormTitle(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(0,212,255,0.2)",
+                      borderRadius: "8px",
+                      color: "white",
+                      fontSize: "14px",
+                      fontFamily: "inherit",
+                      boxSizing: "border-box",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: "12px" }}>
+                  <label style={{ fontSize: "12px", fontWeight: 700, color: "rgba(0,212,255,0.7)", display: "block", marginBottom: "6px" }}>DESCRIPTION</label>
+                  <textarea
+                    placeholder="Enter project description"
+                    value={formDescription}
+                    onChange={(e) => setFormDescription(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(0,212,255,0.2)",
+                      borderRadius: "8px",
+                      color: "white",
+                      fontSize: "14px",
+                      fontFamily: "inherit",
+                      minHeight: "80px",
+                      boxSizing: "border-box",
+                      outline: "none",
+                      resize: "vertical",
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: "12px" }}>
+                  <label style={{ fontSize: "12px", fontWeight: 700, color: "rgba(0,212,255,0.7)", display: "block", marginBottom: "6px" }}>PROJECT LINK</label>
+                  <input
+                    type="url"
+                    placeholder="https://example.com"
+                    value={formLink}
+                    onChange={(e) => setFormLink(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(0,212,255,0.2)",
+                      borderRadius: "8px",
+                      color: "white",
+                      fontSize: "14px",
+                      fontFamily: "inherit",
+                      boxSizing: "border-box",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ fontSize: "12px", fontWeight: 700, color: "rgba(0,212,255,0.7)", display: "block", marginBottom: "6px" }}>TAGS (comma-separated)</label>
+                  <input
+                    type="text"
+                    placeholder="design, development, mobile"
+                    value={formTags}
+                    onChange={(e) => setFormTags(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(0,212,255,0.2)",
+                      borderRadius: "8px",
+                      color: "white",
+                      fontSize: "14px",
+                      fontFamily: "inherit",
+                      boxSizing: "border-box",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    onClick={handleSaveProject}
+                    style={{
+                      flex: 1,
+                      padding: "10px 16px",
+                      background: "linear-gradient(135deg, rgba(34,197,94,0.3), rgba(0,212,255,0.2))",
+                      border: "1px solid rgba(34,197,94,0.4)",
+                      borderRadius: "8px",
+                      color: "#22c55e",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontSize: "14px",
+                    }}
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    style={{
+                      flex: 1,
+                      padding: "10px 16px",
+                      background: "rgba(255,255,255,0.05)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: "8px",
+                      color: "rgba(255,255,255,0.6)",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontSize: "14px",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {projects.length === 0 && !showAddProject && (
+              <div style={{
+                padding: "32px 24px",
+                textAlign: "center",
+                background: "rgba(0,212,255,0.03)",
+                border: "1px dashed rgba(0,212,255,0.15)",
+                borderRadius: "16px",
+                color: "rgba(255,255,255,0.4)",
+              }}>
+                <p style={{ margin: 0, fontSize: "14px", fontWeight: 600 }}>No projects yet</p>
+                {canEdit && <p style={{ margin: "8px 0 0", fontSize: "12px" }}>Add your first project to get started</p>}
+              </div>
+            )}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              {projects.map(project => (
+                <div key={project.id} className="cv-card" style={{
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(0,212,255,0.15)",
+                  borderRadius: "16px",
+                  padding: "20px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}>
+                  <div>
+                    <h3 style={{ margin: "0 0 8px", fontSize: "16px", fontWeight: 800, color: "white" }}>{project.title}</h3>
+                    <p style={{ margin: "0 0 12px", fontSize: "13px", color: "rgba(255,255,255,0.65)", lineHeight: 1.5 }}>
+                      {project.description}
+                    </p>
+                  </div>
+
+                  {project.tags.length > 0 && (
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                      {project.tags.map(tag => (
+                        <span key={tag} style={{
+                          padding: "4px 10px",
+                          background: "rgba(0,212,255,0.1)",
+                          border: "1px solid rgba(0,212,255,0.2)",
+                          borderRadius: "12px",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          color: "#00d4ff",
+                        }}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "auto" }}>
+                    <a
+                      href={project.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        flex: 1,
+                        color: "#00d4ff",
+                        textDecoration: "none",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      View Project →
+                    </a>
+                    {canEdit && (
+                      <div style={{ display: "flex", gap: "4px" }}>
+                        <button
+                          onClick={() => handleEditProject(project)}
+                          style={{
+                            padding: "6px 10px",
+                            background: "rgba(139,92,246,0.15)",
+                            border: "1px solid rgba(139,92,246,0.3)",
+                            borderRadius: "6px",
+                            color: "#8b5cf6",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProject(project.id)}
+                          style={{
+                            padding: "6px 10px",
+                            background: "rgba(239,68,68,0.15)",
+                            border: "1px solid rgba(239,68,68,0.3)",
+                            borderRadius: "6px",
+                            color: "#ef4444",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
         </div>

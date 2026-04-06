@@ -127,6 +127,30 @@ export interface Task {
   completionMode?: "one-time" | "unlimited"; // one-time = once per player, unlimited = repeatable
   fromJobId?: string; // If this task was created from a job posting
   requirement?: "required" | "available"; // required = mandatory (in checkpoint), available = optional (cohort-wide)
+  // ── LMS extensions (Season>Checkpoint>Project>Tasks hierarchy) ──
+  projectId?: string; // Parent Project (Tasks live under Projects; checkpoint is derived via project.checkpointId)
+  criteria?: { id: string; label: string }[]; // Up to 10 host-defined criteria (peer reviewer rates each 1–5)
+  deadlineDate?: string; // YYYY-MM-DD (separate from legacy dueDate so day+time can co-exist)
+  deadlineTime?: string; // HH:MM (24-hour)
+  assignedPlayerIds?: string[]; // Explicit player multi-select (in addition to cohort assignment)
+  allowPeerSendBack?: boolean; // If true, peer reviewer can send the submission back to the player for revision
+  resourceLinks?: string[]; // Multiple resource links (superset of legacy single `link`)
+  // ── Core Pathways linking ──
+  corePathwayNodeIds?: string[]; // Core Pathway node IDs this task is linked to (bidirectional)
+  unlockOverride?: boolean; // If true, task is unlocked regardless of prerequisite completion
+  // ── Battle Arena per-entity settings (Task) ──
+  taskArenaMicroChallenge?: boolean;           // Embed a 1–3 min arena micro-challenge for this task
+  taskCriterionArenaMap?: { criterionId: string; metric: string; threshold?: number }[]; // Map criteria to arena performance metrics
+  taskArenaBestOf?: number;                     // Best-of-N arena attempts
+  taskArenaBotOpponents?: string[];             // Player IDs from XCOIN_ROSTER to use as AI opponents
+  taskArenaFallback?: boolean;                  // Falls through to upload/link submission if arena failed
+  taskArenaRequiredForCompletion?: boolean;     // If true, arena attempt failures can trigger fines
+  // ── DarkCampus per-entity settings (Task) ──
+  taskSubmissionPostTarget?: string;            // Channel ID where X-Bot posts peer-feedback requests (default #Terminal)
+  taskDeadlineChannel?: string;                 // Channel ID for deadline reminders, or "dm" for private nudges
+  taskCompletionCelebration?: boolean;          // Auto-post celebration + badges earned on completion
+  taskViolationEscalation?: boolean;            // Route submission violations into DarkCampus escalation system
+  taskCommBonusEligible?: boolean;              // Discussion of this task counts toward comm reward
 }
 
 export interface Checkpoint {
@@ -144,6 +168,35 @@ export interface Checkpoint {
   jobIds?: string[]; // Jobs directly assigned to this checkpoint
   link?: string; // Optional resource link
   rewardBadges?: { name: string; xc: number }[]; // Multi-badge rewards for checkpoint completion
+  // ── Cadence (default 2 weeks, configurable per host) ──
+  cadenceDays?: number; // Default cycle length in days (14 = 2 weeks)
+  // ── Subscription gating (Organization / Cohort / SeasonPass) ──
+  subscriptionTier?: ("organization" | "cohort" | "seasonpass")[];
+  // ── Per-instance settings — each Checkpoint is its own mini-campaign ──
+  rewards?: string[]; // Named rewards unlocked this checkpoint
+  upgrades?: string[]; // Upgrades available to players this checkpoint
+  patches?: string[]; // Patch / balance notes or IDs
+  events?: { name: string; date?: string; description?: string }[]; // Events scheduled this checkpoint
+  sponsors?: { name: string; logo?: string; link?: string }[]; // Sponsors / partners
+  programs?: string[]; // Programs running inside this checkpoint
+  arenaGameTypes?: string[]; // Battle Arena game types active during this checkpoint
+  corePathwayNodeIds?: string[]; // Core Pathway nodes featured this checkpoint
+  // ── Battle Arena per-entity settings (Checkpoint) ──
+  checkpointModes?: string[];                         // Subset of the season's active modes featured this checkpoint
+  checkpointTheme?: { skin?: string; soundPack?: string; backgroundImage?: string };  // 2-week visual + audio override
+  checkpointWagerCaps?: { min?: number; max?: number }; // XC wager min/max for this checkpoint
+  checkpointXcMultiplier?: number;                    // Global XC reward multiplier for arena wins this checkpoint
+  checkpointDoubleXpWindows?: { start: string; end: string }[]; // ISO date ranges when rewards double
+  checkpointEvents?: { name: string; type: string; date?: string; description?: string }[]; // Scheduled arena events
+  checkpointBadgeRewards?: { rank: string; badge: string; xc?: number }[]; // Badges for top 3 / top 10 / participation
+  checkpointSponsorPrizes?: { sponsor: string; prize: string; leaderboardSlot?: string }[]; // Real-world prizes tied to slots
+  // ── DarkCampus per-entity settings (Checkpoint) ──
+  checkpointChannel?: string;                         // Auto-created PFLX channel scoped to this checkpoint
+  checkpointBriefingPost?: boolean;                   // X-Bot auto-posts checkpoint release briefing on start date
+  checkpointDeadlineReminders?: ("72h" | "24h" | "2h")[]; // Scheduled X-Bot nudges before checkpoint end
+  checkpointResultsPost?: boolean;                    // Auto-publish summary at checkpoint close
+  checkpointCommRewardMultiplier?: number;            // Multiplier on the +50 XC comm reward for this checkpoint
+  checkpointBridgedMissionControl?: string[];         // External #missioncontrol channel IDs that receive cross-posts
 }
 
 export interface JobMilestone {
@@ -182,6 +235,18 @@ export interface Job {
   requirement?: "required" | "available"; // required = mandatory (in checkpoint), available = optional
   // X-Bot notification channels (DarkCampus channel IDs to notify when posted)
   xbotChannels?: string[];
+  // ── Battle Arena per-entity settings (Job) ──
+  jobArenaTryout?: boolean;                           // Turn Job posting into a tryout match — top arena scorer gets hired
+  jobTryoutMode?: string;                             // Which arena mode runs the tryout (e.g., "cipher_agent")
+  jobTryoutCutoff?: number;                           // Minimum score to be considered for hire
+  jobArenaMaxApplicants?: number;                     // Concurrent applicants allowed in tryout lobby
+  jobWinnerRewards?: { xc?: number; badges?: string[] }; // Immediate rewards for tryout winner on top of being hired
+  // ── DarkCampus per-entity settings (Job) ──
+  jobPostingChannel?: string;                         // Channel where Job announcement is posted (X-Bot formats it)
+  jobApplicationThread?: boolean;                     // Applicants reply in a thread vs main channel
+  jobHireAnnouncement?: boolean;                      // X-Bot auto-posts congratulations + DMs hired player onboarding
+  jobMilestonePings?: boolean;                        // Scheduled reminders for job.milestones[]
+  jobSlackDiscordMirror?: string[];                   // External workspace/server IDs to mirror job posting into
 }
 
 // Helper: check if a task/job is visible to a given player
@@ -538,6 +603,36 @@ export interface GamePeriod {
   endDate?: string;
   durationString?: string;
   image?: string;
+  // ── Season structure + cadence ──
+  checkpointCount?: number;        // Typically 5 checkpoints per season
+  checkpointCadenceDays?: number;  // Default 14 (new checkpoint every 2 weeks)
+  // ── Subscription gating ──
+  subscriptionTier?: ("organization" | "cohort" | "seasonpass")[];
+  // ── Per-instance settings — each Season is a branded campaign ──
+  rewards?: string[];
+  upgrades?: string[];
+  patches?: string[];
+  events?: { name: string; date?: string; description?: string }[];
+  sponsors?: { name: string; logo?: string; link?: string }[];
+  programs?: string[];
+  arenaGameTypes?: string[];
+  corePathwayNodeIds?: string[];
+  // ── Battle Arena per-entity settings (Season) ──
+  activeGameModes?: string[];                         // Side Quest + Live Play modes available this season
+  seasonBanner?: string;                              // Arena home-screen banner image URL
+  seasonWagerCurve?: { rank: string; min: number; max: number }[]; // Wager limits scaling with rank
+  seasonTournamentBracket?: "single_elim" | "double_elim" | "round_robin" | "ladder";
+  seasonRewards?: { kind: string; value: string }[]; // Arena participation + performance rewards
+  seasonLeaderboardScope?: "cohort" | "organization" | "global";
+  seasonSponsorSkin?: { sponsor: string; logo?: string; hudColor?: string }; // Sponsor branding in arena UI
+  seasonEntryRequirement?: { minRank?: string; minXc?: number; badgeKey?: string }; // Gate for queueing
+  // ── DarkCampus per-entity settings (Season) ──
+  seasonChannels?: string[];                          // Auto-provisioned PFLX channels scoped to the season
+  seasonBridgedChannels?: { platform: "discord" | "slack"; id: string }[]; // External broadcast targets
+  seasonXbotPersonaOverride?: string;                 // e.g., "cyber_commander" for a themed season
+  seasonAnnouncementSchedule?: { name: string; date: string; body?: string }[]; // X-Bot auto-posts
+  seasonBadgeSuggestionWeights?: Record<string, number>; // Which Primary Badges X-Bot watches most aggressively
+  seasonViolationThresholdOverride?: { warn?: number; freeze?: number; fine?: number }; // Per-season WARN/FREEZE/FINE thresholds
 }
 
 export let mockGamePeriods: GamePeriod[] = [
@@ -1346,6 +1441,26 @@ export interface Project {
   repeatable?: boolean;           // Can players complete this project multiple times?
   // X-Bot notification channels (DarkCampus channel IDs to notify when posted)
   xbotChannels?: string[];
+  // ── LMS hierarchy: Season > Checkpoint > Project > Jobs/Tasks ──
+  checkpointId?: string; // Parent Checkpoint — enforces hierarchy (a Project belongs to a Checkpoint, never vice versa)
+  // ── Core Pathways linking ──
+  corePathwayNodeIds?: string[]; // Core Pathway node IDs this project is linked to (bidirectional)
+  unlockOverride?: boolean; // If true, project is unlocked regardless of prerequisite completion
+  // ── Battle Arena per-entity settings (Project) ──
+  projectArenaQuest?: boolean;                        // Project spawns a custom arena challenge tied to its curriculum
+  projectQuestionPack?: string;                       // ID of a custom Cipher question set (auto-generated via X-Bot from content)
+  projectArenaBoss?: boolean;                         // Final submission defended against peer sabotage rounds
+  projectWagerPool?: number;                          // Collective XC pool staked by team members
+  projectArenaXcMultiplier?: number;                  // XC multiplier when arena runs use this project's content
+  projectSpectators?: ("host" | "mentors" | "higher_rank" | "all")[]; // Who can spectate arena matches tied to this project
+  // ── DarkCampus per-entity settings (Project) ──
+  projectChannel?: string;                            // Dedicated group channel ID for this project's team
+  projectThreadOnly?: boolean;                        // Collapse project comms into a thread instead of a new channel
+  projectPeerFeedbackChannel?: string;                // Channel ID where X-Bot posts peer-feedback requests for this project
+  projectDirectorDMRouting?: boolean;                 // Route escalated peer feedback as DMs via dc_dm_*
+  projectStandupCadence?: "daily" | "weekly" | "none"; // X-Bot standup prompt cadence
+  projectXbotWatchKeywords?: string[];                // Keywords X-Bot monitors to surface blockers, wins, mentions
+  projectCrossPostTargets?: { platform: "discord" | "slack"; id: string }[]; // External targets for project updates
 }
 
 // ─── Mock Startup Studios ────────────────────────────────────────

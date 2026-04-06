@@ -474,3 +474,17 @@ button:not([disabled]):hover { filter: brightness(1.1); }
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* ── Host ↔ Player role swap: belt-and-suspenders visibility rules ──
+   RoleGuard sets `document.body.dataset.pflxRole` to "host" or "player".
+   Any element tagged with .host-only or .admin-only is hidden in player
+   mode; .player-only is hidden in host mode. Used as a fallback so
+   stray admin chrome cannot leak through if a route swap misses. */
+body[data-pflx-role="player"] .host-only,
+body[data-pflx-role="player"] .admin-only {
+  display: none !important;
+}
+body[data-pflx-role="host"] .player-only {
+  display: none !important;
+}
+

@@ -28,7 +28,7 @@ export default function Home() {
   const [tempPin, setTempPin] = useState("");
 
   // ═══ PFLX SSO AUTO-LOGIN ═══
-  // When embedded in the PFLX Overlay, URL params bypass the login screen
+  // When embedded in the PFLX Platform, URL params bypass the login screen
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sso = params.get("sso");
@@ -44,6 +44,7 @@ export default function Home() {
         const correctPin = user.pin ?? (user.role === "admin" ? "0000" : "1234");
         if (!ssoPin || ssoPin === correctPin) {
           // SSO from PFLX Overlay — mark onboarding complete (handled by overlay login)
+          // SSO from PFLX Platform — mark onboarding complete (handled by overlay login)
           user.onboardingComplete = true;
           user.pinChanged = true;
           // Sync SSO data (XC, cohort, role) from overlay

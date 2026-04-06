@@ -13,6 +13,7 @@ import {
 } from "../../lib/data";
 import { saveCheckpoints, saveTasks, saveJobs, saveProjects, saveCohortGroups, saveProjectPitches } from "../../lib/store";
 import { saveAndToast } from "../../lib/saveToast";
+import { logXBotEvent, logXBotEventForPlayers } from "../../lib/xbotBriefing";
 import { notifyPitchApproved, notifyPitchSubmitted, notifyJobHired, notifyDarkCampus } from "../../lib/notifications";
 import { playClick, playNav, playSuccess, playError, playDelete, playModalOpen, playModalClose } from "../../lib/sounds";
 import { compressBannerImage } from "../../lib/imageUtils";
@@ -228,6 +229,13 @@ export default function TaskManagement() {
   const [taskLinks, setTaskLinks] = useState<string[]>([""]);
   const [badgeDropdownOpen, setBadgeDropdownOpen] = useState(false);
   const [badgeSearch, setBadgeSearch] = useState("");
+  // LMS Task extensions
+  const [taskCriteria, setTaskCriteria] = useState<{ id: string; label: string }[]>([]);
+  const [taskPlayerIds, setTaskPlayerIds] = useState<string[]>([]);
+  const [taskPlayerSearch, setTaskPlayerSearch] = useState("");
+  const [taskDeadlineDate, setTaskDeadlineDate] = useState("");
+  const [taskDeadlineTime, setTaskDeadlineTime] = useState("");
+  const [taskAllowSendBack, setTaskAllowSendBack] = useState(true);
 
   // Job modal
   const [jobModal, setJobModal]   = useState(false);
@@ -370,6 +378,18 @@ export default function TaskManagement() {
       projectIds: cpProjectIds,
       jobIds: cpJobIds,
       rewardBadges: cpBadges,
+      // ── Cadence + subscription gating ──
+      cadenceDays: (editingCP as any).cadenceDays ?? 14,
+      subscriptionTier: (editingCP as any).subscriptionTier || [],
+      // ── Per-instance settings ──
+      rewards: (editingCP as any).rewards || [],
+      upgrades: (editingCP as any).upgrades || [],
+      patches: (editingCP as any).patches || [],
+      events: (editingCP as any).events || [],
+      sponsors: (editingCP as any).sponsors || [],
+      programs: (editingCP as any).programs || [],
+      arenaGameTypes: (editingCP as any).arenaGameTypes || [],
+      corePathwayNodeIds: (editingCP as any).corePathwayNodeIds || [],
     } as Checkpoint;
 
     if (isNew) {
@@ -410,6 +430,29 @@ export default function TaskManagement() {
 
     playSuccess();
     saveAndToast([saveCheckpoints, saveTasks, saveJobs], "Checkpoint saved to cloud ✓");
+    // X-Bot briefing: checkpoint release → every impacted player gets a data point
+    try {
+      const impacted = new Set<string>();
+      updatedTasks.filter(t => t.roundId === cpId).forEach(t => {
+        const ids = Array.isArray(t.assignedTo) ? t.assignedTo : (t.assignedPlayerIds || []);
+        ids.forEach(id => impacted.add(id));
+      });
+      if (impacted.size) {
+        logXBotEventForPlayers(Array.from(impacted), {
+          kind: isNew ? "checkpoint_released" : "briefing",
+          title: isNew ? `New checkpoint: ${saved.name}` : `Checkpoint updated: ${saved.name}`,
+          body: saved.description,
+          contextType: "checkpoint",
+          contextId: saved.id,
+          meta: {
+            cadenceDays: (saved as any).cadenceDays,
+            subscriptionTier: (saved as any).subscriptionTier,
+            startDate: saved.startDate,
+            endDate: saved.endDate,
+          },
+        });
+      }
+    } catch {}
     setCpModal(false);
   };
 
@@ -437,6 +480,13 @@ export default function TaskManagement() {
     setTaskLinks([""]);
     setBadgeSearch("");
     setBadgeDropdownOpen(false);
+    // LMS defaults
+    setTaskCriteria([]);
+    setTaskPlayerIds([]);
+    setTaskPlayerSearch("");
+    setTaskDeadlineDate("");
+    setTaskDeadlineTime("");
+    setTaskAllowSendBack(true);
     setTaskModal(true);
   };
 
@@ -462,6 +512,13 @@ export default function TaskManagement() {
     }
     setBadgeSearch("");
     setBadgeDropdownOpen(false);
+    // LMS fields
+    setTaskCriteria(Array.isArray((task as any).criteria) ? [...(task as any).criteria] : []);
+    setTaskPlayerIds(Array.isArray((task as any).assignedPlayerIds) ? [...(task as any).assignedPlayerIds] : []);
+    setTaskPlayerSearch("");
+    setTaskDeadlineDate((task as any).deadlineDate || "");
+    setTaskDeadlineTime((task as any).deadlineTime || "");
+    setTaskAllowSendBack((task as any).allowPeerSendBack !== false);
     setTaskModal(true);
   };
 
@@ -485,6 +542,16 @@ export default function TaskManagement() {
       links: cleanLinks,
       completionMode: (editingTask as any).completionMode || "unlimited",
       fromJobId: (editingTask as any).fromJobId,
+      // LMS fields
+      projectId: (editingTask as any).projectId || undefined,
+      criteria: taskCriteria.filter(c => c.label.trim()).slice(0, 10),
+      assignedPlayerIds: taskPlayerIds.length ? taskPlayerIds : undefined,
+      deadlineDate: taskDeadlineDate || undefined,
+      deadlineTime: taskDeadlineTime || undefined,
+      allowPeerSendBack: taskAllowSendBack,
+      resourceLinks: cleanLinks,
+      corePathwayNodeIds: (editingTask as any).corePathwayNodeIds || [],
+      unlockOverride: !!(editingTask as any).unlockOverride,
     } as Task;
     if (isNew) { setTasks(prev => [...prev, saved]); mockTasks.push(saved); }
     else {
@@ -494,6 +561,28 @@ export default function TaskManagement() {
     }
     playSuccess();
     saveAndToast([saveTasks], "Task saved to cloud ✓");
+    // X-Bot briefing: log a data point for each assigned player
+    try {
+      const targetIds = Array.isArray(saved.assignedTo)
+        ? saved.assignedTo
+        : (saved.assignedPlayerIds || []);
+      if (targetIds.length) {
+        logXBotEventForPlayers(targetIds, {
+          kind: isNew ? "task_assigned" : "briefing",
+          title: isNew ? `New task: ${saved.title}` : `Task updated: ${saved.title}`,
+          body: saved.description,
+          contextType: "task",
+          contextId: saved.id,
+          meta: {
+            deadlineDate: saved.deadlineDate,
+            deadlineTime: saved.deadlineTime,
+            criteriaCount: saved.criteria?.length || 0,
+            corePathwayNodeIds: saved.corePathwayNodeIds,
+            xc: saved.xpValue,
+          },
+        });
+      }
+    } catch {}
     setTaskModal(false);
   };
 
@@ -658,6 +747,9 @@ export default function TaskManagement() {
       closedPlayerIds: editingProject.closedPlayerIds || [],
       repeatable: editingProject.repeatable || false,
       xbotChannels: projXbotChannels,
+      checkpointId: (editingProject as any).checkpointId || undefined,
+      corePathwayNodeIds: (editingProject as any).corePathwayNodeIds || [],
+      unlockOverride: !!(editingProject as any).unlockOverride,
     };
     if (isNew) { setProjects(prev => [...prev, saved]); mockProjects.push(saved); }
     else {
@@ -667,6 +759,25 @@ export default function TaskManagement() {
     }
     playSuccess();
     saveAndToast([saveProjects], "Project saved to cloud ✓");
+    // X-Bot briefing: per-player data point
+    try {
+      const targetIds = Array.isArray(saved.assignedTo) ? saved.assignedTo : [];
+      if (targetIds.length) {
+        logXBotEventForPlayers(targetIds, {
+          kind: isNew ? "project_assigned" : "briefing",
+          title: isNew ? `New project: ${saved.title}` : `Project updated: ${saved.title}`,
+          body: saved.description,
+          contextType: "project",
+          contextId: saved.id,
+          meta: {
+            checkpointId: saved.checkpointId,
+            corePathwayNodeIds: saved.corePathwayNodeIds,
+            xc: saved.xcRewardPool,
+            taskCount: saved.taskIds?.length || 0,
+          },
+        });
+      }
+    } catch {}
     // Notify DarkCampus channels when a new project is created (if X-Bot channels selected)
     if (isNew && projXbotChannels.length > 0) {
       notifyDarkCampus({
@@ -1939,6 +2050,92 @@ export default function TaskManagement() {
                   placeholder="https://docs.google.com/... or any URL" style={inputSx} />
               </Field>
 
+              {/* ── Cadence + Subscription gating ── */}
+              <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(245,200,66,0.05)", border: "1px solid rgba(245,200,66,0.18)" }}>
+                <p style={{ margin: "0 0 10px", fontSize: "11px", fontWeight: 700, color: "#f5c842", letterSpacing: "0.08em", textTransform: "uppercase" }}>⏱ CADENCE + SUBSCRIPTION GATE</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "14px" }}>
+                  <Field label="Cadence (days)">
+                    <input type="number" min={1}
+                      value={(editingCP as any).cadenceDays ?? 14}
+                      onChange={e => setEditingCP(p => ({ ...p, cadenceDays: parseInt(e.target.value) || 14 } as any))}
+                      style={inputSx} />
+                  </Field>
+                  <Field label="Subscription tiers (who can unlock this checkpoint)">
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      {(["organization", "cohort", "seasonpass"] as const).map(tier => {
+                        const arr = ((editingCP as any).subscriptionTier as string[] | undefined) || [];
+                        const on = arr.includes(tier);
+                        return (
+                          <button key={tier} type="button"
+                            onClick={() => setEditingCP(p => {
+                              const cur = (((p as any).subscriptionTier as string[] | undefined) || []).slice();
+                              const idx = cur.indexOf(tier);
+                              if (idx >= 0) cur.splice(idx, 1); else cur.push(tier);
+                              return { ...p, subscriptionTier: cur } as any;
+                            })}
+                            style={{ padding: "6px 14px", borderRadius: "10px", fontSize: "11px", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer",
+                              background: on ? "linear-gradient(135deg,#f5c842,#f59e0b)" : "rgba(255,255,255,0.05)",
+                              color: on ? "#1a1a2e" : "rgba(255,255,255,0.5)",
+                              border: on ? "1px solid #f5c842" : "1px solid rgba(255,255,255,0.12)" }}>
+                            {tier}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </Field>
+                </div>
+              </div>
+
+              {/* ── Per-instance settings — branded campaign content ── */}
+              <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(167,139,250,0.05)", border: "1px solid rgba(167,139,250,0.18)" }}>
+                <p style={{ margin: "0 0 12px", fontSize: "11px", fontWeight: 700, color: "#a78bfa", letterSpacing: "0.08em", textTransform: "uppercase" }}>🎁 CHECKPOINT SETTINGS — rewards / upgrades / patches / events / sponsors / programs / arena</p>
+                {([
+                  { key: "rewards", label: "Rewards (comma-separated)" },
+                  { key: "upgrades", label: "Upgrades (comma-separated)" },
+                  { key: "patches", label: "Patches (comma-separated)" },
+                  { key: "programs", label: "Programs (comma-separated)" },
+                  { key: "arenaGameTypes", label: "Battle Arena Game Types (comma-separated)" },
+                  { key: "corePathwayNodeIds", label: "Featured Core Pathway Node IDs (comma-separated)" },
+                ] as const).map(f => (
+                  <div key={f.key} style={{ marginBottom: "10px" }}>
+                    <Field label={f.label}>
+                      <input
+                        value={(((editingCP as any)[f.key] as string[] | undefined) || []).join(", ")}
+                        onChange={e => setEditingCP(p => ({ ...p, [f.key]: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } as any))}
+                        style={inputSx} />
+                    </Field>
+                  </div>
+                ))}
+                <Field label="Events (name | date | description, one per line)">
+                  <textarea rows={2}
+                    value={(((editingCP as any).events as any[] | undefined) || []).map((ev: any) => `${ev.name || ""} | ${ev.date || ""} | ${ev.description || ""}`).join("\n")}
+                    onChange={e => {
+                      const lines = e.target.value.split("\n").filter(l => l.trim());
+                      const events = lines.map(l => {
+                        const [name, date, description] = l.split("|").map(s => (s || "").trim());
+                        return { name: name || "", date: date || undefined, description: description || undefined };
+                      });
+                      setEditingCP(p => ({ ...p, events } as any));
+                    }}
+                    placeholder="Kickoff | 2026-04-10 | Launch event&#10;Demo Day | 2026-04-24 | Player showcases"
+                    style={{ ...inputSx, resize: "vertical" }} />
+                </Field>
+                <Field label="Sponsors / Partners (name | logo URL | link, one per line)">
+                  <textarea rows={2}
+                    value={(((editingCP as any).sponsors as any[] | undefined) || []).map((s: any) => `${s.name || ""} | ${s.logo || ""} | ${s.link || ""}`).join("\n")}
+                    onChange={e => {
+                      const lines = e.target.value.split("\n").filter(l => l.trim());
+                      const sponsors = lines.map(l => {
+                        const [name, logo, link] = l.split("|").map(s => (s || "").trim());
+                        return { name: name || "", logo: logo || undefined, link: link || undefined };
+                      });
+                      setEditingCP(p => ({ ...p, sponsors } as any));
+                    }}
+                    placeholder="Acme Studio | https://cdn/logo.png | https://acme.example"
+                    style={{ ...inputSx, resize: "vertical" }} />
+                </Field>
+              </div>
+
               {/* Task selection */}
               <Field label={`Assign Individual Tasks (${cpTaskIds.length} selected)`}>
                 <div style={{ maxHeight: "220px", overflowY: "auto", background: "rgba(255,255,255,0.03)",
@@ -2155,11 +2352,17 @@ export default function TaskManagement() {
                     <option value="archived">Archived</option>
                   </select>
                 </Field>
-                <Field label="Checkpoint">
-                  <select value={editingTask.roundId || ""} onChange={e => setEditingTask(p => ({ ...p, roundId: e.target.value || undefined }))}
+                <Field label="Project (parent)">
+                  <select value={(editingTask as any).projectId || ""} onChange={e => {
+                    const pid = e.target.value || undefined;
+                    // Auto-derive checkpoint from the selected project (Season>Checkpoint>Project>Task)
+                    const parentProj = projects.find(p => p.id === pid);
+                    const derivedCheckpoint = (parentProj as any)?.checkpointId || undefined;
+                    setEditingTask(p => ({ ...p, projectId: pid, roundId: derivedCheckpoint } as any));
+                  }}
                     style={{ ...inputSx, cursor: "pointer" }}>
                     <option value="">Unassigned</option>
-                    {checkpoints.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
                   </select>
                 </Field>
                 <Field label="Completion">
@@ -2189,6 +2392,83 @@ export default function TaskManagement() {
                   📌 This task was created from a Job Posting — assigned to hired player only
                 </div>
               )}
+
+              {/* ── LMS: Player multi-select ── */}
+              <Field label={`Assigned Players (${taskPlayerIds.length}) — optional, in addition to cohorts`}>
+                {taskPlayerIds.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+                    {taskPlayerIds.map(pid => {
+                      const u = mockUsers.find(x => x.id === pid);
+                      return (
+                        <span key={pid} style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, background: "rgba(6,214,160,0.12)", border: "1px solid rgba(6,214,160,0.3)", color: "#06d6a0" }}>
+                          {u?.brandName || u?.name || pid}
+                          <span onClick={() => setTaskPlayerIds(prev => prev.filter(id => id !== pid))} style={{ cursor: "pointer", color: "rgba(255,255,255,0.4)", marginLeft: "2px", fontSize: "14px" }}>×</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                <input value={taskPlayerSearch} onChange={e => setTaskPlayerSearch(e.target.value)} placeholder="Search players to add…" style={inputSx} />
+                {taskPlayerSearch.trim() && (
+                  <div style={{ marginTop: "4px", maxHeight: "140px", overflowY: "auto", background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px" }}>
+                    {mockUsers.filter(u => u.role === "player" && !taskPlayerIds.includes(u.id) && ((u.brandName || u.name || "").toLowerCase().includes(taskPlayerSearch.toLowerCase()))).slice(0, 20).map(u => (
+                      <div key={u.id} onClick={() => { setTaskPlayerIds(prev => [...prev, u.id]); setTaskPlayerSearch(""); }}
+                        style={{ padding: "8px 14px", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "rgba(255,255,255,0.7)", display: "flex", justifyContent: "space-between" }}>
+                        <span>{u.brandName || u.name}</span>
+                        <span style={{ color: "rgba(255,255,255,0.3)", fontSize: "11px" }}>{u.cohort}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Field>
+
+              {/* ── LMS: Deadline day + time ── */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                <Field label="Deadline Date">
+                  <input type="date" value={taskDeadlineDate} onChange={e => setTaskDeadlineDate(e.target.value)} style={inputSx} />
+                </Field>
+                <Field label="Deadline Time">
+                  <input type="time" value={taskDeadlineTime} onChange={e => setTaskDeadlineTime(e.target.value)} style={inputSx} />
+                </Field>
+              </div>
+
+              {/* ── LMS: Criteria (up to 10) — peer reviewer rates each 1–5 ── */}
+              <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(167,139,250,0.05)", border: "1px solid rgba(167,139,250,0.18)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <p style={{ margin: 0, fontSize: "11px", fontWeight: 700, color: "#a78bfa", letterSpacing: "0.08em", textTransform: "uppercase" }}>📋 CRITERIA ({taskCriteria.length}/10) — peer rates each 1–5</p>
+                  <button type="button" onClick={() => { if (taskCriteria.length < 10) setTaskCriteria(prev => [...prev, { id: `crit_${Date.now()}_${prev.length}`, label: "" }]); }}
+                    disabled={taskCriteria.length >= 10}
+                    style={{ background: taskCriteria.length >= 10 ? "rgba(255,255,255,0.04)" : "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)", borderRadius: "8px", color: taskCriteria.length >= 10 ? "rgba(255,255,255,0.25)" : "#a78bfa", padding: "5px 12px", fontWeight: 700, fontSize: "11px", cursor: taskCriteria.length >= 10 ? "not-allowed" : "pointer" }}>
+                    + Add Criterion
+                  </button>
+                </div>
+                {taskCriteria.length === 0 ? (
+                  <p style={{ margin: 0, fontSize: "11px", color: "rgba(255,255,255,0.35)", fontStyle: "italic" }}>No criteria yet. Add up to 10 that peer reviewers will rate.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {taskCriteria.map((c, i) => (
+                      <div key={c.id} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <span style={{ width: "22px", fontSize: "11px", fontWeight: 800, color: "#a78bfa", textAlign: "center" }}>{i + 1}.</span>
+                        <input value={c.label} onChange={e => setTaskCriteria(prev => prev.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
+                          placeholder={`Criterion ${i + 1} (e.g. "Clear problem statement")`} style={{ ...inputSx, flex: 1 }} />
+                        <button type="button" onClick={() => setTaskCriteria(prev => prev.filter((_, j) => j !== i))}
+                          style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "8px", color: "#ef4444", padding: "0 10px", cursor: "pointer", fontSize: "14px", fontWeight: 700 }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── LMS: Peer feedback — allow send-back ── */}
+              <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", borderRadius: "10px", background: "rgba(6,214,160,0.05)", border: "1px solid rgba(6,214,160,0.15)", cursor: "pointer" }}>
+                <input type="checkbox" checked={taskAllowSendBack} onChange={e => setTaskAllowSendBack(e.target.checked)}
+                  style={{ width: "16px", height: "16px", accentColor: "#06d6a0", cursor: "pointer" }} />
+                <div>
+                  <p style={{ margin: 0, fontSize: "12px", fontWeight: 700, color: "#06d6a0" }}>Allow peer reviewer to send back to player</p>
+                  <p style={{ margin: 0, fontSize: "10px", color: "rgba(255,255,255,0.4)" }}>If enabled, the peer can request a revision. The player can then route it to host / higher-ranked peer / hired director-producer-manager / X-Bot.</p>
+                </div>
+              </label>
+
               <Field label={`Resource Links (${taskLinks.filter(l => l.trim()).length})`}>
                 {taskLinks.map((link, i) => (
                   <div key={i} style={{ display: "flex", gap: "8px", marginBottom: i < taskLinks.length - 1 ? "6px" : 0 }}>
@@ -2209,6 +2489,29 @@ export default function TaskManagement() {
                   </div>
                 ))}
               </Field>
+
+              {/* ── Core Pathways linking for Tasks ── */}
+              <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(0,212,255,0.05)", border: "1px solid rgba(0,212,255,0.18)" }}>
+                <p style={{ margin: "0 0 10px", fontSize: "11px", fontWeight: 700, color: "#00d4ff", letterSpacing: "0.08em", textTransform: "uppercase" }}>🧭 CORE PATHWAYS LINK</p>
+                <Field label="Pathway Node IDs (comma-separated — e.g. a task like 'Complete Design Thinking Concepts')">
+                  <input
+                    value={((editingTask as any).corePathwayNodeIds || []).join(", ")}
+                    onChange={e => setEditingTask(p => ({ ...p, corePathwayNodeIds: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } as any))}
+                    placeholder="e.g. design-thinking-concepts, digital-artist-1"
+                    style={inputSx}
+                  />
+                </Field>
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px", cursor: "pointer" }}>
+                  <input type="checkbox"
+                    checked={!!(editingTask as any).unlockOverride}
+                    onChange={e => setEditingTask(p => ({ ...p, unlockOverride: e.target.checked } as any))}
+                    style={{ width: "16px", height: "16px", accentColor: "#00d4ff", cursor: "pointer" }} />
+                  <div>
+                    <p style={{ margin: 0, fontSize: "12px", fontWeight: 700, color: "#00d4ff" }}>Unlock override (ignore prerequisites)</p>
+                    <p style={{ margin: 0, fontSize: "10px", color: "rgba(255,255,255,0.4)" }}>By default, this task is locked behind its pathway node prerequisites. Enable to make it available regardless of sequence.</p>
+                  </div>
+                </label>
+              </div>
             </div>
             <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "24px" }}>
               <button onClick={() => { playClick(); setTaskModal(false); }}
@@ -2241,7 +2544,14 @@ export default function TaskManagement() {
                 <textarea value={editingProject.description || ""} onChange={e => setEditingProject(p => ({ ...p, description: e.target.value }))}
                   placeholder="What does this project involve?" rows={2} style={{ ...inputSx, resize: "vertical" }} />
               </Field>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                <Field label="Parent Checkpoint (Season › Checkpoint › Project)">
+                  <select value={(editingProject as any).checkpointId || ""} onChange={e => setEditingProject(p => ({ ...p, checkpointId: e.target.value || undefined } as any))}
+                    style={{ ...inputSx, cursor: "pointer" }}>
+                    <option value="">Unassigned</option>
+                    {checkpoints.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </Field>
                 <Field label="Status">
                   <select value={editingProject.status || "active"} onChange={e => setEditingProject(p => ({ ...p, status: e.target.value as Project["status"] }))}
                     style={{ ...inputSx, cursor: "pointer" }}>
@@ -2250,6 +2560,8 @@ export default function TaskManagement() {
                     <option value="archived">Archived</option>
                   </select>
                 </Field>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                 <Field label="Due Date">
                   <input type="date" value={editingProject.dueDate || ""} onChange={e => setEditingProject(p => ({ ...p, dueDate: e.target.value || undefined }))} style={inputSx} />
                 </Field>
@@ -2347,6 +2659,29 @@ export default function TaskManagement() {
                 <input value={editingProject.link || ""} onChange={e => setEditingProject(p => ({ ...p, link: e.target.value }))}
                   placeholder="https://docs.google.com/... or any URL" style={inputSx} />
               </Field>
+
+              {/* ── Core Pathways linking ── */}
+              <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(0,212,255,0.05)", border: "1px solid rgba(0,212,255,0.18)" }}>
+                <p style={{ margin: "0 0 10px", fontSize: "11px", fontWeight: 700, color: "#00d4ff", letterSpacing: "0.08em", textTransform: "uppercase" }}>🧭 CORE PATHWAYS LINK</p>
+                <Field label="Pathway Node IDs (comma-separated — projects created here sync to these live nodes)">
+                  <input
+                    value={((editingProject as any).corePathwayNodeIds || []).join(", ")}
+                    onChange={e => setEditingProject(p => ({ ...p, corePathwayNodeIds: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } as any))}
+                    placeholder="e.g. digital-artist-3, stem-innovator-2"
+                    style={inputSx}
+                  />
+                </Field>
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px", cursor: "pointer" }}>
+                  <input type="checkbox"
+                    checked={!!(editingProject as any).unlockOverride}
+                    onChange={e => setEditingProject(p => ({ ...p, unlockOverride: e.target.checked } as any))}
+                    style={{ width: "16px", height: "16px", accentColor: "#00d4ff", cursor: "pointer" }} />
+                  <div>
+                    <p style={{ margin: 0, fontSize: "12px", fontWeight: 700, color: "#00d4ff" }}>Unlock override (ignore prerequisites)</p>
+                    <p style={{ margin: 0, fontSize: "10px", color: "rgba(255,255,255,0.4)" }}>By default, this project is locked behind its pathway node prerequisites. Enable to make it available regardless of sequence.</p>
+                  </div>
+                </label>
+              </div>
 
               {/* Task selection */}
               <Field label={`Assign Tasks (${projTaskIds.length} selected)`}>
