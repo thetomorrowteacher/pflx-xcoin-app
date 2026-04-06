@@ -57,11 +57,12 @@ export async function initStore(): Promise<void> {
   // never sees a resolved promise with default data.
   _initPromise = (async () => {
     let retryRound = 0;
+    const MAX_RETRIES = 3; // Cap retries to prevent infinite flickering
 
     while (true) {
       try {
         retryRound++;
-        setProgress(10, retryRound > 1 ? `Reconnecting (round ${retryRound})...` : "Fetching saved data...");
+        setProgress(10, retryRound > 1 ? `Reconnecting (attempt ${retryRound}/${MAX_RETRIES})...` : "Fetching saved data...");
 
         const result = await loadAllData((loaded, total) => {
           // Map parallel fetches to 10–60% of the progress bar
@@ -69,8 +70,14 @@ export async function initStore(): Promise<void> {
           setProgress(p, `Loading collections... (${loaded}/${total})`);
         });
 
-        // If all retries in loadAllData failed, wait and loop again
+        // If all retries in loadAllData failed, wait and loop again (up to MAX_RETRIES)
         if (!result.ok) {
+          if (retryRound >= MAX_RETRIES) {
+            console.warn(`[store] Load failed after ${MAX_RETRIES} attempts — proceeding with defaults`);
+            setProgress(100, "Using cached data");
+            _loadFailed = true;
+            break; // Exit loop — proceed with default/mock data instead of looping forever
+          }
           console.warn(`[store] Load round ${retryRound} failed — waiting 2s then retrying...`);
           setProgress(10, "Connection lost — retrying...");
           _loadFailed = true;
@@ -169,11 +176,24 @@ export async function initStore(): Promise<void> {
         return; // ← only exit point — promise resolves ONLY here
 
       } catch (err) {
+        if (retryRound >= MAX_RETRIES) {
+          console.error(`[store] initStore crashed after ${MAX_RETRIES} attempts:`, err, "— proceeding with defaults");
+          _loadFailed = true;
+          break;
+        }
         console.error(`[store] initStore round ${retryRound} crashed:`, err, "— retrying in 2s...");
         setProgress(10, "Error — retrying...");
         await new Promise(r => setTimeout(r, 2000));
         continue; // stay in loop — promise stays pending
       }
+    }
+
+    // If we broke out of the loop (max retries), still initialize so the app loads
+    if (!_initialized) {
+      setProgress(100, "Ready");
+      _initialized = true;
+      _loading = false;
+      notify();
     }
   })();
 

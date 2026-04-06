@@ -130,6 +130,8 @@ async function migrateImages() {
 
 export default function StoreProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
+  const [fadeOut, setFadeOut] = useState(false);
+  const [showChildren, setShowChildren] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadStatus, setLoadStatus] = useState("Connecting...");
   const lastSnaps = useRef<Record<string, string>>({});
@@ -153,7 +155,12 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
 
       // Take per-collection snapshots AFTER load + image merge + migration
       lastSnaps.current = snapshotAll();
-      setReady(true);
+      // Start fade-out animation, then reveal children
+      setFadeOut(true);
+      setTimeout(() => {
+        setShowChildren(true);
+        setReady(true);
+      }, 500);
 
       // If Supabase was empty, seed with defaults
       if (needsSeed()) {
@@ -198,7 +205,8 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
     };
   }, [ready]);
 
-  if (!ready) {
+  // Show loading screen with fade-out transition
+  if (!showChildren) {
     return (
       <div style={{
         display: "flex",
@@ -211,6 +219,8 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
         fontFamily: "monospace",
         fontSize: "1.2rem",
         gap: "20px",
+        opacity: fadeOut ? 0 : 1,
+        transition: "opacity 0.5s ease-out",
       }}>
         {/* PFLX logo text */}
         <div style={{

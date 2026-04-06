@@ -17,6 +17,7 @@ export default function Home() {
   const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [pinError, setPinError] = useState("");
   const [btnHover, setBtnHover] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   // Change-PIN state
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -57,6 +58,7 @@ export default function Home() {
           localStorage.setItem("pflx_keep_signed_in", "true");
           localStorage.setItem("pflx_sso_active", "true");
           console.log("[X-Coin] SSO auto-login for:", user.brandName || user.name);
+          setRedirecting(true);
           if (isHostUser(user)) {
             router.push("/admin");
           } else {
@@ -78,6 +80,7 @@ export default function Home() {
     const stay = localStorage.getItem("pflx_keep_signed_in");
     if (existing && stay) {
       const u = JSON.parse(existing);
+      setRedirecting(true);
       if (isHostUser(u)) { router.push("/admin"); }
       else { router.push("/player"); }
     }
@@ -212,6 +215,28 @@ export default function Home() {
     marginBottom: "8px",
     textTransform: "uppercase",
   };
+
+  // Show a minimal loading screen while SSO redirect is in progress
+  // This prevents the login form from flashing before the route change
+  if (redirecting) {
+    return (
+      <div style={{
+        display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
+        height: "100vh", background: "#06090d", color: "#00d4ff",
+        fontFamily: "monospace", fontSize: "0.8rem", gap: "16px",
+      }}>
+        <div style={{
+          fontSize: "1.8rem", fontWeight: 900, letterSpacing: "0.2em",
+          background: "linear-gradient(90deg, #00d4ff, #a78bfa, #00d4ff)",
+          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+          filter: "drop-shadow(0 0 20px rgba(0,212,255,0.4))",
+        }}>PFLX</div>
+        <div style={{ fontSize: "0.6rem", color: "rgba(0,229,255,0.35)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
+          Initializing session...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
