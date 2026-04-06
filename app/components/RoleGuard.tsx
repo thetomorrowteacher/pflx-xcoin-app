@@ -1,23 +1,21 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 /**
  * RoleGuard — Listens for `pflx_role_changed` postMessage from the PFLX
- * Platform shell (preview.html's pflxSetRole). When the active role flips
- * to "player", the host is redirected out of /admin/* into the matching
- * /player/* route so they see exactly what a player sees. When it flips
- * back to "host", they return to /admin.
+ * Platform shell. When the active role flips to "player", the host is
+ * redirected out of /admin/* into /player/*. When it flips back to "host",
+ * they return to /admin.
  *
- * Also checks initial role on mount (via localStorage bridge + parent
- * identity broadcast) to handle page loads while already in player mode.
+ * KEY FIX: This no longer re-runs the full effect on pathname changes,
+ * which was causing an infinite redirect loop:
+ *   SSO → /admin → RoleGuard reads stale "player" → /player →
+ *   parent says "host" → /admin → repeat
  *
- * Belt-and-suspenders: toggles `document.body.dataset.pflxRole` so CSS
- * can hide any lingering admin chrome if a route swap misses a corner.
+ * Now uses a ref for pathname and a cooldown to prevent rapid redirects.
  */
 
-// Map admin sub-routes → matching player sub-routes (best-effort).
-// Anything that doesn't have an explicit match falls back to /player.
 const ADMIN_TO_PLAYER: Record<string, string> = {
   "/admin": "/player",
   "/admin/task-management": "/player/tasks",
@@ -43,7 +41,6 @@ const PLAYER_TO_ADMIN: Record<string, string> = {
 
 function mapRoute(pathname: string, role: "host" | "player"): string | null {
   if (role === "player") {
-    // Find longest matching admin prefix
     const keys = Object.keys(ADMIN_TO_PLAYER).sort((a, b) => b.length - a.length);
     for (const k of keys) {
       if (pathname === k || pathname.startsWith(k + "/")) {
@@ -62,12 +59,42 @@ function mapRoute(pathname: string, role: "host" | "player"): string | null {
   }
 }
 
+// Minimum ms between consecutive redirects to prevent loops
+const REDIRECT_COOLDOWN = 2000;
+
 export default function RoleGuard() {
   const router = useRouter();
   const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  const lastRedirectTime = useRef(0);
+  const hasInitialized = useRef(false);
+
+  // Keep pathname ref in sync without triggering effect re-runs
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
 
   useEffect(() => {
-    // ── Initial role check (page load / refresh) ──
+    // Only run once on mount
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    function safeRedirect(target: string) {
+      const now = Date.now();
+      if (now - lastRedirectTime.current < REDIRECT_COOLDOWN) {
+        console.log("[RoleGuard] Redirect throttled — cooldown active");
+        return;
+      }
+      if (target === pathnameRef.current) return;
+      lastRedirectTime.current = now;
+      console.log("[RoleGuard] Redirecting:", pathnameRef.current, "→", target);
+      router.replace(target);
+    }
+
+    // ── Initial role check ──
+    // Skip initial redirect if SSO is actively logging in (pflx_sso_active flag)
+    // The SSO handler in page.tsx already sets the correct role
+    const ssoActive = localStorage.getItem("pflx_sso_active");
     let initialRole: "host" | "player" | null = null;
     try {
       const stored = localStorage.getItem("pflx_active_role");
@@ -76,22 +103,26 @@ export default function RoleGuard() {
 
     if (initialRole) {
       document.body.dataset.pflxRole = initialRole;
-      const target = mapRoute(pathname || "/admin", initialRole);
-      if (target && target !== pathname) {
-        router.replace(target);
+      // Only redirect on initial load if NOT during SSO login
+      // During SSO, page.tsx already routes correctly
+      if (!ssoActive) {
+        const target = mapRoute(pathnameRef.current || "/admin", initialRole);
+        if (target && target !== pathnameRef.current) {
+          safeRedirect(target);
+        }
       }
     } else {
-      // Default assumption: if we're on /admin without an explicit role,
-      // treat as host. Ask the parent to confirm.
       document.body.dataset.pflxRole = "host";
-      if (window.parent !== window) {
-        try {
-          window.parent.postMessage(
-            JSON.stringify({ type: "pflx_role_query" }),
-            "*"
-          );
-        } catch {}
-      }
+    }
+
+    // Ask parent for authoritative role
+    if (window.parent !== window) {
+      try {
+        window.parent.postMessage(
+          JSON.stringify({ type: "pflx_role_query" }),
+          "*"
+        );
+      } catch {}
     }
 
     // ── Live role change listener ──
@@ -104,9 +135,9 @@ export default function RoleGuard() {
         try { localStorage.setItem("pflx_active_role", role); } catch {}
         document.body.dataset.pflxRole = role;
 
-        const target = mapRoute(pathname || "/admin", role);
-        if (target && target !== pathname) {
-          router.push(target);
+        const target = mapRoute(pathnameRef.current || "/admin", role);
+        if (target) {
+          safeRedirect(target);
         }
       } catch {
         // ignore non-JSON
@@ -115,7 +146,7 @@ export default function RoleGuard() {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [pathname, router]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
 }

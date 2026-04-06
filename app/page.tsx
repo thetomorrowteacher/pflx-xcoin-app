@@ -57,7 +57,11 @@ export default function Home() {
           localStorage.setItem("pflx_user", JSON.stringify(user));
           localStorage.setItem("pflx_keep_signed_in", "true");
           localStorage.setItem("pflx_sso_active", "true");
-          console.log("[X-Coin] SSO auto-login for:", user.brandName || user.name);
+          // Set the active role BEFORE routing so RoleGuard doesn't fight
+          const activeRole = isHostUser(user) ? "host" : "player";
+          localStorage.setItem("pflx_active_role", activeRole);
+          document.body.dataset.pflxRole = activeRole;
+          console.log("[X-Coin] SSO auto-login for:", user.brandName || user.name, "role:", activeRole);
           setRedirecting(true);
           if (isHostUser(user)) {
             router.push("/admin");
@@ -80,6 +84,10 @@ export default function Home() {
     const stay = localStorage.getItem("pflx_keep_signed_in");
     if (existing && stay) {
       const u = JSON.parse(existing);
+      // Set role before routing to prevent RoleGuard conflict
+      const resumeRole = isHostUser(u) ? "host" : "player";
+      localStorage.setItem("pflx_active_role", resumeRole);
+      document.body.dataset.pflxRole = resumeRole;
       setRedirecting(true);
       if (isHostUser(u)) { router.push("/admin"); }
       else { router.push("/player"); }
