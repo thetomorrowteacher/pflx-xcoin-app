@@ -92,7 +92,8 @@ export default function Home() {
       if (isHostUser(u)) { router.push("/admin"); }
       else { router.push("/player"); }
     }
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const players = mockUsers.filter(u => u.role === "player" && !u.isHost);
   const hosts = mockUsers.filter(u => isHostUser(u));
