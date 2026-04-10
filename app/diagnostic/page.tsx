@@ -459,6 +459,26 @@ export default function DiagnosticPage() {
     if (idx >= 0) mockUsers[idx] = updatedUser;
     setUser(updatedUser);
     setStep("welcome");
+
+    // When embedded in PFLX Platform login (?embed=pflx), send results back to parent
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("embed") === "pflx" && window.parent && window.parent !== window) {
+        const payload = {
+          brandType: updatedUser.diagnosticResult?.brandType,
+          topPathways: updatedUser.diagnosticResult?.topPathways,
+          style: updatedUser.diagnosticResult?.style,
+          scores: updatedUser.diagnosticResult?.scores,
+          brandName: updatedUser.brandName,
+          slogan: (updatedUser as any).slogan || "",
+          role: (updatedUser as any).role || "",
+          studioId: updatedUser.studioId,
+        };
+        window.parent.postMessage({ type: "pflx_diagnostic_complete", payload }, "*");
+      }
+    } catch (e) {
+      console.warn("[Diagnostic] Failed to post completion to parent:", e);
+    }
   };
 
   if (!user) return null;

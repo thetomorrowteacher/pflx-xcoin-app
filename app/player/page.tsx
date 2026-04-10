@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../components/SideNav";
 import { mergePlayerStats } from "../lib/playerStats";
@@ -94,7 +94,8 @@ export default function PlayerHome() {
     } catch {
       router.push("/");
     }
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Fetch X-Bot daily report
   const fetchDailyReport = useCallback(async (u: User) => {
@@ -157,12 +158,14 @@ Return ONLY valid JSON with this exact format (no markdown, no code blocks):
     }
   }, []);
 
-  // Auto-fetch daily report on mount
+  // Auto-fetch daily report on mount (ONCE per user — no retry loop on error)
+  const reportFetchedForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (user && !dailyReport && !reportLoading) {
+    if (user && reportFetchedForRef.current !== user.id) {
+      reportFetchedForRef.current = user.id;
       fetchDailyReport(user);
     }
-  }, [user, dailyReport, reportLoading, fetchDailyReport]);
+  }, [user, fetchDailyReport]);
 
   if (!user) return null;
 
