@@ -77,6 +77,26 @@ export default function SideNav({ user }: NavProps) {
   const router = useRouter();
   const pathname = usePathname();
   const isHost = isHostUser(user);
+  // ── Embed mode: when this app is loaded inside the PFLX Platform Mission
+  // Control iframe (?embed=mc), hide the X-Coin sidebar entirely so the
+  // parent shell is the only chrome the host sees. This prevents duplicate
+  // nav items like "Master Leaderboard" from appearing inside Mission
+  // Control's Player Management panel.
+  const [isEmbed, setIsEmbed] = useState(false);
+  useEffect(() => {
+    try {
+      const inIframe = typeof window !== "undefined" && window.self !== window.top;
+      const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const embedParam = params?.get("embed");
+      if (inIframe || embedParam === "mc" || embedParam === "pflx") {
+        setIsEmbed(true);
+      }
+    } catch {
+      // Cross-origin access to window.top throws — if it does, we're definitely embedded.
+      setIsEmbed(true);
+    }
+  }, []);
+  if (isEmbed) return null;
   // Executive Evo Rank players (Chief level 9+, Partner level 10) get access to Approvals
   const rankLevel = getCurrentRank(user.totalXcoin, user).level;
   const isExecutiveRank = rankLevel >= 9;
