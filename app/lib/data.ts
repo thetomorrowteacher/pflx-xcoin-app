@@ -1593,67 +1593,12 @@ export let mockProjects: Project[] = [
   },
 ];
 
-// ─── Studio Assignment Algorithm ─────────────────────────────────
-// Maps diagnostic results → one of the 4 Startup Studios
-export function assignStudioFromDiagnostic(result: DiagnosticResult): string {
-  const studioScores: Record<string, number> = {
-    "studio-mindforge": 0,
-    "studio-emagination": 0,
-    "studio-gentech": 0,
-    "studio-innov8": 0,
-  };
-
-  // Pathway → studio affinity matrix
-  const pathwayMatrix: Record<string, Record<string, number>> = {
-    "content-creator":    { "studio-mindforge": 3, "studio-emagination": 3, "studio-gentech": 0, "studio-innov8": 1 },
-    "digital-artist":     { "studio-mindforge": 3, "studio-emagination": 2, "studio-gentech": 0, "studio-innov8": 1 },
-    "sound-designer":     { "studio-mindforge": 2, "studio-emagination": 3, "studio-gentech": 0, "studio-innov8": 2 },
-    "game-designer":      { "studio-mindforge": 0, "studio-emagination": 2, "studio-gentech": 2, "studio-innov8": 3 },
-    "computer-programmer":{ "studio-mindforge": 0, "studio-emagination": 0, "studio-gentech": 3, "studio-innov8": 2 },
-    "3d-modeler":         { "studio-mindforge": 0, "studio-emagination": 1, "studio-gentech": 2, "studio-innov8": 3 },
-  };
-
-  // Score by top pathways (weighted: 1st = ×3, 2nd = ×2, 3rd = ×1)
-  result.topPathways.slice(0, 3).forEach((pathway, i) => {
-    const weight = 3 - i;
-    const affinities = pathwayMatrix[pathway] || {};
-    Object.entries(affinities).forEach(([studio, pts]) => {
-      studioScores[studio] += pts * weight;
-    });
-  });
-
-  // Storyteller vs Technologist axis
-  if (result.scores.storyteller > result.scores.technologist) {
-    studioScores["studio-mindforge"] += 4;
-    studioScores["studio-emagination"] += 4;
-  } else {
-    studioScores["studio-gentech"] += 4;
-    studioScores["studio-innov8"] += 4;
-  }
-
-  // Within storyteller: MindForge (identity/advocacy) vs eMagination (worlds/fantasy)
-  if (result.scores.storyteller >= result.scores.technologist) {
-    const visionCreate = result.visionStatement?.create || "";
-    const isImpactDriven = /divers|cultur|justic|equit|community|impact|voice|change/i.test(visionCreate);
-    if (isImpactDriven || result.brandType === "creative-director") {
-      studioScores["studio-mindforge"] += 3;
-    } else {
-      studioScores["studio-emagination"] += 3;
-    }
-  }
-
-  // Within tech: Gentech (build/execute) vs Innov8 (speculative/visionary)
-  if (result.scores.technologist >= result.scores.storyteller) {
-    if (result.scores.visionary > result.scores.maker || result.brandType === "digital-innovator") {
-      studioScores["studio-innov8"] += 3;
-    } else {
-      studioScores["studio-gentech"] += 3;
-    }
-  }
-
-  // Return studio with highest score
-  return Object.entries(studioScores).sort(([, a], [, b]) => b - a)[0][0];
-}
+// ─── Studio Assignment ───────────────────────────────────────────
+// NOTE: `assignStudioFromDiagnostic` was removed when the diagnostic flow
+// migrated to PFLX Platform (pflx-overlay) as the official SSO onboarding.
+// The Platform owns the diagnostic → studio mapping now. X-Coin only keeps
+// `assignStudioFromVisionText` below, which is still used by the player
+// options page's "edit vision" feature (post-onboarding).
 
 // AI-powered studio assignment from vision statement text alone (for skip/manual-entry flow)
 export function assignStudioFromVisionText(visionText: string): string {
