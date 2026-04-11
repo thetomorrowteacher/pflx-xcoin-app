@@ -45,10 +45,12 @@ interface NavProps {
   user: User;
 }
 
+// NOTE: Player Management now lives in Mission Control (PFLX Platform).
+// X-Coin's /admin/players route still exists and is iframe-embedded by MC,
+// but the sidebar link has been removed to avoid duplicated navigation.
 const adminLinks = [
   { href: "/admin", label: "Home", icon: "🏠" },
   { href: "/admin/leaderboard", label: "Master Leaderboard", icon: "🏆" },
-  { href: "/admin/players", label: "Player Management", icon: "👥" },
   { href: "/admin/coins", label: "Digital Badge Management", icon: "💎" },
   { href: "/admin/task-management", label: "Task Management", icon: "📋" },
   { href: "/admin/studios", label: "Startup Studios", icon: "🏢" },
@@ -82,6 +84,12 @@ export default function SideNav({ user }: NavProps) {
   // parent shell is the only chrome the host sees. This prevents duplicate
   // nav items like "Master Leaderboard" from appearing inside Mission
   // Control's Player Management panel.
+  // ─── ALL HOOKS MUST BE DECLARED BEFORE ANY EARLY RETURN ───────────────────
+  // React Rules of Hooks: hook count must be identical between renders.
+  // Previously we returned null when isEmbed flipped to true, but the
+  // soundOn useState + useEffect lived below that return — causing React
+  // to see a different number of hooks on subsequent renders and crash
+  // with "Rendered fewer hooks than expected".
   const [isEmbed, setIsEmbed] = useState(false);
   useEffect(() => {
     try {
@@ -96,7 +104,16 @@ export default function SideNav({ user }: NavProps) {
       setIsEmbed(true);
     }
   }, []);
+
+  const [soundOn, setSoundOn] = useState(true);
+  useEffect(() => {
+    const s = getSoundSettings();
+    setSoundOn(s.enabled);
+  }, []);
+
+  // ─── ALL HOOKS DECLARED — SAFE TO RETURN EARLY NOW ─────────────────────────
   if (isEmbed) return null;
+
   // Executive Evo Rank players (Chief level 9+, Partner level 10) get access to Approvals
   const rankLevel = getCurrentRank(user.totalXcoin, user).level;
   const isExecutiveRank = rankLevel >= 9;
@@ -106,12 +123,6 @@ export default function SideNav({ user }: NavProps) {
   const links = isHost ? adminLinks : basePlayerLinks;
   // Always show the latest uploaded profile image, even if localStorage is stale
   const displayUser = applyPlayerImages([user])[0] ?? user;
-  const [soundOn, setSoundOn] = useState(true);
-
-  useEffect(() => {
-    const s = getSoundSettings();
-    setSoundOn(s.enabled);
-  }, []);
 
   const toggleSound = () => {
     const s = getSoundSettings();
