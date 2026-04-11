@@ -12,6 +12,7 @@ import {
   PITCH_AUTO_JOBS, calculateNFTValue, calculateRarity,
 } from "../../lib/data";
 import { saveCheckpoints, saveTasks, saveJobs, saveProjects, saveCohortGroups, saveProjectPitches } from "../../lib/store";
+import { bootstrapPflxSSOFromURL } from "../../lib/ssoBootstrap";
 import { saveAndToast } from "../../lib/saveToast";
 import { logXBotEvent, logXBotEventForPlayers } from "../../lib/xbotBriefing";
 import { notifyPitchApproved, notifyPitchSubmitted, notifyJobHired, notifyDarkCampus } from "../../lib/notifications";
@@ -282,6 +283,12 @@ export default function TaskManagement() {
   const [pitchXbotChannels, setPitchXbotChannels] = useState<string[]>([]);
 
   useEffect(() => {
+    // Deep-link SSO: if Mission Control opened this URL with
+    // ?sso=pflx&brand=..., hydrate pflx_user BEFORE the auth check runs.
+    // Otherwise the auth gate below would push to "/" and we'd lose the
+    // canonical Task Management UI when iframed inside MC.
+    bootstrapPflxSSOFromURL();
+
     const stored = localStorage.getItem("pflx_user");
     if (!stored) { router.push("/"); return; }
     const u = JSON.parse(stored) as User;
