@@ -17,7 +17,7 @@ export default function PlayerMarketplace() {
     if (!stored) { router.push("/"); return; }
     const u = JSON.parse(stored) as User;
     if (u.role !== "player") { router.push("/admin"); return; }
-    if (!u.onboardingComplete) { router.push("/diagnostic"); return; }
+    // Onboarding now owned by PFLX Platform SSO — no per-route gate needed
     setUser(u);
     // Filter upgrades by availability restrictions
     const playerRank = getCurrentRank(u.totalXcoin, u).level;

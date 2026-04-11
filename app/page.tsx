@@ -115,12 +115,18 @@ export default function Home() {
         return;
       }
 
-      localStorage.setItem("pflx_user", JSON.stringify(selectedUser));
+      // Onboarding is now owned by PFLX Platform SSO — legacy/local X-Coin sign-ins
+      // bypass the old /diagnostic page and auto-mark the flag so downstream routes don't loop.
+      const idx = mockUsers.findIndex(u => u.id === selectedUser.id);
+      if (idx >= 0 && !mockUsers[idx].onboardingComplete) {
+        mockUsers[idx].onboardingComplete = true;
+        saveUsers(mockUsers);
+      }
+      const userToStore = { ...selectedUser, onboardingComplete: true };
+      localStorage.setItem("pflx_user", JSON.stringify(userToStore));
       if (keepSignedIn) localStorage.setItem("pflx_keep_signed_in", "true");
       if (isHostUser(selectedUser)) {
         router.push("/admin");
-      } else if (!selectedUser.onboardingComplete) {
-        router.push("/diagnostic");
       } else {
         router.push("/player");
       }
@@ -143,17 +149,17 @@ export default function Home() {
       mockUsers[idx].pinChanged = true;
     }
 
-    const updatedUser = { ...selectedUser, pin: newPin, pinChanged: true };
+    // Onboarding is now owned by PFLX Platform SSO — PIN-change flow auto-completes onboarding
+    // so legacy accounts don't bounce to a removed /diagnostic route.
+    if (idx >= 0 && !mockUsers[idx].onboardingComplete) {
+      mockUsers[idx].onboardingComplete = true;
+    }
+    const updatedUser = { ...selectedUser, pin: newPin, pinChanged: true, onboardingComplete: true };
     localStorage.setItem("pflx_user", JSON.stringify(updatedUser));
     if (keepSignedIn) localStorage.setItem("pflx_keep_signed_in", "true");
     saveUsers(mockUsers);
 
-    // Now route based on onboarding status
-    if (!updatedUser.onboardingComplete) {
-      router.push("/diagnostic");
-    } else {
-      router.push("/player");
-    }
+    router.push("/player");
   };
 
   const handleClaimAccount = () => {

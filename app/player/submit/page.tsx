@@ -41,7 +41,7 @@ export default function PlayerSubmit() {
     const stored = localStorage.getItem("pflx_user");
     if (!stored) { router.push("/"); return; }
     const userData = JSON.parse(stored) as User;
-    if (!userData.onboardingComplete) { router.push("/diagnostic"); return; }
+    // Onboarding now owned by PFLX Platform SSO — no per-route gate needed
     setUser(userData);
 
     // Filter all activities for this player
