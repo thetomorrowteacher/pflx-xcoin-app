@@ -65,7 +65,16 @@ export default function PlayerHome() {
     try {
       let u = JSON.parse(stored) as User;
       if (u.role !== "player") { router.push("/admin"); return; }
-      if (!u.onboardingComplete) { router.push("/diagnostic"); return; }
+      if (!u.onboardingComplete) {
+        // Onboarding (diagnostic + brand + studio placement) now lives in
+        // PFLX Platform (pflx-overlay). Bounce un-onboarded players back to
+        // the Platform SSO so the flow runs once, globally.
+        const base =
+          process.env.NEXT_PUBLIC_PLATFORM_URL ||
+          "https://pflx-overlay.vercel.app";
+        window.location.replace(base);
+        return;
+      }
 
       // Merge with live mockUsers to pick up any admin changes this session
       const fresh = mockUsers.find(mu => mu.id === u.id);
