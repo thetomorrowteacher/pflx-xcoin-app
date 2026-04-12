@@ -93,16 +93,16 @@ export default function SideNav({ user }: NavProps) {
   // with "Rendered fewer hooks than expected".
   const [isEmbed, setIsEmbed] = useState(false);
   useEffect(() => {
-    try {
-      const inIframe = typeof window !== "undefined" && window.self !== window.top;
-      const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-      const embedParam = params?.get("embed");
-      if (inIframe || embedParam === "mc" || embedParam === "pflx") {
+    // Only hide the sidebar when X-Coin is loaded as a Mission Control
+    // panel via ?embed=mc (or ?embed=pflx). Do NOT hide just because
+    // we're in an iframe — the Platform's app cartridge view also uses
+    // an iframe, and the sidebar should remain visible there.
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const embedParam = params.get("embed");
+      if (embedParam === "mc" || embedParam === "pflx") {
         setIsEmbed(true);
       }
-    } catch {
-      // Cross-origin access to window.top throws — if it does, we're definitely embedded.
-      setIsEmbed(true);
     }
   }, []);
 
