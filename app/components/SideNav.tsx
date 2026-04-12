@@ -45,16 +45,17 @@ interface NavProps {
   user: User;
 }
 
-// NOTE: Player Management now lives in Mission Control (PFLX Platform).
-// X-Coin's /admin/players route still exists and is iframe-embedded by MC,
-// but the sidebar link has been removed to avoid duplicated navigation.
+// X-Coin adminLinks — economy-focused surfaces only.
+// Player Management, Task/Project Management, Game Management (modifiers),
+// and Season/Checkpoint admin settings now live in Mission Control.
+// Those X-Coin routes still exist (MC iframes them for 1:1 UI parity)
+// but they're no longer reachable from X-Coin's own sidebar.
 const adminLinks = [
   { href: "/admin", label: "Home", icon: "🏠" },
   { href: "/admin/leaderboard", label: "Master Leaderboard", icon: "🏆" },
   { href: "/admin/coins", label: "Digital Badge Management", icon: "💎" },
-  { href: "/admin/task-management", label: "Task Management", icon: "📋" },
+  { href: "/admin/economy", label: "Upgrade / Fine / Tax", icon: "💰" },
   { href: "/admin/studios", label: "Startup Studios", icon: "🏢" },
-  { href: "/admin/modifiers", label: "Game Management", icon: "🎮" },
   { href: "/admin/approvals", label: "Approvals", icon: "🔔" },
   { href: "/admin/settings", label: "Settings", icon: "⚙️" },
 ];

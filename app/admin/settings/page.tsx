@@ -6,6 +6,7 @@ import { User, mockPflxRanks, PFLXRank, mockGamePeriods, GamePeriod, isHostUser,
 } from "../../lib/data";
 import { getSoundSettings, saveSoundSettings, SoundSettings, playClick, playNav, playSuccess, playReward, playAlert, playError, playDelete, playSave, playCoin, playBadge, playTax, playToggle, playModalOpen, playModalClose, playLevelUp, playCashRegister, playCoinShower, playWalletOpen, playTradeComplete, playInvest, playNotification, playUnlock, playSubmit } from "../../lib/sounds";
 import { saveGamePeriods, savePflxRanks } from "../../lib/store";
+import { bootstrapPflxSSOFromURL } from "../../lib/ssoBootstrap";
 import { saveAndToast } from "../../lib/saveToast";
 import { compressImage, compressBannerImage } from "../../lib/imageUtils";
 
@@ -170,6 +171,10 @@ export default function AdminSettings() {
   const [newSeasonTitle, setNewSeasonTitle] = useState("");
 
   useEffect(() => {
+    // Hydrate pflx_user from ?sso=pflx URL params when Mission Control
+    // deep-links this page into an iframe (embed=mc).
+    bootstrapPflxSSOFromURL();
+
     try {
       const stored = localStorage.getItem("pflx_user");
       if (!stored) { router.push("/"); return; }

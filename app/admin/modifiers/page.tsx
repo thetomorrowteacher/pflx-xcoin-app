@@ -9,6 +9,7 @@ import {
 } from "../../lib/data";
 import { playSuccess, playError, playClick, playDelete } from "../../lib/sounds";
 import { saveModifiers } from "../../lib/store";
+import { bootstrapPflxSSOFromURL } from "../../lib/ssoBootstrap";
 import { saveAndToast } from "../../lib/saveToast";
 import { compressImage } from "../../lib/imageUtils";
 
@@ -47,6 +48,10 @@ export default function AdminModifiers() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Hydrate pflx_user from ?sso=pflx URL params when Mission Control
+    // deep-links this page into an iframe (embed=mc).
+    bootstrapPflxSSOFromURL();
+
     const stored = localStorage.getItem("pflx_user");
     if (!stored) { router.push("/"); return; }
     const u = JSON.parse(stored) as User;
