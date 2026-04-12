@@ -91,10 +91,27 @@ export default function RoleGuard() {
       router.replace(target);
     }
 
-    // ── Initial role check ──
-    // Skip initial redirect if SSO is actively logging in (pflx_sso_active flag)
-    // The SSO handler in page.tsx already sets the correct role
-    const ssoActive = localStorage.getItem("pflx_sso_active");
+    // ── Detect whether we're embedded inside the PFLX Platform ──
+    // The role toggle (Host ↔ Player) is a Platform concept. When X-Coin
+    // is opened standalone, the user's actual role in pflx_user decides
+    // which routes are accessible — NOT the pflx_active_role toggle.
+    // Redirecting based on a stale toggle value when standalone causes an
+    // infinite loop: RoleGuard reads "player" → /player → auth gate sees
+    // admin → /admin → RoleGuard remounts → reads "player" → repeat.
+    let isEmbedded = false;
+    try {
+      isEmbedded = window.self !== window.top;
+    } catch {
+      isEmbedded = true; // cross-origin access throws → we're in an iframe
+    }
+    if (!isEmbedded) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("embed") === "mc" || params.get("embed") === "pflx") {
+        isEmbedded = true;
+      }
+    }
+
+    // ── Initial role check (ONLY when embedded) ──
     let initialRole: "host" | "player" | null = null;
     try {
       const stored = localStorage.getItem("pflx_active_role");
@@ -103,20 +120,22 @@ export default function RoleGuard() {
 
     if (initialRole) {
       document.body.dataset.pflxRole = initialRole;
-      // Only redirect on initial load if NOT during SSO login
-      // During SSO, page.tsx already routes correctly
-      if (!ssoActive) {
-        const target = mapRoute(pathnameRef.current || "/admin", initialRole);
-        if (target && target !== pathnameRef.current) {
-          safeRedirect(target);
+      // Only redirect on initial load when embedded AND not during SSO login
+      if (isEmbedded) {
+        const ssoActive = localStorage.getItem("pflx_sso_active");
+        if (!ssoActive) {
+          const target = mapRoute(pathnameRef.current || "/admin", initialRole);
+          if (target && target !== pathnameRef.current) {
+            safeRedirect(target);
+          }
         }
       }
     } else {
       document.body.dataset.pflxRole = "host";
     }
 
-    // Ask parent for authoritative role
-    if (window.parent !== window) {
+    // Ask parent for authoritative role (only when embedded)
+    if (isEmbedded && window.parent !== window) {
       try {
         window.parent.postMessage(
           JSON.stringify({ type: "pflx_role_query" }),
@@ -126,6 +145,9 @@ export default function RoleGuard() {
     }
 
     // ── Live role change listener ──
+    // Always listen for role changes (even standalone, the Platform could
+    // send a message if it opens X-Coin later), but only redirect when
+    // we're actually embedded. Standalone just updates the CSS dataset.
     function handleMessage(event: MessageEvent) {
       try {
         const msg = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
@@ -135,9 +157,13 @@ export default function RoleGuard() {
         try { localStorage.setItem("pflx_active_role", role); } catch {}
         document.body.dataset.pflxRole = role;
 
-        const target = mapRoute(pathnameRef.current || "/admin", role);
-        if (target) {
-          safeRedirect(target);
+        // Only redirect when embedded — standalone X-Coin should not
+        // bounce between routes based on external toggle messages
+        if (isEmbedded) {
+          const target = mapRoute(pathnameRef.current || "/admin", role);
+          if (target) {
+            safeRedirect(target);
+          }
         }
       } catch {
         // ignore non-JSON
