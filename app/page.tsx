@@ -18,6 +18,7 @@ export default function Home() {
   const [pinError, setPinError] = useState("");
   const [btnHover, setBtnHover] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
   // Change-PIN state
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -74,9 +75,13 @@ export default function Home() {
         if (autoselect) {
           setSelectedId(user.id);
           setStep("pin");
+          setSessionChecked(true);
           console.log("[X-Coin] Auto-selected player for PIN entry:", user.brandName || user.name);
           return;
         }
+      } else {
+        // SSO brand not found — fall through to keep-signed-in check or login
+        console.warn("[X-Coin] SSO brand not found:", brand);
       }
     }
     // Also check existing session (keep-signed-in)
@@ -91,7 +96,10 @@ export default function Home() {
       setRedirecting(true);
       if (isHostUser(u)) { router.push("/admin"); }
       else { router.push("/player"); }
+      return; // Don't show login screen
     }
+    // No SSO and no keep-signed-in — safe to show login screen
+    setSessionChecked(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -231,9 +239,9 @@ export default function Home() {
     textTransform: "uppercase",
   };
 
-  // Show a minimal loading screen while SSO redirect is in progress
-  // This prevents the login form from flashing before the route change
-  if (redirecting) {
+  // Show a minimal loading screen while checking session or redirecting
+  // This prevents the login form from flashing before SSO/keep-signed-in redirect
+  if (redirecting || !sessionChecked) {
     return (
       <div style={{
         display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
