@@ -112,22 +112,31 @@ export default function RoleGuard() {
     }
 
     // ── Initial role check (ONLY when embedded) ──
+    // Derive initial role from pflx_active_role, falling back to pflx_user's actual role
     let initialRole: "host" | "player" | null = null;
     try {
       const stored = localStorage.getItem("pflx_active_role");
-      if (stored === "host" || stored === "player") initialRole = stored;
+      if (stored === "host" || stored === "player") {
+        initialRole = stored;
+      } else {
+        // No pflx_active_role — derive from the user's actual role
+        const pu = localStorage.getItem("pflx_user");
+        if (pu) {
+          const parsed = JSON.parse(pu);
+          initialRole = (parsed.role === "admin" || parsed.isHost) ? "host" : "player";
+          try { localStorage.setItem("pflx_active_role", initialRole); } catch {}
+        }
+      }
     } catch {}
 
     if (initialRole) {
       document.body.dataset.pflxRole = initialRole;
-      // Only redirect on initial load when embedded AND not during SSO login
+      // Redirect on initial load when embedded — pflx_sso_active no longer blocks this
+      // since the SSO handler now clears it after routing settles
       if (isEmbedded) {
-        const ssoActive = localStorage.getItem("pflx_sso_active");
-        if (!ssoActive) {
-          const target = mapRoute(pathnameRef.current || "/admin", initialRole);
-          if (target && target !== pathnameRef.current) {
-            safeRedirect(target);
-          }
+        const target = mapRoute(pathnameRef.current || "/admin", initialRole);
+        if (target && target !== pathnameRef.current) {
+          safeRedirect(target);
         }
       }
     } else {

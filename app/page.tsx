@@ -57,11 +57,12 @@ export default function Home() {
           if (ssoCohort && ssoCohort !== "N/A") user.cohort = ssoCohort;
           localStorage.setItem("pflx_user", JSON.stringify(user));
           localStorage.setItem("pflx_keep_signed_in", "true");
-          localStorage.setItem("pflx_sso_active", "true");
           // Set the active role BEFORE routing so RoleGuard doesn't fight
           const activeRole = isHostUser(user) ? "host" : "player";
           localStorage.setItem("pflx_active_role", activeRole);
           document.body.dataset.pflxRole = activeRole;
+          // Temporarily block RoleGuard during SSO routing, then clear so it works on future loads
+          localStorage.setItem("pflx_sso_active", "true");
           console.log("[X-Coin] SSO auto-login for:", user.brandName || user.name, "role:", activeRole);
           setRedirecting(true);
           if (isHostUser(user)) {
@@ -69,6 +70,8 @@ export default function Home() {
           } else {
             router.push("/player");
           }
+          // Clear SSO flag after routing settles so RoleGuard can function normally
+          setTimeout(() => { try { localStorage.removeItem("pflx_sso_active"); } catch(e) {} }, 3000);
           return;
         }
         // Auto-select mode: pre-select player and show PIN entry only
@@ -92,6 +95,8 @@ export default function Home() {
       // Set role before routing to prevent RoleGuard conflict
       const resumeRole = isHostUser(u) ? "host" : "player";
       localStorage.setItem("pflx_active_role", resumeRole);
+      // Clear stale SSO flag so RoleGuard works on this session
+      try { localStorage.removeItem("pflx_sso_active"); } catch(e) {}
       document.body.dataset.pflxRole = resumeRole;
       setRedirecting(true);
       if (isHostUser(u)) { router.push("/admin"); }
