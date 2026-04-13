@@ -54,7 +54,7 @@ const adminLinks = [
   { href: "/admin", label: "Home", icon: "🏠" },
   { href: "/admin/leaderboard", label: "Master Leaderboard", icon: "🏆" },
   { href: "/admin/coins", label: "Digital Badge Management", icon: "💎" },
-  { href: "/admin/economy", label: "Upgrade / Fine / Tax", icon: "💰" },
+  { href: "/admin/modifiers", label: "Upgrade / Fine / Tax", icon: "💰" },
   { href: "/admin/studios", label: "Startup Studios", icon: "🏢" },
   { href: "/admin/approvals", label: "Approvals", icon: "🔔" },
   { href: "/admin/settings", label: "Settings", icon: "⚙️" },

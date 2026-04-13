@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
-import { User, mockPflxRanks, PFLXRank, mockGamePeriods, GamePeriod, isHostUser, COIN_CATEGORIES,
+import { User, mockPflxRanks, PFLXRank, mockGamePeriods, GamePeriod, isHostUser,
 } from "../../lib/data";
 import { getSoundSettings, saveSoundSettings, SoundSettings, playClick, playNav, playSuccess, playReward, playAlert, playError, playDelete, playSave, playCoin, playBadge, playTax, playToggle, playModalOpen, playModalClose, playLevelUp, playCashRegister, playCoinShower, playWalletOpen, playTradeComplete, playInvest, playNotification, playUnlock, playSubmit } from "../../lib/sounds";
 import { saveGamePeriods, savePflxRanks } from "../../lib/store";
@@ -13,7 +13,7 @@ import { compressImage, compressBannerImage } from "../../lib/imageUtils";
 export default function AdminSettings() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<"seasons" | "ranks" | "sound" | "onboarding" | "integrations">("seasons");
+  const [activeTab, setActiveTab] = useState<"sound" | "onboarding" | "integrations">("sound");
   const [onboardingFineXC, setOnboardingFineXC] = useState(() => {
     if (typeof window !== "undefined") {
       return parseInt(localStorage.getItem("pflx_onboarding_fine") || "10");
@@ -296,13 +296,13 @@ export default function AdminSettings() {
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
             filter: "drop-shadow(0 0 10px rgba(0,212,255,0.4))"
           }}>⚙️ SETTINGS</h1>
-          <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.1em" }}>[ MANAGE SEASONS, RANKINGS, SOUND & INTEGRATIONS ]</p>
+          <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.1em" }}>[ SOUND, ONBOARDING & INTEGRATIONS ]</p>
         </div>
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: "8px", marginBottom: "32px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "16px" }}>
-          {(["seasons", "ranks", "sound", "onboarding", "integrations"] as const).map(tab => {
-            const tabColors: Record<string, string> = { seasons: "#f5c842", ranks: "#4f8ef7", sound: "#22c55e", onboarding: "#f472b6", integrations: "#00d4ff" };
+          {(["sound", "onboarding", "integrations"] as const).map(tab => {
+            const tabColors: Record<string, string> = { sound: "#22c55e", onboarding: "#f472b6", integrations: "#00d4ff" };
             const isActive = activeTab === tab;
             return (
               <button
@@ -316,128 +316,13 @@ export default function AdminSettings() {
                   borderBottom: isActive ? `2px solid ${tabColors[tab]}` : "2px solid transparent",
                 }}
               >
-                {tab === "seasons" ? "🗓️ Seasons" : tab === "ranks" ? "⚡ Evolution Rankings" : tab === "sound" ? "🔊 Sound Settings" : tab === "onboarding" ? "🧬 Onboarding" : "🔗 Integrations"}
+                {tab === "sound" ? "🔊 Sound Settings" : tab === "onboarding" ? "🧬 Onboarding" : "🔗 Integrations"}
               </button>
             );
           })}
         </div>
 
-        {/* ── SEASONS TAB ── */}
-        {activeTab === "seasons" && (
-          <div>
-            {/* Info callout */}
-            <div style={{
-              background: "rgba(245,200,66,0.06)", border: "1px solid rgba(245,200,66,0.18)",
-              borderRadius: "12px", padding: "14px 18px", marginBottom: "28px",
-              display: "flex", alignItems: "flex-start", gap: "12px"
-            }}>
-              <span style={{ fontSize: "18px", lineHeight: 1 }}>💡</span>
-              <div>
-                <p style={{ margin: "0 0 4px", fontSize: "13px", fontWeight: 700, color: "#f5c842" }}>
-                  Seasons are the big-picture containers for your game arc.
-                </p>
-                <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
-                  Each Season (e.g. "Season 1: Origins") holds multiple <strong style={{ color: "rgba(255,255,255,0.7)" }}>Checkpoints</strong> — the task sprints players complete.
-                  To create and manage Checkpoints and their tasks, go to{" "}
-                  <button
-                    onClick={() => router.push("/admin/task-management")}
-                    style={{ background: "none", border: "none", color: "#f5c842", fontWeight: 700, cursor: "pointer", textDecoration: "underline", padding: 0, fontSize: "13px" }}
-                  >
-                    Task Management →
-                  </button>
-                </p>
-              </div>
-            </div>
-
-            {/* Create new season */}
-            <div style={{
-              background: "rgba(22,22,31,0.6)", border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: "16px", padding: "24px", marginBottom: "28px"
-            }}>
-              <h2 style={{ margin: "0 0 16px", fontSize: "17px", fontWeight: 700, color: "#f0f0ff" }}>Create New Season</h2>
-              <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                <input
-                  type="text"
-                  placeholder='e.g. "Season 2: The Ascent"'
-                  value={newSeasonTitle}
-                  onChange={e => setNewSeasonTitle(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleAddSeason()}
-                  style={{
-                    flex: 1, padding: "12px 16px", borderRadius: "10px",
-                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                    color: "#f0f0ff", fontSize: "14px", outline: "none"
-                  }}
-                />
-                <button
-                  onClick={handleAddSeason}
-                  style={{
-                    padding: "12px 28px", borderRadius: "10px", background: "#f5c842",
-                    color: "black", fontSize: "14px", fontWeight: 700, border: "none", cursor: "pointer"
-                  }}
-                >
-                  + Create
-                </button>
-              </div>
-            </div>
-
-            {/* Seasons list */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {periods.length === 0 && (
-                <p style={{ color: "rgba(255,255,255,0.3)", fontSize: "14px", textAlign: "center", padding: "32px 0" }}>
-                  No seasons yet — create one above.
-                </p>
-              )}
-              {periods.map(p => (
-                <div key={p.id} style={{
-                  background: "rgba(22,22,31,0.9)",
-                  border: p.isActive ? "1px solid rgba(245,200,66,0.3)" : "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: "14px", padding: "18px 20px",
-                  display: "flex", alignItems: "center", gap: "14px"
-                }}>
-                  {/* Season image / icon */}
-                  <div style={{
-                    width: "48px", height: "48px", borderRadius: "10px", flexShrink: 0,
-                    background: "rgba(245,200,66,0.08)", border: "1px solid rgba(245,200,66,0.15)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "22px", overflow: "hidden"
-                  }}>
-                    {p.image
-                      ? <img src={p.image} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      : "🗓️"}
-                  </div>
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ margin: "0 0 4px", fontSize: "15px", fontWeight: 700, color: "#f0f0ff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.title}</p>
-                    <p style={{ margin: 0, fontSize: "12px", color: p.isActive ? "#f5c842" : "rgba(255,255,255,0.35)" }}>
-                      {p.isActive ? "● Active" : "○ Inactive"}
-                      {p.durationString && <span style={{ marginLeft: "8px", color: "rgba(255,255,255,0.3)" }}>{p.durationString}</span>}
-                      {p.startDate && <span style={{ marginLeft: "8px", color: "rgba(255,255,255,0.3)" }}>{p.startDate} → {p.endDate}</span>}
-                    </p>
-                  </div>
-
-                  <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-                    <button
-                      onClick={() => setEditingPeriod({ ...p })}
-                      style={{ padding: "6px 12px", borderRadius: "8px", background: "transparent", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)", fontSize: "12px", cursor: "pointer", fontWeight: 600 }}
-                    >✏️ Edit</button>
-                    <button
-                      onClick={() => toggleSeasonActive(p.id)}
-                      style={{
-                        padding: "6px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer", border: "none",
-                        background: p.isActive ? "rgba(239,68,68,0.1)" : "rgba(34,197,94,0.1)",
-                        color: p.isActive ? "#ef4444" : "#22c55e"
-                      }}
-                    >{p.isActive ? "Deactivate" : "Activate"}</button>
-                    <button
-                      onClick={() => deleteSeason(p.id)}
-                      style={{ padding: "6px 10px", borderRadius: "8px", background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.3)", fontSize: "12px", cursor: "pointer" }}
-                    >🗑️</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Seasons + Evolution Rankings tabs moved to Mission Control */}
 
         {/* ── SOUND TAB ── */}
         {activeTab === "sound" && (
@@ -591,8 +476,8 @@ export default function AdminSettings() {
           </div>
         )}
 
-        {/* ── RANKS TAB ── */}
-        {activeTab === "ranks" && (
+        {/* Ranks tab removed — now in Mission Control */}
+        {false && (
           <div>
             <p style={{ margin: "0 0 24px", color: "rgba(255,255,255,0.6)", fontSize: "14px" }}>
               Edit the criteria for each Evolution Rank. Players are promoted when they meet the XC threshold, checkpoint count, and badge requirements.
