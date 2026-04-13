@@ -117,7 +117,9 @@ export default function PlayerLeaderboard() {
     const stored = localStorage.getItem("pflx_user");
     if (!stored) { router.push("/"); return; }
     const u = JSON.parse(stored) as User;
-    if (u.role !== "player") { router.push("/admin"); return; }
+    // When Platform has toggled to player mode, allow host users on player pages
+    const activeRole = localStorage.getItem("pflx_active_role");
+    if (u.role !== "player" && activeRole !== "player") { router.push("/admin"); return; }
     // Onboarding now owned by PFLX Platform SSO — no per-route gate needed
     setUser(u);
   }, [router]);

@@ -292,7 +292,9 @@ export default function TaskManagement() {
     const stored = localStorage.getItem("pflx_user");
     if (!stored) { router.push("/"); return; }
     const u = JSON.parse(stored) as User;
-    if (!isHostUser(u)) { router.push("/player/dashboard"); return; }
+    // When Platform has toggled to host mode, allow player users on admin pages
+    const activeRole = localStorage.getItem("pflx_active_role");
+    if (!isHostUser(u) && activeRole !== "host") { router.push("/player/dashboard"); return; }
     setUser(u);
   }, [router]);
 

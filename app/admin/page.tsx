@@ -346,7 +346,9 @@ export default function AdminDashboard() {
       const stored = localStorage.getItem("pflx_user");
       if (!stored) { router.push("/"); return; }
       const u = JSON.parse(stored) as User;
-      if (!isHostUser(u)) { router.push("/player"); return; }
+      // When Platform has toggled to host mode, allow player users on admin pages
+      const activeRole = localStorage.getItem("pflx_active_role");
+      if (!isHostUser(u) && activeRole !== "host") { router.push("/player"); return; }
       setUser(u);
     } catch {
       localStorage.removeItem("pflx_user");

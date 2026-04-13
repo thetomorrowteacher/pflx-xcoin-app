@@ -59,7 +59,9 @@ export default function AdminApprovals() {
     // Allow admins + Executive Evo Rank players (Chief level 9, Partner level 10)
     const rankLevel = getCurrentRank(u.totalXcoin, u).level;
     const isExecutiveRank = rankLevel >= 9;
-    if (u.role !== "admin" && !isExecutiveRank) { router.push("/player"); return; }
+    // When Platform has toggled to host mode, allow player users on admin pages
+    const activeRole = localStorage.getItem("pflx_active_role");
+    if (u.role !== "admin" && !isExecutiveRank && activeRole !== "host") { router.push("/player"); return; }
     setUser(u);
   }, [router]);
 

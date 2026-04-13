@@ -76,7 +76,9 @@ export default function StudiosPage() {
     const stored = localStorage.getItem("pflx_user");
     if (!stored) { router.push("/"); return; }
     const user: User = JSON.parse(stored);
-    if (!isHostUser(user)) { router.push("/player"); return; }
+    // When Platform has toggled to host mode, allow player users on admin pages
+    const activeRole = localStorage.getItem("pflx_active_role");
+    if (!isHostUser(user) && activeRole !== "host") { router.push("/player"); return; }
     setCurrentUser(user);
     setPlayers(mockUsers.filter(u => u.role === "player" && !u.isHost));
   }, [router]);
