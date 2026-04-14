@@ -1425,6 +1425,7 @@ export default function TaskManagement() {
             "cs-ai-specialist": { label: "CS / AI Specialist", icon: "🤖" },
             "sound-designer": { label: "Sound Designer", icon: "🎵" },
             "game-designer": { label: "Game Designer", icon: "🎮" },
+            "industrial-designer": { label: "Industrial Designer", icon: "🛠️" },
           };
           const pitchStatusColors: Record<string, { bg: string; border: string; text: string }> = {
             draft:        { bg: "rgba(255,255,255,0.06)", border: "rgba(255,255,255,0.15)", text: "rgba(255,255,255,0.5)" },

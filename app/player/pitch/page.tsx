@@ -20,6 +20,7 @@ const PATHWAYS = [
   { slug: "cs-ai-specialist", label: "CS / AI Specialist", icon: "🤖" },
   { slug: "sound-designer", label: "Sound Designer", icon: "🎵" },
   { slug: "game-designer", label: "Game Designer", icon: "🎮" },
+  { slug: "industrial-designer", label: "Industrial Designer", icon: "🛠️" },
 ];
 
 const CYAN = "#00d4ff";

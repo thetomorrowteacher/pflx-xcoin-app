@@ -26,6 +26,9 @@ const pathwayLabels: Record<string, { name: string; icon: string }> = {
   "digital-artist": { name: "Digital Artist", icon: "🎨" },
   "computer-programmer": { name: "Computer Programmer", icon: "💻" },
   "game-designer": { name: "Game Designer", icon: "🎯" },
+  "industrial-designer": { name: "Industrial Designer", icon: "🛠️" },
+  "professional-entrepreneur": { name: "Professional Entrepreneur", icon: "📖" },
+  "cs-ai-specialist": { name: "CS / AI Specialist", icon: "🤖" },
 };
 
 // ─── Studio logo helper ────────────────────────────────────────────────────
