@@ -228,10 +228,10 @@ Return ONLY valid JSON with this exact format (no markdown, no code blocks):
         {/* Stat Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "14px", marginBottom: "28px" }}>
           {[
-            { label: "Digital Badges", value: user.digitalBadges.toLocaleString(), color: "#f5c842", icon: "🏅" },
-            { label: "XC Balance", value: user.xcoin.toLocaleString(), color: "#4f8ef7", icon: "⚡" },
-            { label: "Total XC Earned", value: user.totalXcoin.toLocaleString(), color: "#a78bfa", icon: "💎" },
-            { label: "Evo Rank", value: currentRank?.name ?? `LV.${user.level}`, color: "#00d4ff", icon: currentRank?.icon ?? "🌱" },
+            { label: "Digital Badges", value: (user.digitalBadges ?? 0).toLocaleString(), color: "#f5c842", icon: "🏅" },
+            { label: "XC Balance", value: (user.xcoin ?? 0).toLocaleString(), color: "#4f8ef7", icon: "⚡" },
+            { label: "Total XC Earned", value: (user.totalXcoin ?? 0).toLocaleString(), color: "#a78bfa", icon: "💎" },
+            { label: "Evo Rank", value: currentRank?.name ?? `LV.${user.level ?? 1}`, color: "#00d4ff", icon: currentRank?.icon ?? "🌱" },
           ].map(stat => (
             <div key={stat.label} style={{
               padding: "18px", borderRadius: "16px",

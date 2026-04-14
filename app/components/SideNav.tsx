@@ -116,7 +116,7 @@ export default function SideNav({ user }: NavProps) {
   if (isEmbed) return null;
 
   // Executive Evo Rank players (Chief level 9+, Partner level 10) get access to Approvals
-  const rankLevel = getCurrentRank(user.totalXcoin, user).level;
+  const rankLevel = getCurrentRank(user.totalXcoin ?? 0, user)?.level ?? 1;
   const isExecutiveRank = rankLevel >= 9;
   const basePlayerLinks = isExecutiveRank
     ? [...playerLinks.slice(0, -1), { href: "/admin/approvals", label: "Approvals", icon: "🔔" }, playerLinks[playerLinks.length - 1]]
@@ -269,7 +269,7 @@ export default function SideNav({ user }: NavProps) {
               borderRadius: "8px", padding: "8px 4px",
             }}>
               <span style={{ fontSize: "13px" }}>🏅</span>
-              <span style={{ fontSize: "13px", fontWeight: 800, color: CYAN }}>{user.digitalBadges}</span>
+              <span style={{ fontSize: "13px", fontWeight: 800, color: CYAN }}>{user.digitalBadges ?? 0}</span>
               <span style={{ fontSize: "8px", color: CYAN_DIM, letterSpacing: "0.08em", fontWeight: 700 }}>BADGES</span>
             </div>
             <div style={{
@@ -279,7 +279,7 @@ export default function SideNav({ user }: NavProps) {
               borderRadius: "8px", padding: "8px 4px",
             }}>
               <span style={{ fontSize: "13px" }}>⚡</span>
-              <span style={{ fontSize: "13px", fontWeight: 800, color: "#a78bfa" }}>{user.xcoin.toLocaleString()}</span>
+              <span style={{ fontSize: "13px", fontWeight: 800, color: "#a78bfa" }}>{(user.xcoin ?? 0).toLocaleString()}</span>
               <span style={{ fontSize: "8px", color: "rgba(167,139,250,0.6)", letterSpacing: "0.08em", fontWeight: 700 }}>XC</span>
             </div>
           </div>
