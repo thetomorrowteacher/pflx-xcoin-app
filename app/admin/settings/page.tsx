@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
-import { User, mockPflxRanks, PFLXRank, mockGamePeriods, GamePeriod, isHostUser,
+import { User, mockPflxRanks, PFLXRank, mockGamePeriods, GamePeriod, isHostUser, COIN_CATEGORIES,
 } from "../../lib/data";
 import { getSoundSettings, saveSoundSettings, SoundSettings, playClick, playNav, playSuccess, playReward, playAlert, playError, playDelete, playSave, playCoin, playBadge, playTax, playToggle, playModalOpen, playModalClose, playLevelUp, playCashRegister, playCoinShower, playWalletOpen, playTradeComplete, playInvest, playNotification, playUnlock, playSubmit } from "../../lib/sounds";
 import { saveGamePeriods, savePflxRanks } from "../../lib/store";
