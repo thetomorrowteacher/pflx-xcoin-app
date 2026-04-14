@@ -127,6 +127,8 @@ export interface Task {
   completionMode?: "one-time" | "unlimited"; // one-time = once per player, unlimited = repeatable
   fromJobId?: string; // If this task was created from a job posting
   requirement?: "required" | "available"; // required = mandatory (in checkpoint), available = optional (cohort-wide)
+  isBonus?: boolean; // Marks this task as a bonus/optional task inside a Project or Checkpoint (grants bonusXC on top of xcReward)
+  bonusXC?: number; // Extra XC granted when an optional/bonus task is completed (0 = none)
   // ── LMS extensions (Season>Checkpoint>Project>Tasks hierarchy) ──
   projectId?: string; // Parent Project (Tasks live under Projects; checkpoint is derived via project.checkpointId)
   criteria?: { id: string; label: string }[]; // Up to 10 host-defined criteria (peer reviewer rates each 1–5)
@@ -1434,6 +1436,8 @@ export interface Project {
   assignedTo?: "all" | string[];
   studioId?: string;         // If adopted by a studio
   xcRewardPool?: number;     // Total XC available if project fully completed
+  bonusXCPool?: number;      // Separate XC pool distributed across bonus/optional tasks inside this project
+  requiredLeadRank?: "manager" | "director" | "mentor" | "associate" | "senior" | "chief" | "partner"; // Minimum rank to lead this Project (canonical: Manager+; host-configurable)
   image?: string;
   link?: string; // Optional resource link
   rewardBadges?: { name: string; xc: number }[]; // Multi-badge rewards for project completion
