@@ -18,7 +18,6 @@ import { logXBotEvent, logXBotEventForPlayers } from "../../lib/xbotBriefing";
 import { notifyPitchApproved, notifyPitchSubmitted, notifyJobHired, notifyDarkCampus } from "../../lib/notifications";
 import { playClick, playNav, playSuccess, playError, playDelete, playModalOpen, playModalClose } from "../../lib/sounds";
 import { compressBannerImage } from "../../lib/imageUtils";
-import { PATHWAY_CATALOG, getPathwayCourses, findCourseByNodeId } from "../../lib/pathwayCatalog";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -562,8 +561,6 @@ export default function TaskManagement() {
       resourceLinks: cleanLinks,
       corePathwayNodeIds: (editingTask as any).corePathwayNodeIds || [],
       unlockOverride: !!(editingTask as any).unlockOverride,
-      isBonus: !!(editingTask as any).isBonus,
-      bonusXC: (editingTask as any).isBonus ? ((editingTask as any).bonusXC || 0) : 0,
     } as Task;
     if (isNew) { setTasks(prev => [...prev, saved]); mockTasks.push(saved); }
     else {
@@ -762,8 +759,6 @@ export default function TaskManagement() {
       checkpointId: (editingProject as any).checkpointId || undefined,
       corePathwayNodeIds: (editingProject as any).corePathwayNodeIds || [],
       unlockOverride: !!(editingProject as any).unlockOverride,
-      bonusXCPool: (editingProject as any).bonusXCPool || 0,
-      requiredLeadRank: (editingProject as any).requiredLeadRank || "manager",
     };
     if (isNew) { setProjects(prev => [...prev, saved]); mockProjects.push(saved); }
     else {
@@ -2505,93 +2500,17 @@ export default function TaskManagement() {
                 ))}
               </Field>
 
-              {/* ── Required / Bonus Task Settings ── */}
-              <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(245,200,66,0.05)", border: "1px solid rgba(245,200,66,0.22)" }}>
-                <p style={{ margin: "0 0 10px", fontSize: "11px", fontWeight: 700, color: "#f5c842", letterSpacing: "0.08em", textTransform: "uppercase" }}>✅ REQUIRED / BONUS</p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-                  <Field label="Completion Requirement (Google-Form style)">
-                    <select
-                      value={(editingTask as any).isBonus ? "bonus" : ((editingTask as any).requirement || "required")}
-                      onChange={e => {
-                        const v = e.target.value;
-                        setEditingTask(p => ({
-                          ...p,
-                          isBonus: v === "bonus",
-                          requirement: v === "bonus" ? "available" : (v as any),
-                        } as any));
-                      }}
-                      style={{ ...inputSx, cursor: "pointer" }}
-                    >
-                      <option value="required">Required — must complete</option>
-                      <option value="available">Available — optional</option>
-                      <option value="bonus">⭐ Bonus — optional, grants extra XC</option>
-                    </select>
-                  </Field>
-                  <Field label="Bonus XC (if Bonus)">
-                    <input
-                      type="number"
-                      min={0}
-                      value={(editingTask as any).bonusXC || 0}
-                      onChange={e => setEditingTask(p => ({ ...p, bonusXC: parseInt(e.target.value) || 0 } as any))}
-                      disabled={!(editingTask as any).isBonus}
-                      placeholder="0"
-                      style={{ ...inputSx, opacity: (editingTask as any).isBonus ? 1 : 0.4 }}
-                    />
-                  </Field>
-                </div>
-                <p style={{ margin: "8px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.4)" }}>
-                  Required tasks are mandatory for the checkpoint. Bonus tasks stack extra XC on top of the base reward when completed.
-                </p>
-              </div>
-
-              {/* ── Core Pathways linking for Tasks (dropdown) ── */}
+              {/* ── Core Pathways linking for Tasks ── */}
               <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(0,212,255,0.05)", border: "1px solid rgba(0,212,255,0.18)" }}>
                 <p style={{ margin: "0 0 10px", fontSize: "11px", fontWeight: 700, color: "#00d4ff", letterSpacing: "0.08em", textTransform: "uppercase" }}>🧭 CORE PATHWAYS LINK</p>
-                {(() => {
-                  const linkedIds: string[] = ((editingTask as any).corePathwayNodeIds || []);
-                  const firstLinked = linkedIds.length ? findCourseByNodeId(linkedIds[0]) : null;
-                  const selectedPathway = firstLinked?.pathway.slug || "";
-                  const courses = selectedPathway ? getPathwayCourses(selectedPathway) : [];
-                  return (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-                      <Field label="Core Pathway">
-                        <select
-                          value={selectedPathway}
-                          onChange={e => {
-                            const slug = e.target.value;
-                            setEditingTask(p => ({ ...p, corePathwayNodeIds: [] } as any));
-                            // briefly store pathway so the course dropdown can filter; cleared once courses are picked
-                            (editingTask as any).__pathwaySlug = slug;
-                            setEditingTask(p => ({ ...p }));
-                          }}
-                          style={{ ...inputSx, cursor: "pointer" }}
-                        >
-                          <option value="">— none —</option>
-                          {PATHWAY_CATALOG.map(pw => (
-                            <option key={pw.slug} value={pw.slug}>{pw.icon} {pw.label}</option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label="Course / Project in pathway (multi-select)">
-                        <select
-                          multiple
-                          value={linkedIds}
-                          onChange={e => {
-                            const selected = Array.from(e.target.selectedOptions).map(o => o.value);
-                            setEditingTask(p => ({ ...p, corePathwayNodeIds: selected } as any));
-                          }}
-                          style={{ ...inputSx, cursor: "pointer", minHeight: "88px" }}
-                        >
-                          {(selectedPathway ? courses : PATHWAY_CATALOG.flatMap(pw => pw.courses.map(c => ({ ...c, pathwayLabel: pw.label })))).map(c => (
-                            <option key={c.id} value={c.id}>
-                              {c.icon || "•"} {c.label}{(c as any).pathwayLabel ? ` — ${(c as any).pathwayLabel}` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    </div>
-                  );
-                })()}
+                <Field label="Pathway Node IDs (comma-separated — e.g. a task like 'Complete Design Thinking Concepts')">
+                  <input
+                    value={((editingTask as any).corePathwayNodeIds || []).join(", ")}
+                    onChange={e => setEditingTask(p => ({ ...p, corePathwayNodeIds: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } as any))}
+                    placeholder="e.g. design-thinking-concepts, digital-artist-1"
+                    style={inputSx}
+                  />
+                </Field>
                 <label style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px", cursor: "pointer" }}>
                   <input type="checkbox"
                     checked={!!(editingTask as any).unlockOverride}
@@ -2751,92 +2670,17 @@ export default function TaskManagement() {
                   placeholder="https://docs.google.com/... or any URL" style={inputSx} />
               </Field>
 
-              {/* ── Bonus XC Pool + Lead Rank Gate ── */}
-              <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(245,200,66,0.05)", border: "1px solid rgba(245,200,66,0.22)" }}>
-                <p style={{ margin: "0 0 10px", fontSize: "11px", fontWeight: 700, color: "#f5c842", letterSpacing: "0.08em", textTransform: "uppercase" }}>⭐ BONUS POOL & LEADERSHIP</p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-                  <Field label="Bonus XC Pool (for optional tasks)">
-                    <input
-                      type="number"
-                      min={0}
-                      value={(editingProject as any).bonusXCPool || 0}
-                      onChange={e => setEditingProject(p => ({ ...p, bonusXCPool: parseInt(e.target.value) || 0 } as any))}
-                      placeholder="0"
-                      style={inputSx}
-                    />
-                  </Field>
-                  <Field label="Minimum Lead Rank (Marriott Bonvoy tiering)">
-                    <select
-                      value={(editingProject as any).requiredLeadRank || "manager"}
-                      onChange={e => setEditingProject(p => ({ ...p, requiredLeadRank: e.target.value as any } as any))}
-                      style={{ ...inputSx, cursor: "pointer" }}
-                    >
-                      <option value="manager">Manager / Head (default)</option>
-                      <option value="director">Director / Producer</option>
-                      <option value="mentor">Mentor / Intern</option>
-                      <option value="associate">Associate</option>
-                      <option value="senior">Senior</option>
-                      <option value="chief">Chief</option>
-                      <option value="partner">Partner</option>
-                    </select>
-                  </Field>
-                </div>
-                <p style={{ margin: "8px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.4)" }}>
-                  Only players at the selected rank or higher may lead this Project. The Bonus XC Pool is distributed across any tasks marked ⭐ Bonus inside it.
-                </p>
-              </div>
-
-              {/* ── Core Pathways linking (Pathway + Course dropdowns) ── */}
+              {/* ── Core Pathways linking ── */}
               <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(0,212,255,0.05)", border: "1px solid rgba(0,212,255,0.18)" }}>
                 <p style={{ margin: "0 0 10px", fontSize: "11px", fontWeight: 700, color: "#00d4ff", letterSpacing: "0.08em", textTransform: "uppercase" }}>🧭 CORE PATHWAYS LINK</p>
-                {(() => {
-                  const linkedIds: string[] = ((editingProject as any).corePathwayNodeIds || []);
-                  const firstLinked = linkedIds.length ? findCourseByNodeId(linkedIds[0]) : null;
-                  const selectedPathway = firstLinked?.pathway.slug || "";
-                  const courses = selectedPathway ? getPathwayCourses(selectedPathway) : [];
-                  return (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-                      <Field label="Core Pathway">
-                        <select
-                          value={selectedPathway}
-                          onChange={e => {
-                            const slug = e.target.value;
-                            if (!slug) {
-                              setEditingProject(p => ({ ...p, corePathwayNodeIds: [] } as any));
-                            } else {
-                              // keep only ids that belong to the newly selected pathway
-                              const newCourses = getPathwayCourses(slug).map(c => c.id);
-                              setEditingProject(p => ({ ...p, corePathwayNodeIds: linkedIds.filter(id => newCourses.includes(id)) } as any));
-                            }
-                          }}
-                          style={{ ...inputSx, cursor: "pointer" }}
-                        >
-                          <option value="">— none —</option>
-                          {PATHWAY_CATALOG.map(pw => (
-                            <option key={pw.slug} value={pw.slug}>{pw.icon} {pw.label}</option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label="Courses / Projects (multi-select)">
-                        <select
-                          multiple
-                          value={linkedIds}
-                          onChange={e => {
-                            const selected = Array.from(e.target.selectedOptions).map(o => o.value);
-                            setEditingProject(p => ({ ...p, corePathwayNodeIds: selected } as any));
-                          }}
-                          style={{ ...inputSx, cursor: "pointer", minHeight: "88px" }}
-                        >
-                          {(selectedPathway ? courses : PATHWAY_CATALOG.flatMap(pw => pw.courses.map(c => ({ ...c, pathwayLabel: pw.label })))).map(c => (
-                            <option key={c.id} value={c.id}>
-                              {c.icon || "•"} {c.label}{(c as any).pathwayLabel ? ` — ${(c as any).pathwayLabel}` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    </div>
-                  );
-                })()}
+                <Field label="Pathway Node IDs (comma-separated — projects created here sync to these live nodes)">
+                  <input
+                    value={((editingProject as any).corePathwayNodeIds || []).join(", ")}
+                    onChange={e => setEditingProject(p => ({ ...p, corePathwayNodeIds: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } as any))}
+                    placeholder="e.g. digital-artist-3, stem-innovator-2"
+                    style={inputSx}
+                  />
+                </Field>
                 <label style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px", cursor: "pointer" }}>
                   <input type="checkbox"
                     checked={!!(editingProject as any).unlockOverride}
