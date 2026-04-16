@@ -93,6 +93,172 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
   </div>
 );
 
+// ── Badge Catalog ─────────────────────────────────────────────────────────────
+const BADGE_CATALOG: { type: string; color: string; badges: { name: string; xc: number }[] }[] = [
+  {
+    type: "Primary", color: "#4f8ef7",
+    badges: [
+      { name: "Professional Communicator", xc: 100 }, { name: "Peer Supporter", xc: 100 },
+      { name: "Critical Thinker", xc: 100 }, { name: "Innovative Creator", xc: 100 },
+      { name: "Digital Citizen", xc: 100 }, { name: "Master Collaborator", xc: 100 },
+      { name: "Resilient Learner", xc: 100 }, { name: "Growth Mindset", xc: 100 },
+      { name: "Goal Setter", xc: 100 }, { name: "Time Manager", xc: 100 },
+      { name: "Focus Optimizer", xc: 100 }, { name: "Self Advocate", xc: 100 },
+      { name: "Strategic Organizer", xc: 100 }, { name: "Entrepreneurial Spirit", xc: 100 },
+      { name: "Emerging Leader", xc: 100 }, { name: "Digital Tool Master", xc: 100 },
+      { name: "Positive Participant", xc: 100 }, { name: "Self Directed Player", xc: 200 },
+      { name: "Battle Arena Champion", xc: 300 }, { name: "Gamification Guru", xc: 100 },
+    ],
+  },
+  {
+    type: "Premium", color: "#a855f7",
+    badges: [
+      { name: "Beacon of Knowledge", xc: 1000 }, { name: "Beacon of Creativity", xc: 750 },
+      { name: "Beacon of X-Cellence", xc: 750 }, { name: "Beacon of Collaboration", xc: 500 },
+    ],
+  },
+  {
+    type: "Executive", color: "#f5c842",
+    badges: [
+      { name: "Executive Producer", xc: 1000 }, { name: "Creative Director", xc: 1000 },
+      { name: "Project Manager", xc: 1000 }, { name: "Lead Editor", xc: 1000 },
+      { name: "Director of Photography", xc: 1000 }, { name: "Technical Director", xc: 650 },
+      { name: "Stage Manager", xc: 600 }, { name: "Video Editor", xc: 500 },
+      { name: "Studio Director", xc: 500 }, { name: "Lighting Technician", xc: 500 },
+      { name: "Host/Anchor/Actor", xc: 350 }, { name: "Camera Operator", xc: 250 },
+    ],
+  },
+  {
+    type: "Signature", color: "#ef4444",
+    badges: [
+      { name: "Cert: Photoshop", xc: 5000 }, { name: "Cert: Premiere", xc: 5000 },
+      { name: "Master Builder", xc: 5000 }, { name: "Creative Innovator", xc: 3000 },
+      { name: "Digital Artist", xc: 3000 }, { name: "3D Modeler", xc: 3000 },
+      { name: "Brand Strategist", xc: 3000 }, { name: "Community Builder", xc: 2000 },
+      { name: "Code Pioneer", xc: 3000 },
+    ],
+  },
+];
+
+function BadgePicker({
+  selected,
+  onChange,
+}: {
+  selected: { name: string; xc: number }[];
+  onChange: (badges: { name: string; xc: number }[]) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState<string | null>(null);
+
+  const totalXC = selected.reduce((s, b) => s + b.xc, 0);
+  const isSelected = (name: string) => selected.some((b) => b.name === name);
+
+  const toggle = (badge: { name: string; xc: number }) => {
+    if (isSelected(badge.name)) {
+      onChange(selected.filter((b) => b.name !== badge.name));
+    } else {
+      onChange([...selected, badge]);
+    }
+  };
+
+  const filtered = BADGE_CATALOG.filter((cat) => !filterType || cat.type === filterType).flatMap((cat) =>
+    cat.badges
+      .filter((b) => !search || b.name.toLowerCase().includes(search.toLowerCase()))
+      .map((b) => ({ ...b, type: cat.type, color: cat.color }))
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      {selected.length > 0 && (
+        <div style={{
+          padding: "10px", borderRadius: "10px",
+          background: "rgba(79,142,247,0.06)", border: "1px solid rgba(79,142,247,0.15)",
+        }}>
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px",
+          }}>
+            <span style={{ fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              Selected ({selected.length})
+            </span>
+            <span style={{ fontSize: "13px", fontWeight: 800, color: "#f5c842", fontFamily: "monospace" }}>
+              {totalXC.toLocaleString()} XC total
+            </span>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            {selected.map((badge) => {
+              const cat = BADGE_CATALOG.find((c) => c.badges.some((b) => b.name === badge.name));
+              const color = cat?.color || "#4f8ef7";
+              return (
+                <span key={badge.name} onClick={() => toggle(badge)} style={{
+                  display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer",
+                  padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: 700,
+                  background: `${color}20`, border: `1px solid ${color}50`, color,
+                  transition: "opacity 0.15s",
+                }}>
+                  {badge.name}
+                  <span style={{ color: "#f5c842", fontFamily: "monospace", fontSize: "10px" }}>{badge.xc}</span>
+                  <span style={{ color: "rgba(255,255,255,0.35)", fontSize: "13px", marginLeft: "2px" }}>×</span>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+        <input
+          value={search} onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search badges..."
+          style={{
+            flex: 1, padding: "8px 12px", background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px",
+            color: "white", fontSize: "13px", outline: "none",
+          }}
+        />
+        {(["Primary", "Premium", "Executive", "Signature"] as const).map((t) => (
+          <button key={t} onClick={() => setFilterType(filterType === t ? null : t)} style={{
+            padding: "6px 10px", borderRadius: "6px", fontSize: "10px", fontWeight: 700, cursor: "pointer",
+            border: filterType === t ? `1px solid ${BADGE_CATALOG.find((c) => c.type === t)!.color}` : "1px solid rgba(255,255,255,0.1)",
+            background: filterType === t ? `${BADGE_CATALOG.find((c) => c.type === t)!.color}20` : "rgba(255,255,255,0.03)",
+            color: filterType === t ? BADGE_CATALOG.find((c) => c.type === t)!.color : "rgba(255,255,255,0.5)",
+            textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap",
+          }}>
+            {t}
+          </button>
+        ))}
+      </div>
+      <div style={{
+        display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "6px",
+        maxHeight: "240px", overflowY: "auto", padding: "2px",
+      }}>
+        {filtered.map((badge) => {
+          const sel = isSelected(badge.name);
+          return (
+            <div key={badge.name} onClick={() => toggle(badge)} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "8px 10px", borderRadius: "8px", cursor: "pointer",
+              background: sel ? `${badge.color}15` : "rgba(255,255,255,0.03)",
+              border: sel ? `1px solid ${badge.color}60` : "1px solid rgba(255,255,255,0.06)",
+              transition: "all 0.15s",
+            }}>
+              <span style={{ fontSize: "12px", fontWeight: 600, color: sel ? badge.color : "rgba(255,255,255,0.6)" }}>
+                {badge.name}
+              </span>
+              <span style={{ fontSize: "10px", fontWeight: 700, color: "#f5c842", fontFamily: "monospace", whiteSpace: "nowrap", marginLeft: "6px" }}>
+                {badge.xc} XC
+              </span>
+            </div>
+          );
+        })}
+        {filtered.length === 0 && (
+          <div style={{ gridColumn: "1 / -1", padding: "16px", textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>
+            No badges match your search
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const inputSx: React.CSSProperties = {
   width: "100%", padding: "10px 14px", background: "rgba(255,255,255,0.05)",
   border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px",
@@ -2343,33 +2509,9 @@ export default function TaskManagement() {
                 </div>
               </Field>
 
-              {/* Multi-badge selector for checkpoint */}
+              {/* Multi-badge selector for checkpoint — enhanced BadgePicker */}
               <Field label={`Completion Badges (${cpBadges.length} · ${cpBadges.reduce((s, b) => s + b.xc, 0)} XC)`}>
-                {cpBadges.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
-                    {cpBadges.map((badge, i) => (
-                      <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, background: "rgba(79,142,247,0.12)", border: "1px solid rgba(79,142,247,0.3)", color: "#4f8ef7" }}>
-                        {badge.name} <span style={{ color: "#f5c842", fontFamily: "monospace" }}>{badge.xc} XC</span>
-                        <span onClick={() => setCpBadges(prev => prev.filter((_, j) => j !== i))} style={{ cursor: "pointer", color: "rgba(255,255,255,0.4)", marginLeft: "2px", fontSize: "14px" }}>×</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
-                  <input value={cpBadgeSearch} onChange={e => { setCpBadgeSearch(e.target.value); setCpBadgeDropdown(true); }} onFocus={() => setCpBadgeDropdown(true)} placeholder="Search and add badges…" style={inputSx} />
-                  {cpBadgeDropdown && (
-                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100, maxHeight: "180px", overflowY: "auto", marginTop: "4px", background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
-                      {COIN_CATEGORIES.map(cat => {
-                        const filtered = cat.coins.filter(c => (!cpBadgeSearch || c.name.toLowerCase().includes(cpBadgeSearch.toLowerCase())) && !cpBadges.some(b => b.name === c.name));
-                        if (filtered.length === 0) return null;
-                        return (<div key={cat.name}>
-                          <div style={{ padding: "6px 12px", fontSize: "9px", fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>{cat.name.toUpperCase()}</div>
-                          {filtered.map(coin => (<div key={coin.name} onClick={() => { setCpBadges(prev => [...prev, { name: coin.name, xc: coin.xc }]); setCpBadgeSearch(""); }} style={{ padding: "8px 14px", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "rgba(255,255,255,0.7)", display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.03)" }} onMouseEnter={e => (e.currentTarget.style.background = "rgba(79,142,247,0.1)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}><span>{coin.name}</span><span style={{ color: "#f5c842", fontSize: "11px", fontFamily: "monospace" }}>{coin.xc} XC</span></div>))}
-                        </div>);
-                      })}
-                    </div>
-                  )}
-                </div>
+                <BadgePicker selected={cpBadges} onChange={setCpBadges} />
               </Field>
 
               {/* Resource Link */}
@@ -2591,78 +2733,9 @@ export default function TaskManagement() {
                 <textarea value={editingTask.description || ""} onChange={e => setEditingTask(p => ({ ...p, description: e.target.value }))}
                   placeholder="Describe what the player must do…" rows={2} style={{ ...inputSx, resize: "vertical" }} />
               </Field>
-              {/* Multi-badge selector */}
+              {/* Multi-badge selector — enhanced BadgePicker */}
               <Field label={`Digital Badges (${taskBadges.length} selected · ${taskBadges.reduce((s, b) => s + b.xc, 0)} XC total)`}>
-                {/* Selected badge chips */}
-                {taskBadges.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
-                    {taskBadges.map((badge, i) => (
-                      <span key={i} style={{
-                        display: "inline-flex", alignItems: "center", gap: "6px",
-                        padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
-                        background: "rgba(79,142,247,0.12)", border: "1px solid rgba(79,142,247,0.3)", color: "#4f8ef7",
-                      }}>
-                        {badge.name} <span style={{ color: "#f5c842", fontFamily: "monospace" }}>{badge.xc} XC</span>
-                        <span onClick={() => setTaskBadges(prev => prev.filter((_, j) => j !== i))}
-                          style={{ cursor: "pointer", color: "rgba(255,255,255,0.4)", marginLeft: "2px", fontSize: "14px" }}>×</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {/* Badge search + dropdown */}
-                <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
-                  <input
-                    value={badgeSearch}
-                    onChange={e => { setBadgeSearch(e.target.value); setBadgeDropdownOpen(true); }}
-                    onFocus={() => setBadgeDropdownOpen(true)}
-                    placeholder="Search and add badges…"
-                    style={inputSx}
-                  />
-                  {badgeDropdownOpen && (
-                    <div style={{
-                      position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100,
-                      maxHeight: "220px", overflowY: "auto", marginTop: "4px",
-                      background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px",
-                      boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-                    }}>
-                      {COIN_CATEGORIES.map(cat => {
-                        const filtered = cat.coins.filter(c =>
-                          (!badgeSearch || c.name.toLowerCase().includes(badgeSearch.toLowerCase())) &&
-                          !taskBadges.some(b => b.name === c.name)
-                        );
-                        if (filtered.length === 0) return null;
-                        return (
-                          <div key={cat.name}>
-                            <div style={{ padding: "6px 12px", fontSize: "9px", fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                              {cat.name.toUpperCase()}
-                            </div>
-                            {filtered.map(coin => (
-                              <div key={coin.name}
-                                onClick={() => {
-                                  setTaskBadges(prev => [...prev, { name: coin.name, xc: coin.xc }]);
-                                  setBadgeSearch("");
-                                }}
-                                style={{
-                                  padding: "8px 14px", cursor: "pointer", fontSize: "13px", fontWeight: 600,
-                                  color: "rgba(255,255,255,0.7)", display: "flex", justifyContent: "space-between",
-                                  borderBottom: "1px solid rgba(255,255,255,0.03)",
-                                }}
-                                onMouseEnter={e => (e.currentTarget.style.background = "rgba(79,142,247,0.1)")}
-                                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                              >
-                                <span>{coin.name}</span>
-                                <span style={{ color: "#f5c842", fontSize: "11px", fontFamily: "monospace" }}>{coin.xc} XC</span>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })}
-                      {allCoinsFlat.filter(c => !badgeSearch || c.name.toLowerCase().includes(badgeSearch.toLowerCase())).filter(c => !taskBadges.some(b => b.name === c.name)).length === 0 && (
-                        <div style={{ padding: "12px", textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>No badges found</div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <BadgePicker selected={taskBadges} onChange={setTaskBadges} />
               </Field>
               {/* Manual XC override if no badges selected */}
               {taskBadges.length === 0 && (
@@ -2967,33 +3040,9 @@ export default function TaskManagement() {
                 )}
               </div>
 
-              {/* Multi-badge selector for project */}
+              {/* Multi-badge selector for project — enhanced BadgePicker */}
               <Field label={`Completion Badges (${projBadges.length} · ${projBadges.reduce((s, b) => s + b.xc, 0)} XC)`}>
-                {projBadges.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
-                    {projBadges.map((badge, i) => (
-                      <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)", color: "#a78bfa" }}>
-                        {badge.name} <span style={{ color: "#f5c842", fontFamily: "monospace" }}>{badge.xc} XC</span>
-                        <span onClick={() => setProjBadges(prev => prev.filter((_, j) => j !== i))} style={{ cursor: "pointer", color: "rgba(255,255,255,0.4)", marginLeft: "2px", fontSize: "14px" }}>×</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
-                  <input value={projBadgeSearch} onChange={e => { setProjBadgeSearch(e.target.value); setProjBadgeDropdown(true); }} onFocus={() => setProjBadgeDropdown(true)} placeholder="Search and add badges…" style={inputSx} />
-                  {projBadgeDropdown && (
-                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100, maxHeight: "180px", overflowY: "auto", marginTop: "4px", background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
-                      {COIN_CATEGORIES.map(cat => {
-                        const filtered = cat.coins.filter(c => (!projBadgeSearch || c.name.toLowerCase().includes(projBadgeSearch.toLowerCase())) && !projBadges.some(b => b.name === c.name));
-                        if (filtered.length === 0) return null;
-                        return (<div key={cat.name}>
-                          <div style={{ padding: "6px 12px", fontSize: "9px", fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>{cat.name.toUpperCase()}</div>
-                          {filtered.map(coin => (<div key={coin.name} onClick={() => { setProjBadges(prev => [...prev, { name: coin.name, xc: coin.xc }]); setProjBadgeSearch(""); }} style={{ padding: "8px 14px", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "rgba(255,255,255,0.7)", display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.03)" }} onMouseEnter={e => (e.currentTarget.style.background = "rgba(167,139,250,0.1)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}><span>{coin.name}</span><span style={{ color: "#f5c842", fontSize: "11px", fontFamily: "monospace" }}>{coin.xc} XC</span></div>))}
-                        </div>);
-                      })}
-                    </div>
-                  )}
-                </div>
+                <BadgePicker selected={projBadges} onChange={setProjBadges} />
               </Field>
 
               {/* Resource Link */}
@@ -3196,33 +3245,9 @@ export default function TaskManagement() {
                 </Field>
               </div>
 
-              {/* Multi-badge selector for job */}
+              {/* Multi-badge selector for job — enhanced BadgePicker */}
               <Field label={`Digital Badges (${jobBadges.length} · ${jobBadges.reduce((s, b) => s + b.xc, 0)} XC)`}>
-                {jobBadges.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
-                    {jobBadges.map((badge, i) => (
-                      <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, background: "rgba(79,142,247,0.12)", border: "1px solid rgba(79,142,247,0.3)", color: "#4f8ef7" }}>
-                        {badge.name} <span style={{ color: "#f5c842", fontFamily: "monospace" }}>{badge.xc} XC</span>
-                        <span onClick={() => setJobBadges(prev => prev.filter((_, j) => j !== i))} style={{ cursor: "pointer", color: "rgba(255,255,255,0.4)", marginLeft: "2px", fontSize: "14px" }}>×</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
-                  <input value={jobBadgeSearch} onChange={e => { setJobBadgeSearch(e.target.value); setJobBadgeDropdown(true); }} onFocus={() => setJobBadgeDropdown(true)} placeholder="Search and add badges…" style={inputSx} />
-                  {jobBadgeDropdown && (
-                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100, maxHeight: "180px", overflowY: "auto", marginTop: "4px", background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
-                      {COIN_CATEGORIES.map(cat => {
-                        const filtered = cat.coins.filter(c => (!jobBadgeSearch || c.name.toLowerCase().includes(jobBadgeSearch.toLowerCase())) && !jobBadges.some(b => b.name === c.name));
-                        if (filtered.length === 0) return null;
-                        return (<div key={cat.name}>
-                          <div style={{ padding: "6px 12px", fontSize: "9px", fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>{cat.name.toUpperCase()}</div>
-                          {filtered.map(coin => (<div key={coin.name} onClick={() => { setJobBadges(prev => [...prev, { name: coin.name, xc: coin.xc }]); setJobBadgeSearch(""); }} style={{ padding: "8px 14px", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "rgba(255,255,255,0.7)", display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.03)" }} onMouseEnter={e => (e.currentTarget.style.background = "rgba(79,142,247,0.1)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}><span>{coin.name}</span><span style={{ color: "#f5c842", fontSize: "11px", fontFamily: "monospace" }}>{coin.xc} XC</span></div>))}
-                        </div>);
-                      })}
-                    </div>
-                  )}
-                </div>
+                <BadgePicker selected={jobBadges} onChange={setJobBadges} />
               </Field>
 
               {/* ── Hiring System ── */}
