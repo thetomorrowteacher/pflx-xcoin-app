@@ -891,15 +891,16 @@ export function getBadgeBreakdown(user: User): BadgeBreakdown {
 // Composite Status Score — determines leaderboard position
 // Weights: Evolution Rank > Signature > Executive > Premium > Primary > XC (tiebreaker)
 export function getStatusScore(user: User): number {
-  const rankLevel = getCurrentRank(user.totalXcoin, user).level;
+  if (!user) return 0;
+  const rankLevel = getCurrentRank(user.totalXcoin ?? 0, user).level;
   const b = getBadgeBreakdown(user);
   return (
     (rankLevel - 1) * 100000 +
-    b.signature     * 10000  +
-    b.executive     * 1000   +
-    b.premium       * 100    +
-    b.primary       * 10     +
-    Math.floor(user.xcoin / 100)
+    (b.signature  ?? 0) * 10000  +
+    (b.executive  ?? 0) * 1000   +
+    (b.premium    ?? 0) * 100    +
+    (b.primary    ?? 0) * 10     +
+    Math.floor((user.xcoin ?? 0) / 100)
   );
 }
 
@@ -1227,9 +1228,14 @@ function playerHasBadgeType(badgeCounts: BadgeBreakdown | undefined, typeName: s
 
 /** Full rank calculation — evaluates ALL requirements, not just XC */
 export function getCurrentRank(totalXcoin: number, user?: User): PFLXRank {
+  const xc = totalXcoin ?? 0;
+  // Safety: if ranks array is empty (Supabase returned nothing), return a safe default
+  if (!mockPflxRanks || mockPflxRanks.length === 0) {
+    return { level: 1, name: "Rookie", title: "Beginner", xcoinUnlock: 0, image: "", description: "", checkpointsRequired: 0, badgeTypeRequirements: [], specificBadgeRequirements: [] } as any;
+  }
   // If no user context provided, fall back to XC-only check (backward compat)
   if (!user) {
-    return [...mockPflxRanks].reverse().find(r => totalXcoin >= r.xcoinUnlock) || mockPflxRanks[0];
+    return [...mockPflxRanks].reverse().find(r => xc >= r.xcoinUnlock) || mockPflxRanks[0];
   }
 
   const checkpointsCompleted = getPlayerCheckpointsCompleted(user.id);
@@ -1240,7 +1246,7 @@ export function getCurrentRank(totalXcoin: number, user?: User): PFLXRank {
     const rank = mockPflxRanks[i];
 
     // 1. XC requirement
-    if (totalXcoin < rank.xcoinUnlock) continue;
+    if (xc < rank.xcoinUnlock) continue;
 
     // 2. Checkpoints requirement
     if (checkpointsCompleted < rank.checkpointsRequired) continue;
@@ -1285,7 +1291,7 @@ export function getRankRequirements(rank: PFLXRank, user: User): RankRequirement
   const checkpointsCurrent = getPlayerCheckpointsCompleted(user.id);
   const earnedBadgeNames = getPlayerEarnedBadgeNames(user.id);
 
-  const xcMet = user.totalXcoin >= rank.xcoinUnlock;
+  const xcMet = (user.totalXcoin ?? 0) >= rank.xcoinUnlock;
   const checkpointsMet = checkpointsCurrent >= rank.checkpointsRequired;
 
   const badgeTypesDetail = rank.badgeTypeRequirements.map(type => {
@@ -1304,7 +1310,7 @@ export function getRankRequirements(rank: PFLXRank, user: User): RankRequirement
 
   return {
     rank,
-    xcMet, xcCurrent: user.totalXcoin,
+    xcMet, xcCurrent: user.totalXcoin ?? 0,
     checkpointsMet, checkpointsCurrent,
     badgeTypesMet, badgeTypesDetail,
     specificBadgesMet, specificBadgesDetail,
@@ -1313,12 +1319,15 @@ export function getRankRequirements(rank: PFLXRank, user: User): RankRequirement
 }
 
 export function getRankProgress(totalXcoin: number, user?: User): number {
-  const current = getCurrentRank(totalXcoin, user);
+  const xc = totalXcoin ?? 0;
+  const current = getCurrentRank(xc, user);
+  if (!mockPflxRanks || mockPflxRanks.length === 0) return 0;
   const nextIdx = mockPflxRanks.findIndex(r => r.level === current.level) + 1;
   if (nextIdx >= mockPflxRanks.length) return 100;
   const next = mockPflxRanks[nextIdx];
   const range = next.xcoinUnlock - current.xcoinUnlock;
-  const progress = totalXcoin - current.xcoinUnlock;
+  if (range <= 0) return 100;
+  const progress = xc - current.xcoinUnlock;
   return Math.min(100, Math.max(0, (progress / range) * 100));
 }
 

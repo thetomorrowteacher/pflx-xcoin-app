@@ -155,8 +155,8 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
     reader.readAsDataURL(file);
   };
 
-  const currentRank = getCurrentRank(profileUser.totalXcoin, profileUser);
-  const xpProgress = getXCProgress(profileUser.xcoin);
+  const currentRank = getCurrentRank(profileUser.totalXcoin ?? 0, profileUser);
+  const xpProgress = getXCProgress(profileUser.xcoin ?? 0);
 
   // Next rank requirements
   const nextRankDef = mockPflxRanks.find(r => r.level === currentRank.level + 1);
@@ -441,7 +441,7 @@ export default function PlayerProfile({ params }: { params: { id: string } }) {
             </div>
             <div style={{ borderLeft: "1px solid rgba(255,255,255,0.1)", paddingLeft: "24px" }}>
               <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px" }}>Lifetime XC</p>
-              <p style={{ margin: 0, fontSize: "28px", fontWeight: 900, color: "#4f8ef7" }}>{profileUser.totalXcoin.toLocaleString()}</p>
+              <p style={{ margin: 0, fontSize: "28px", fontWeight: 900, color: "#4f8ef7" }}>{(profileUser.totalXcoin ?? 0).toLocaleString()}</p>
             </div>
             <div style={{ borderLeft: "1px solid rgba(255,255,255,0.1)", paddingLeft: "24px" }}>
               <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px" }}>Evolution Rank</p>

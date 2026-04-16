@@ -91,7 +91,9 @@ export default function Home() {
     const existing = localStorage.getItem("pflx_user");
     const stay = localStorage.getItem("pflx_keep_signed_in");
     if (existing && stay) {
-      const u = JSON.parse(existing);
+      let u: any;
+      try { u = JSON.parse(existing); } catch(e) { console.warn("[X-Coin] Corrupt pflx_user in localStorage, clearing"); localStorage.removeItem("pflx_user"); localStorage.removeItem("pflx_keep_signed_in"); setSessionChecked(true); return; }
+      if (!u || !u.id) { localStorage.removeItem("pflx_user"); localStorage.removeItem("pflx_keep_signed_in"); setSessionChecked(true); return; }
       // Set role before routing to prevent RoleGuard conflict
       const resumeRole = isHostUser(u) ? "host" : "player";
       localStorage.setItem("pflx_active_role", resumeRole);

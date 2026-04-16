@@ -128,7 +128,7 @@ function buildTickerEvents(): TickerEvent[] {
       events.push({
         icon: "🏢",
         color: "#06b6d4",
-        text: `ACTIVE STAKE — ${handle} has ${inv.stakeXC.toLocaleString()} XC staked in their studio (${inv.stakePercent}% of pool)`,
+        text: `ACTIVE STAKE — ${handle} has ${(inv.stakeXC ?? 0).toLocaleString()} XC staked in their studio (${inv.stakePercent ?? 0}% of pool)`,
         date: inv.createdAt || "2026-03-01",
       });
     }
@@ -136,13 +136,19 @@ function buildTickerEvents(): TickerEvent[] {
 
   // ── Current #1 leader ──────────────────────────────────────────
   if (players.length > 0) {
-    const leader = [...players].sort((a, b) => getStatusScore(b) - getStatusScore(a))[0];
-    events.push({
-      icon: "🏆",
-      color: "#f5c842",
-      text: `CURRENT #1 — @${leader.brandName || leader.name} leads the PFLX Leaderboard with a Status Score of ${getStatusScore(leader).toLocaleString()} · ${leader.totalXcoin.toLocaleString()} lifetime XC · ${leader.digitalBadges} badges`,
-      date: new Date().toISOString(),
-    });
+    try {
+      const leader = [...players].sort((a, b) => getStatusScore(b) - getStatusScore(a))[0];
+      if (leader) {
+        events.push({
+          icon: "🏆",
+          color: "#f5c842",
+          text: `CURRENT #1 — @${leader.brandName || leader.name} leads the PFLX Leaderboard with a Status Score of ${getStatusScore(leader).toLocaleString()} · ${(leader.totalXcoin ?? 0).toLocaleString()} lifetime XC · ${leader.digitalBadges ?? 0} badges`,
+          date: new Date().toISOString(),
+        });
+      }
+    } catch (e) {
+      console.warn("[Ticker] Error computing leader:", e);
+    }
   }
 
   // Filter to today only (events without a valid date are excluded except #1 which always has now())
