@@ -119,6 +119,7 @@ export async function initStore(): Promise<void> {
             ["investments",       () => { if (all.investments?.length)       D.mockInvestments.splice(0, D.mockInvestments.length, ...all.investments); }],
             ["cohortGroups",      () => { if (all.cohortGroups?.length)      D.mockCohortGroups.splice(0, D.mockCohortGroups.length, ...all.cohortGroups); }],
             ["projectPitches",    () => { if (all.projectPitches?.length)    D.mockProjectPitches.splice(0, D.mockProjectPitches.length, ...all.projectPitches); }],
+            ["communityContributions", () => { if (all.communityContributions?.length) D.mockCommunityContributions.splice(0, D.mockCommunityContributions.length, ...all.communityContributions); }],
           ];
           for (let i = 0; i < spliceOps.length; i++) {
             spliceOps[i][1]();
@@ -153,6 +154,7 @@ export async function initStore(): Promise<void> {
                 ["investments",       () => { if (seedAll.investments?.length)       D.mockInvestments.splice(0, D.mockInvestments.length, ...(seedAll.investments as any[])); }],
                 ["cohortGroups",      () => { if (seedAll.cohortGroups?.length)      D.mockCohortGroups.splice(0, D.mockCohortGroups.length, ...(seedAll.cohortGroups as any[])); }],
                 ["projectPitches",    () => { if (seedAll.projectPitches?.length)    D.mockProjectPitches.splice(0, D.mockProjectPitches.length, ...(seedAll.projectPitches as any[])); }],
+                ["communityContributions", () => { if (seedAll.communityContributions?.length) D.mockCommunityContributions.splice(0, D.mockCommunityContributions.length, ...(seedAll.communityContributions as any[])); }],
               ];
               for (const [, fn] of seedSplice) fn();
               console.log("[store] ✓ Loaded seed-data.json fallback with", Object.keys(seedAll).length, "collections");
@@ -275,6 +277,9 @@ export function saveCohortGroups() {
 export function saveProjectPitches() {
   return saveData("projectPitches", D.mockProjectPitches);
 }
+export function saveCommunityContributions() {
+  return saveData("communityContributions", D.mockCommunityContributions);
+}
 
 /**
  * Convenience: save everything at once (used after bulk operations).
@@ -300,5 +305,6 @@ export async function saveAll() {
     saveInvestments(),
     saveCohortGroups(),
     saveProjectPitches(),
+    saveCommunityContributions(),
   ]);
 }

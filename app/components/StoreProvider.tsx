@@ -28,6 +28,7 @@ const COLLECTIONS: { key: CollectionKey; getData: () => any; save: () => Promise
   { key: "cc", getData: () => D.COIN_CATEGORIES,       save: () => import("../lib/store").then(m => m.saveCoinCategories()) },
   { key: "tr", getData: () => D.mockTrades,            save: () => import("../lib/store").then(m => m.saveTrades()) },
   { key: "iv", getData: () => D.mockInvestments,       save: () => import("../lib/store").then(m => m.saveInvestments()) },
+  { key: "ccon", getData: () => D.mockCommunityContributions, save: () => import("../lib/store").then(m => m.saveCommunityContributions()) },
 ];
 
 function snapshotAll(): Record<string, string> {

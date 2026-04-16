@@ -6,7 +6,9 @@ import {
   User, COIN_CATEGORIES, mockSubmissions, CoinSubmission,
   mockStartupStudios, mockStudioInvestments, StudioInvestment,
   getStudioMaxStakePercent,
+  CORE_PATHWAYS, mockCommunityContributions,
 } from "../../lib/data";
+import { saveCommunityContributions } from "../../lib/store";
 
 interface RequestEntry {
   id: string;
@@ -14,6 +16,10 @@ interface RequestEntry {
   amount: number;
   reason: string;
   fileName: string | null;
+  pathwaySlug: string;
+  proposeAsCourse: boolean;
+  courseTitle: string;
+  courseDescription: string;
 }
 
 export default function PlayerSubmit() {
@@ -32,7 +38,7 @@ export default function PlayerSubmit() {
   const [studioInvestments, setStudioInvestments] = useState<StudioInvestment[]>([...mockStudioInvestments]);
 
   const [entries, setEntries] = useState<RequestEntry[]>([
-    { id: Math.random().toString(36).substr(2, 9), coinType: "", amount: 1, reason: "", fileName: null }
+    { id: Math.random().toString(36).substr(2, 9), coinType: "", amount: 1, reason: "", fileName: null, pathwaySlug: "", proposeAsCourse: false, courseTitle: "", courseDescription: "" }
   ]);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [history, setHistory] = useState<any[]>([]);
@@ -66,7 +72,7 @@ export default function PlayerSubmit() {
   };
 
   const addEntry = () => {
-    setEntries([...entries, { id: Math.random().toString(36).substr(2, 9), coinType: "", amount: 1, reason: "", fileName: null }]);
+    setEntries([...entries, { id: Math.random().toString(36).substr(2, 9), coinType: "", amount: 1, reason: "", fileName: null, pathwaySlug: "", proposeAsCourse: false, courseTitle: "", courseDescription: "" }]);
   };
 
   const removeEntry = (id: string) => {
@@ -98,7 +104,7 @@ export default function PlayerSubmit() {
 
     // In a real app, this would be an API call to Supabase
     showToast(`${entries.length} submission(s) successful! Waiting for teacher review. 🚀`, "success");
-    
+
     const newSubs = entries.map(entry => ({
       id: Math.random().toString(36).substr(2, 9),
       playerId: user.id,
@@ -110,11 +116,31 @@ export default function PlayerSubmit() {
       date: new Date().toISOString(),
       type: 'coin'
     }));
-    
+
     setHistory([...newSubs, ...history]);
-    
+
+    // Create community contributions for entries with proposeAsCourse checked
+    const courseEntries = entries.filter(e => e.proposeAsCourse && e.pathwaySlug);
+    if (courseEntries.length > 0) {
+      courseEntries.forEach(entry => {
+        const contrib = {
+          id: `cc_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          playerId: user.id,
+          taskId: entry.coinType, // Using coinType as a reference since there is no direct taskId
+          title: entry.courseTitle || `Course proposal: ${entry.coinType}`,
+          description: entry.courseDescription || entry.reason,
+          pathwaySlug: entry.pathwaySlug,
+          evidenceUrl: "",
+          status: "pending" as const,
+          submittedAt: new Date().toISOString(),
+        };
+        mockCommunityContributions.push(contrib);
+      });
+      saveCommunityContributions();
+    }
+
     // Clear form
-    setEntries([{ id: Math.random().toString(36).substr(2, 9), coinType: "", amount: 1, reason: "", fileName: null }]);
+    setEntries([{ id: Math.random().toString(36).substr(2, 9), coinType: "", amount: 1, reason: "", fileName: null, pathwaySlug: "", proposeAsCourse: false, courseTitle: "", courseDescription: "" }]);
   };
 
   const statusStyle = (status: string) => {
@@ -282,11 +308,65 @@ export default function PlayerSubmit() {
                         </div>
                       </label>
                     </div>
+
+                    {/* Pathway Tag & Propose as Course */}
+                    <div style={{ marginTop: "16px", padding: "16px", borderRadius: "12px", background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.15)" }}>
+                      <div style={{ marginBottom: "12px" }}>
+                        <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "rgba(167,139,250,0.6)", marginBottom: "8px", textTransform: "uppercase" }}>CORE PATHWAY TAG</label>
+                        <select
+                          value={entry.pathwaySlug}
+                          onChange={(e) => updateEntry(entry.id, "pathwaySlug", e.target.value)}
+                          className="input-field"
+                          style={{ borderRadius: "12px", background: "rgba(255,255,255,0.03)" }}
+                        >
+                          <option value="">None (optional)</option>
+                          {CORE_PATHWAYS.map(pw => (
+                            <option key={pw.slug} value={pw.slug}>{pw.icon} {pw.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+                        <input type="checkbox"
+                          checked={entry.proposeAsCourse}
+                          onChange={(e) => updateEntry(entry.id, "proposeAsCourse", e.target.checked)}
+                          style={{ width: "16px", height: "16px", accentColor: "#a78bfa", cursor: "pointer" }} />
+                        <div>
+                          <span style={{ fontSize: "12px", fontWeight: 700, color: "#a78bfa" }}>Propose as Course</span>
+                          <p style={{ margin: "2px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.35)" }}>
+                            Suggest this as a new course for the pathway. Your host will review it.
+                          </p>
+                        </div>
+                      </label>
+                      {entry.proposeAsCourse && (
+                        <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                          <div>
+                            <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.3)", marginBottom: "6px", textTransform: "uppercase" }}>PROPOSED COURSE TITLE</label>
+                            <input
+                              value={entry.courseTitle}
+                              onChange={(e) => updateEntry(entry.id, "courseTitle", e.target.value)}
+                              placeholder="What should this course be called?"
+                              className="input-field"
+                              style={{ borderRadius: "12px", background: "rgba(255,255,255,0.03)" }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.3)", marginBottom: "6px", textTransform: "uppercase" }}>WHAT DID YOU LEARN?</label>
+                            <textarea
+                              value={entry.courseDescription}
+                              onChange={(e) => updateEntry(entry.id, "courseDescription", e.target.value)}
+                              placeholder="Describe what this course could teach others..."
+                              className="input-field"
+                              style={{ minHeight: "60px", resize: "vertical", borderRadius: "12px", background: "rgba(255,255,255,0.03)" }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
 
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={addEntry}
                   style={{
                     background: "rgba(245,200,66,0.05)", border: "1px dashed rgba(245,200,66,0.2)",

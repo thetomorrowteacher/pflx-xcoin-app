@@ -22,6 +22,7 @@ export const DATA_KEYS = [
   "coinCategories",
   "trades",
   "investments",
+  "communityContributions",
 ] as const;
 
 export type DataKey = (typeof DATA_KEYS)[number];

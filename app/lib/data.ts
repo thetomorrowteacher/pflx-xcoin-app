@@ -1758,3 +1758,31 @@ export function processEntryFee(
 
   return { playerPaid: entryFeeXC, creatorShare, studioShare };
 }
+
+// ─── Core Pathways constant ─────────────────────────────────────────
+export const CORE_PATHWAYS = [
+  { slug: "digital-artist", name: "Digital Artist", icon: "🎨" },
+  { slug: "music-producer", name: "Music Producer", icon: "🎵" },
+  { slug: "videographer", name: "Videographer", icon: "🎬" },
+  { slug: "professional-entrepreneur", name: "Professional Entrepreneur", icon: "💼" },
+  { slug: "graphic-designer", name: "Graphic Designer", icon: "🖌️" },
+  { slug: "web-developer", name: "Web Developer", icon: "💻" },
+  { slug: "content-creator", name: "Content Creator", icon: "📱" },
+  { slug: "industrial-designer", name: "Industrial Designer", icon: "🏗️" },
+] as const;
+
+// ─── Community Contributions ─────────────────────────────────────────
+export interface CommunityContribution {
+  id: string;
+  playerId: string;
+  taskId: string;
+  title: string;
+  description: string;
+  pathwaySlug: string;
+  evidenceUrl?: string;
+  status: "pending" | "approved" | "rejected";
+  submittedAt: string;
+  reviewedAt?: string;
+  hostNotes?: string;
+}
+export let mockCommunityContributions: CommunityContribution[] = [];

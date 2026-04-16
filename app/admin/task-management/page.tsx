@@ -10,8 +10,9 @@ import {
   CohortGroup, mockCohortGroups,
   ProjectPitch, mockProjectPitches,
   PITCH_AUTO_JOBS, calculateNFTValue, calculateRarity,
+  CORE_PATHWAYS, CommunityContribution, mockCommunityContributions,
 } from "../../lib/data";
-import { saveCheckpoints, saveTasks, saveJobs, saveProjects, saveCohortGroups, saveProjectPitches } from "../../lib/store";
+import { saveCheckpoints, saveTasks, saveJobs, saveProjects, saveCohortGroups, saveProjectPitches, saveCommunityContributions } from "../../lib/store";
 import { bootstrapPflxSSOFromURL } from "../../lib/ssoBootstrap";
 import { saveAndToast } from "../../lib/saveToast";
 import { logXBotEvent, logXBotEventForPlayers } from "../../lib/xbotBriefing";
@@ -212,7 +213,7 @@ function MultiCohortSelector({
 export default function TaskManagement() {
   const router = useRouter();
   const [user, setUser]           = useState<User | null>(null);
-  const [tab, setTab]             = useState<"checkpoints" | "tasks" | "jobs" | "projects" | "cohort-groups" | "pitches">("checkpoints");
+  const [tab, setTab]             = useState<"checkpoints" | "tasks" | "jobs" | "projects" | "cohort-groups" | "pitches" | "contributions">("checkpoints");
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([...mockCheckpoints]);
   const [tasks, setTasks]         = useState<Task[]>([...mockTasks]);
   const [jobs, setJobs]           = useState<Job[]>([...mockJobs]);
@@ -275,6 +276,19 @@ export default function TaskManagement() {
   const [reviewingPitch, setReviewingPitch] = useState<ProjectPitch | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
   const [pitchReviewModal, setPitchReviewModal] = useState(false);
+
+  // AI Course Generator state
+  const [aiGenModal, setAiGenModal] = useState(false);
+  const [aiGenContent, setAiGenContent] = useState("");
+  const [aiGenContentType, setAiGenContentType] = useState<"text" | "link" | "file">("text");
+  const [aiGenFileName, setAiGenFileName] = useState("");
+  const [aiGenLoading, setAiGenLoading] = useState(false);
+  const [aiGenTasks, setAiGenTasks] = useState<{ title: string; description: string; xcReward: number; category: string; pathwayTag: string; selected: boolean }[]>([]);
+  const [aiGenError, setAiGenError] = useState("");
+  const aiFileRef = useRef<HTMLInputElement>(null);
+
+  // Community Contributions state
+  const [contributions, setContributions] = useState<CommunityContribution[]>([...mockCommunityContributions]);
 
   // X-Bot DarkCampus channels for notification targeting
   const [dcChannels, setDcChannels] = useState<{ id: string; name: string; platform: string }[]>([]);
@@ -910,9 +924,9 @@ export default function TaskManagement() {
         <div style={{ display: "flex", gap: "4px", marginBottom: "28px",
           background: "rgba(255,255,255,0.03)", borderRadius: "12px",
           border: "1px solid rgba(255,255,255,0.06)", padding: "4px", width: "fit-content" }}>
-          {(["checkpoints", "tasks", "jobs", "projects", "pitches", "cohort-groups"] as const).map(t => (
+          {(["checkpoints", "tasks", "jobs", "projects", "pitches", "cohort-groups", "contributions"] as const).map(t => (
             <button key={t} onClick={() => { playNav(); setTab(t); }} style={tabBtnSx(tab === t)}>
-              {t === "checkpoints" ? "🏁 CHECKPOINTS" : t === "tasks" ? "✅ TASKS" : t === "jobs" ? "📋 JOB BOARD" : t === "projects" ? "🗂 PROJECTS" : t === "pitches" ? `💡 PITCHES${allPitches.filter(p => p.status === "submitted").length ? ` (${allPitches.filter(p => p.status === "submitted").length})` : ""}` : "👥 COHORT GROUPS"}
+              {t === "checkpoints" ? "🏁 CHECKPOINTS" : t === "tasks" ? "✅ TASKS" : t === "jobs" ? "📋 JOB BOARD" : t === "projects" ? "🗂 PROJECTS" : t === "pitches" ? `💡 PITCHES${allPitches.filter(p => p.status === "submitted").length ? ` (${allPitches.filter(p => p.status === "submitted").length})` : ""}` : t === "contributions" ? `🌱 CONTRIBUTIONS${contributions.filter(c => c.status === "pending").length ? ` (${contributions.filter(c => c.status === "pending").length})` : ""}` : "👥 COHORT GROUPS"}
             </button>
           ))}
         </div>
@@ -1017,7 +1031,10 @@ export default function TaskManagement() {
               <p style={{ margin: 0, color: "rgba(255,255,255,0.4)", fontSize: "13px" }}>
                 {tasks.length} task{tasks.length !== 1 ? "s" : ""} defined
               </p>
-              <button onClick={openNewTask} style={addBtnSx}>＋ New Task</button>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button onClick={() => { playClick(); setAiGenModal(true); setAiGenContent(""); setAiGenTasks([]); setAiGenError(""); setAiGenFileName(""); setAiGenContentType("text"); }} style={{ ...addBtnSx, background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.4)", color: "#a78bfa" }}>🤖 AI Course Generator</button>
+                <button onClick={openNewTask} style={addBtnSx}>＋ New Task</button>
+              </div>
             </div>
 
             <div style={cardSx}>
@@ -1596,7 +1613,308 @@ export default function TaskManagement() {
             )}
           </div>
         )}
+
+        {/* ══════════════════ CONTRIBUTIONS TAB ══════════════════ */}
+        {tab === "contributions" && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <p style={{ margin: 0, color: "rgba(255,255,255,0.4)", fontSize: "13px" }}>
+                {contributions.filter(c => c.status === "pending").length} pending contribution{contributions.filter(c => c.status === "pending").length !== 1 ? "s" : ""} &middot; {contributions.length} total
+              </p>
+            </div>
+            {contributions.length === 0 ? (
+              <div style={{ padding: "60px", textAlign: "center", background: "rgba(255,255,255,0.02)", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "16px", margin: "0 0 8px" }}>No community contributions yet.</p>
+                <p style={{ color: "rgba(255,255,255,0.25)", fontSize: "13px", margin: 0 }}>When players submit tasks and propose them as courses, they will appear here for review.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {contributions.map(contrib => {
+                  const player = mockUsers.find(u => u.id === contrib.playerId);
+                  const task = mockTasks.find(t => t.id === contrib.taskId);
+                  const pathway = CORE_PATHWAYS.find(p => p.slug === contrib.pathwaySlug);
+                  const isPending = contrib.status === "pending";
+                  return (
+                    <div key={contrib.id} style={{
+                      padding: "20px", borderRadius: "16px",
+                      background: isPending ? "rgba(167,139,250,0.04)" : "rgba(255,255,255,0.02)",
+                      border: `1px solid ${isPending ? "rgba(167,139,250,0.2)" : "rgba(255,255,255,0.06)"}`,
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
+                        <div>
+                          <h3 style={{ margin: "0 0 4px", fontSize: "16px", fontWeight: 800, color: "#f0f0ff" }}>{contrib.title}</h3>
+                          <p style={{ margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>
+                            by {player?.brandName || player?.name || "Unknown"} &middot; {new Date(contrib.submittedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                          {pathway && (
+                            <span style={{ padding: "4px 12px", borderRadius: "20px", background: "rgba(0,212,255,0.1)", border: "1px solid rgba(0,212,255,0.25)", color: "#00d4ff", fontSize: "11px", fontWeight: 700 }}>
+                              {pathway.icon} {pathway.name}
+                            </span>
+                          )}
+                          <span style={{
+                            padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: 700,
+                            background: contrib.status === "approved" ? "rgba(34,197,94,0.15)" : contrib.status === "rejected" ? "rgba(239,68,68,0.15)" : "rgba(245,200,66,0.15)",
+                            border: `1px solid ${contrib.status === "approved" ? "rgba(34,197,94,0.4)" : contrib.status === "rejected" ? "rgba(239,68,68,0.4)" : "rgba(245,200,66,0.4)"}`,
+                            color: contrib.status === "approved" ? "#22c55e" : contrib.status === "rejected" ? "#ef4444" : "#f5c842",
+                          }}>
+                            {contrib.status.toUpperCase()}
+                          </span>
+                        </div>
+                      </div>
+                      <p style={{ margin: "0 0 10px", fontSize: "13px", color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>{contrib.description}</p>
+                      {task && (
+                        <p style={{ margin: "0 0 10px", fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>
+                          From task: <span style={{ color: "#4f8ef7" }}>{task.title}</span>
+                        </p>
+                      )}
+                      {contrib.evidenceUrl && (
+                        <p style={{ margin: "0 0 10px", fontSize: "12px" }}>
+                          <a href={contrib.evidenceUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#4f8ef7", textDecoration: "none" }}>View evidence</a>
+                        </p>
+                      )}
+                      {isPending && (
+                        <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
+                          <button onClick={() => {
+                            playSuccess();
+                            // Approve: update contribution status
+                            const updated = contributions.map(c => c.id === contrib.id ? { ...c, status: "approved" as const, reviewedAt: new Date().toISOString() } : c);
+                            setContributions(updated);
+                            mockCommunityContributions.splice(0, mockCommunityContributions.length, ...updated);
+                            saveCommunityContributions();
+                            // Add pathway tag to the task
+                            if (contrib.taskId && contrib.pathwaySlug) {
+                              const taskIdx = mockTasks.findIndex(t => t.id === contrib.taskId);
+                              if (taskIdx >= 0) {
+                                const existing = mockTasks[taskIdx].corePathwayNodeIds || [];
+                                if (!existing.includes(contrib.pathwaySlug)) {
+                                  mockTasks[taskIdx] = { ...mockTasks[taskIdx], corePathwayNodeIds: [...existing, contrib.pathwaySlug] };
+                                  setTasks([...mockTasks]);
+                                  saveTasks();
+                                }
+                              }
+                            }
+                          }} style={{
+                            padding: "8px 20px", borderRadius: "10px", cursor: "pointer", fontWeight: 700, fontSize: "12px",
+                            background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.4)", color: "#22c55e",
+                          }}>Approve</button>
+                          <button onClick={() => {
+                            playError();
+                            const updated = contributions.map(c => c.id === contrib.id ? { ...c, status: "rejected" as const, reviewedAt: new Date().toISOString() } : c);
+                            setContributions(updated);
+                            mockCommunityContributions.splice(0, mockCommunityContributions.length, ...updated);
+                            saveCommunityContributions();
+                          }} style={{
+                            padding: "8px 20px", borderRadius: "10px", cursor: "pointer", fontWeight: 700, fontSize: "12px",
+                            background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444",
+                          }}>Reject</button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </main>
+
+      {/* ══════════════════ AI COURSE GENERATOR MODAL ══════════════════ */}
+      {aiGenModal && (
+        <ModalBG onClose={() => { playClick(); setAiGenModal(false); }}>
+          <div style={{ padding: "32px" }}>
+            <h2 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: 900, color: "#f0f0ff" }}>
+              🤖 AI Course Generator
+            </h2>
+            <p style={{ margin: "0 0 24px", fontSize: "13px", color: "rgba(167,139,250,0.6)" }}>
+              Upload a file, paste a link, or enter text — AI will generate tasks from the content.
+            </p>
+
+            {aiGenTasks.length === 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {/* Content type selector */}
+                <div style={{ display: "flex", gap: "8px" }}>
+                  {(["text", "link", "file"] as const).map(ct => (
+                    <button key={ct} onClick={() => { setAiGenContentType(ct); setAiGenContent(""); setAiGenFileName(""); }}
+                      style={{
+                        padding: "8px 16px", borderRadius: "10px", cursor: "pointer", fontSize: "12px", fontWeight: 700,
+                        background: aiGenContentType === ct ? "rgba(167,139,250,0.2)" : "rgba(255,255,255,0.04)",
+                        border: `1px solid ${aiGenContentType === ct ? "rgba(167,139,250,0.5)" : "rgba(255,255,255,0.1)"}`,
+                        color: aiGenContentType === ct ? "#a78bfa" : "rgba(255,255,255,0.5)",
+                      }}>
+                      {ct === "text" ? "Paste Text" : ct === "link" ? "Enter Link" : "Upload File"}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Input area */}
+                {aiGenContentType === "file" ? (
+                  <div>
+                    <input ref={aiFileRef} type="file" accept=".pdf,.pptx,.html,.htm,.txt" style={{ display: "none" }}
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setAiGenFileName(file.name);
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const text = reader.result as string;
+                          setAiGenContent(text);
+                        };
+                        reader.readAsText(file);
+                      }} />
+                    <button onClick={() => aiFileRef.current?.click()} style={{
+                      width: "100%", padding: "40px 20px", borderRadius: "14px",
+                      border: "2px dashed rgba(167,139,250,0.3)", background: "rgba(167,139,250,0.04)",
+                      color: aiGenFileName ? "#a78bfa" : "rgba(255,255,255,0.4)",
+                      fontSize: "14px", fontWeight: 600, cursor: "pointer", textAlign: "center",
+                    }}>
+                      {aiGenFileName ? `Selected: ${aiGenFileName}` : "Click to upload PDF, PPTX, HTML, or TXT"}
+                    </button>
+                  </div>
+                ) : aiGenContentType === "link" ? (
+                  <input value={aiGenContent} onChange={e => setAiGenContent(e.target.value)}
+                    placeholder="https://example.com/syllabus or any URL..."
+                    style={inputSx} />
+                ) : (
+                  <textarea value={aiGenContent} onChange={e => setAiGenContent(e.target.value)}
+                    placeholder="Paste your course content, syllabus, lesson plan, or any text here..."
+                    style={{ ...inputSx, minHeight: "160px", resize: "vertical" }} />
+                )}
+
+                {aiGenError && (
+                  <p style={{ margin: 0, fontSize: "12px", color: "#ef4444" }}>{aiGenError}</p>
+                )}
+
+                <button disabled={!aiGenContent.trim() || aiGenLoading} onClick={async () => {
+                  setAiGenLoading(true);
+                  setAiGenError("");
+                  try {
+                    const res = await fetch("/api/generate-tasks", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ content: aiGenContent, contentType: aiGenContentType, fileName: aiGenFileName || undefined }),
+                    });
+                    const data = await res.json();
+                    if (data.error) {
+                      setAiGenError(typeof data.error === "string" ? data.error : "Failed to generate tasks. Try again.");
+                    } else if (data.tasks?.length) {
+                      setAiGenTasks(data.tasks.map((t: any) => ({ ...t, selected: true })));
+                    } else {
+                      setAiGenError("No tasks were generated. Try providing more detailed content.");
+                    }
+                  } catch {
+                    setAiGenError("Network error. Please try again.");
+                  }
+                  setAiGenLoading(false);
+                }} style={{
+                  padding: "14px 28px", borderRadius: "12px", cursor: aiGenContent.trim() && !aiGenLoading ? "pointer" : "not-allowed",
+                  background: aiGenContent.trim() && !aiGenLoading ? "linear-gradient(135deg, #a78bfa, #7c3aed)" : "rgba(255,255,255,0.06)",
+                  border: "none", color: "white", fontWeight: 800, fontSize: "14px",
+                  boxShadow: aiGenContent.trim() && !aiGenLoading ? "0 0 20px rgba(167,139,250,0.3)" : "none",
+                  opacity: aiGenContent.trim() && !aiGenLoading ? 1 : 0.5,
+                }}>
+                  {aiGenLoading ? "Generating tasks..." : "Generate Tasks with AI"}
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.5)" }}>
+                  {aiGenTasks.length} tasks generated. Review, edit, and select which to import.
+                </p>
+
+                <div style={{ maxHeight: "50vh", overflow: "auto", display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {aiGenTasks.map((gt, idx) => (
+                    <div key={idx} style={{
+                      padding: "16px", borderRadius: "14px",
+                      background: gt.selected ? "rgba(167,139,250,0.06)" : "rgba(255,255,255,0.02)",
+                      border: `1px solid ${gt.selected ? "rgba(167,139,250,0.25)" : "rgba(255,255,255,0.06)"}`,
+                      opacity: gt.selected ? 1 : 0.5,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
+                        <input type="checkbox" checked={gt.selected}
+                          onChange={() => setAiGenTasks(prev => prev.map((t, i) => i === idx ? { ...t, selected: !t.selected } : t))}
+                          style={{ width: "18px", height: "18px", accentColor: "#a78bfa", cursor: "pointer" }} />
+                        <input value={gt.title}
+                          onChange={e => setAiGenTasks(prev => prev.map((t, i) => i === idx ? { ...t, title: e.target.value } : t))}
+                          style={{ ...inputSx, flex: 1, fontWeight: 700 }} />
+                      </div>
+                      <textarea value={gt.description}
+                        onChange={e => setAiGenTasks(prev => prev.map((t, i) => i === idx ? { ...t, description: e.target.value } : t))}
+                        style={{ ...inputSx, minHeight: "60px", resize: "vertical", marginBottom: "8px" }} />
+                      <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>XC:</span>
+                          <input type="number" value={gt.xcReward} min={50} max={500} step={25}
+                            onChange={e => setAiGenTasks(prev => prev.map((t, i) => i === idx ? { ...t, xcReward: Number(e.target.value) } : t))}
+                            style={{ ...inputSx, width: "80px", padding: "6px 10px" }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>Category:</span>
+                          <input value={gt.category}
+                            onChange={e => setAiGenTasks(prev => prev.map((t, i) => i === idx ? { ...t, category: e.target.value } : t))}
+                            style={{ ...inputSx, width: "120px", padding: "6px 10px" }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>Pathway:</span>
+                          <select value={gt.pathwayTag}
+                            onChange={e => setAiGenTasks(prev => prev.map((t, i) => i === idx ? { ...t, pathwayTag: e.target.value } : t))}
+                            style={{ ...inputSx, width: "180px", padding: "6px 10px" }}>
+                            <option value="">None</option>
+                            {CORE_PATHWAYS.map(pw => (
+                              <option key={pw.slug} value={pw.slug}>{pw.icon} {pw.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                  <button onClick={() => { setAiGenTasks([]); setAiGenContent(""); setAiGenError(""); }}
+                    style={{ padding: "11px 24px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+                      borderRadius: "10px", color: "rgba(255,255,255,0.6)", fontWeight: 700, cursor: "pointer" }}>Start Over</button>
+                  <button onClick={() => {
+                    const selected = aiGenTasks.filter(t => t.selected);
+                    if (!selected.length) return;
+                    selected.forEach(gt => {
+                      const newTask: Task = {
+                        id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                        title: gt.title,
+                        description: gt.description,
+                        coinType: "",
+                        xpValue: gt.xcReward,
+                        rewardBadges: [],
+                        cohort: "all",
+                        assignedTo: "all",
+                        status: "active",
+                        link: "",
+                        completionMode: "unlimited",
+                        corePathwayNodeIds: gt.pathwayTag ? [gt.pathwayTag] : [],
+                        category: gt.category,
+                      } as Task;
+                      mockTasks.push(newTask);
+                    });
+                    setTasks([...mockTasks]);
+                    playSuccess();
+                    saveAndToast([saveTasks], `${selected.length} AI-generated task${selected.length !== 1 ? "s" : ""} imported`);
+                    setAiGenModal(false);
+                    setAiGenTasks([]);
+                    setAiGenContent("");
+                  }} style={{
+                    padding: "11px 28px", background: "linear-gradient(135deg, #a78bfa, #7c3aed)",
+                    border: "none", borderRadius: "10px", color: "white", fontWeight: 800, cursor: "pointer",
+                    boxShadow: "0 0 20px rgba(167,139,250,0.3)", fontSize: "14px",
+                  }}>
+                    Import {aiGenTasks.filter(t => t.selected).length} Selected Task{aiGenTasks.filter(t => t.selected).length !== 1 ? "s" : ""}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </ModalBG>
+      )}
 
       {/* ══════════════════ COHORT GROUP MODAL ══════════════════ */}
       {groupModal && editingGroup && (
@@ -2503,13 +2821,27 @@ export default function TaskManagement() {
               {/* ── Core Pathways linking for Tasks ── */}
               <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(0,212,255,0.05)", border: "1px solid rgba(0,212,255,0.18)" }}>
                 <p style={{ margin: "0 0 10px", fontSize: "11px", fontWeight: 700, color: "#00d4ff", letterSpacing: "0.08em", textTransform: "uppercase" }}>🧭 CORE PATHWAYS LINK</p>
-                <Field label="Pathway Node IDs (comma-separated — e.g. a task like 'Complete Design Thinking Concepts')">
-                  <input
-                    value={((editingTask as any).corePathwayNodeIds || []).join(", ")}
-                    onChange={e => setEditingTask(p => ({ ...p, corePathwayNodeIds: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } as any))}
-                    placeholder="e.g. design-thinking-concepts, digital-artist-1"
-                    style={inputSx}
-                  />
+                <Field label="Select Core Pathway(s)">
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                    {CORE_PATHWAYS.map(pw => {
+                      const selected = ((editingTask as any).corePathwayNodeIds || []).includes(pw.slug);
+                      return (
+                        <button key={pw.slug} type="button" onClick={() => {
+                          const current: string[] = (editingTask as any).corePathwayNodeIds || [];
+                          const next = selected ? current.filter((s: string) => s !== pw.slug) : [...current, pw.slug];
+                          setEditingTask(p => ({ ...p, corePathwayNodeIds: next } as any));
+                        }} style={{
+                          padding: "6px 14px", borderRadius: "20px", cursor: "pointer", fontSize: "12px", fontWeight: 700,
+                          background: selected ? "rgba(0,212,255,0.2)" : "rgba(255,255,255,0.04)",
+                          border: selected ? "1px solid rgba(0,212,255,0.5)" : "1px solid rgba(255,255,255,0.1)",
+                          color: selected ? "#00d4ff" : "rgba(255,255,255,0.5)",
+                          transition: "all 0.2s",
+                        }}>
+                          {pw.icon} {pw.name}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </Field>
                 <label style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px", cursor: "pointer" }}>
                   <input type="checkbox"
