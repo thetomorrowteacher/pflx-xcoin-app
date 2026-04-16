@@ -514,9 +514,9 @@ export default function AdminSettings() {
                               {r.xcoinMaintain > 0 && <span style={{ fontSize: "11px", fontWeight: 700, color: "#00d4ff", background: "rgba(0,212,255,0.06)", border: "1px solid rgba(0,212,255,0.15)", padding: "2px 7px", borderRadius: "5px" }}>🔒 Maintain: {r.xcoinMaintain.toLocaleString()} XC</span>}
                               {r.checkpointsRequired > 0 && <span style={{ fontSize: "11px", fontWeight: 700, color: "#a78bfa", background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.15)", padding: "2px 7px", borderRadius: "5px" }}>📍 {r.checkpointsRequired} Checkpoints</span>}
                             </div>
-                            {r.badgeTypeRequirements.length > 0 && (
+                            {(r.badgeTypeRequirements || []).length > 0 && (
                               <div style={{ display: "flex", gap: "4px", marginTop: "5px", flexWrap: "wrap" }}>
-                                {r.badgeTypeRequirements.map(bt => (
+                                {(r.badgeTypeRequirements || []).map(bt => (
                                   <span key={bt} style={{ fontSize: "10px", fontWeight: 700, color: badgeColors[bt] || "white", background: `${badgeColors[bt] || "rgba(255,255,255,0.1)"}15`, border: `1px solid ${badgeColors[bt] || "rgba(255,255,255,0.2)"}40`, padding: "1px 6px", borderRadius: "4px" }}>{bt}</span>
                                 ))}
                               </div>

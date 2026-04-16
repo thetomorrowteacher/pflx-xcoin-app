@@ -1252,7 +1252,7 @@ export function getCurrentRank(totalXcoin: number, user?: User): PFLXRank {
     if (checkpointsCompleted < rank.checkpointsRequired) continue;
 
     // 3. Badge type requirements — must have at least 1 badge in each required type
-    const badgeTypeMet = rank.badgeTypeRequirements.every(
+    const badgeTypeMet = (Array.isArray(rank.badgeTypeRequirements) ? rank.badgeTypeRequirements : []).every(
       type => playerHasBadgeType(user.badgeCounts, type)
     );
     if (!badgeTypeMet) continue;
@@ -1294,7 +1294,7 @@ export function getRankRequirements(rank: PFLXRank, user: User): RankRequirement
   const xcMet = (user.totalXcoin ?? 0) >= rank.xcoinUnlock;
   const checkpointsMet = checkpointsCurrent >= rank.checkpointsRequired;
 
-  const badgeTypesDetail = rank.badgeTypeRequirements.map(type => {
+  const badgeTypesDetail = (Array.isArray(rank.badgeTypeRequirements) ? rank.badgeTypeRequirements : []).map(type => {
     const map: Record<string, keyof BadgeBreakdown> = { "Primary": "primary", "Premium": "premium", "Executive": "executive", "Signature": "signature" };
     const key = map[type];
     const count = key && user.badgeCounts ? (user.badgeCounts[key] ?? 0) : 0;
