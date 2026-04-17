@@ -462,6 +462,35 @@ export default function TaskManagement() {
   const [projXbotChannels, setProjXbotChannels] = useState<string[]>([]);
   const [pitchXbotChannels, setPitchXbotChannels] = useState<string[]>([]);
 
+  // ── Fine Settings (Feature A: Auto-Fine System) ──────────────────────────
+  const FINE_SETTINGS_DEFAULTS = { baseDailyFine: 10, transferMultiplier: 1.5, maxDailyFine: 500, gracePeriodDays: 1 };
+  const [fineSettings, setFineSettings] = useState<{ baseDailyFine: number; transferMultiplier: number; maxDailyFine: number; gracePeriodDays: number }>(() => {
+    if (typeof window !== "undefined") {
+      try { const s = localStorage.getItem("pflx_fine_settings"); if (s) return JSON.parse(s); } catch {}
+    }
+    return { ...FINE_SETTINGS_DEFAULTS };
+  });
+  const [fineSettingsOpen, setFineSettingsOpen] = useState(false);
+
+  // Persist fine settings to localStorage
+  useEffect(() => {
+    try { localStorage.setItem("pflx_fine_settings", JSON.stringify(fineSettings)); } catch {}
+  }, [fineSettings]);
+
+  // ── Approval Queue (Feature B: Director/Producer Approval Workflow) ──────
+  // approvalStatus is stored per-project in a map: projectId -> status
+  const [approvalQueue, setApprovalQueue] = useState<Record<string, { status: "pending_approval" | "approved" | "rejected"; submittedBy?: string; submittedAt?: string; rejectionNote?: string }>>(() => {
+    if (typeof window !== "undefined") {
+      try { const s = localStorage.getItem("pflx_approval_queue"); if (s) return JSON.parse(s); } catch {}
+    }
+    return {};
+  });
+
+  // Persist approval queue to localStorage
+  useEffect(() => {
+    try { localStorage.setItem("pflx_approval_queue", JSON.stringify(approvalQueue)); } catch {}
+  }, [approvalQueue]);
+
   useEffect(() => {
     // Deep-link SSO: if Mission Control opened this URL with
     // ?sso=pflx&brand=..., hydrate pflx_user BEFORE the auth check runs.
@@ -496,6 +525,124 @@ export default function TaskManagement() {
   }, []);
 
   if (!user) return null;
+
+  // ── Fine Calculation Helper (Feature A) ───────────────────────────────────
+  const calculateFine = (item: { deadlineDate?: string; dueDate?: string; deadline?: string; transferredFrom?: string | boolean }, settings: typeof fineSettings): { dailyFine: number; totalFine: number; daysOverdue: number; isTransferred: boolean } => {
+    const deadlineStr = (item as any).deadlineDate || (item as any).dueDate || (item as any).deadline;
+    if (!deadlineStr) return { dailyFine: 0, totalFine: 0, daysOverdue: 0, isTransferred: false };
+    const deadline = new Date(deadlineStr);
+    if (isNaN(deadline.getTime())) return { dailyFine: 0, totalFine: 0, daysOverdue: 0, isTransferred: false };
+    const now = new Date();
+    const diffMs = now.getTime() - deadline.getTime();
+    const diffDays = Math.floor(diffMs / 86400000);
+    const daysOverdue = Math.max(0, diffDays - settings.gracePeriodDays);
+    if (daysOverdue <= 0) return { dailyFine: 0, totalFine: 0, daysOverdue: 0, isTransferred: !!item.transferredFrom };
+    const isTransferred = !!item.transferredFrom;
+    const baseRate = isTransferred ? settings.baseDailyFine * settings.transferMultiplier : settings.baseDailyFine;
+    // Compounding: day 1 = base, day 2 = base*2, ..., day N = base*N; total = base*(N*(N+1)/2)
+    // But cap daily fine at maxDailyFine
+    let totalFine = 0;
+    let lastDailyFine = 0;
+    for (let d = 1; d <= daysOverdue; d++) {
+      lastDailyFine = Math.min(baseRate * d, settings.maxDailyFine);
+      totalFine += lastDailyFine;
+    }
+    return { dailyFine: lastDailyFine, totalFine: Math.round(totalFine), daysOverdue, isTransferred };
+  };
+
+  // ── Overdue Badge Component ───────────────────────────────────────────────
+  const OverdueBadge = ({ item }: { item: any }) => {
+    const fine = calculateFine(item, fineSettings);
+    if (fine.daysOverdue <= 0) return null;
+    return (
+      <span style={{
+        display: "inline-flex", alignItems: "center", gap: "4px",
+        padding: "3px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: 800,
+        background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.35)", color: "#ef4444",
+        whiteSpace: "nowrap",
+      }}>
+        OVERDUE {fine.daysOverdue}d
+        <span style={{ color: "#f5c842", fontFamily: "monospace", fontWeight: 900 }}>-{fine.totalFine} XC</span>
+        {fine.isTransferred && <span style={{ color: "#ff8c32", fontSize: "10px" }}>(transferred)</span>}
+      </span>
+    );
+  };
+
+  // ── Approval Workflow Handlers (Feature B) ────────────────────────────────
+  const submitProjectForApproval = (projId: string) => {
+    playClick();
+    setApprovalQueue(prev => ({
+      ...prev,
+      [projId]: { status: "pending_approval", submittedBy: user?.id, submittedAt: new Date().toISOString() },
+    }));
+    logXBotEvent({
+      kind: "approval_submitted",
+      title: `Project submitted for approval`,
+      body: `Project ${projects.find(p => p.id === projId)?.title || projId} submitted for Master Admin approval`,
+      contextType: "project",
+      contextId: projId,
+    });
+    saveAndToast([], "Project submitted for approval");
+  };
+
+  const approveProject = (projId: string) => {
+    playSuccess();
+    const proj = projects.find(p => p.id === projId);
+    // Set approval status to approved
+    setApprovalQueue(prev => ({ ...prev, [projId]: { ...prev[projId], status: "approved" } }));
+    // Set project status to completed
+    if (proj) {
+      const updatedProj = { ...proj, status: "completed" as const };
+      setProjects(prev => prev.map(p => p.id === projId ? updatedProj : p));
+      const idx = mockProjects.findIndex(p => p.id === projId);
+      if (idx >= 0) mockProjects[idx] = updatedProj;
+    }
+    // Log XBot event for reward distribution
+    const assignedIds = proj && Array.isArray(proj.assignedTo) ? proj.assignedTo : [];
+    if (assignedIds.length) {
+      logXBotEventForPlayers(assignedIds, {
+        kind: "project_approved",
+        title: `Project approved: ${proj?.title}`,
+        body: `Rewards distributed: ${proj?.xcRewardPool || 0} XC pool + badges`,
+        contextType: "project",
+        contextId: projId,
+        meta: { xc: proj?.xcRewardPool, badges: (proj as any)?.rewardBadges?.map((b: any) => b.name) },
+      });
+    }
+    logXBotEvent({
+      kind: "project_approved",
+      title: `Project approved & rewards distributed`,
+      body: `${proj?.title} approved by Master Admin — XC + badges distributed to team`,
+      contextType: "project",
+      contextId: projId,
+    });
+    saveAndToast([saveProjects], "Project approved — rewards distributed");
+  };
+
+  const rejectProject = (projId: string, note: string) => {
+    playError();
+    const proj = projects.find(p => p.id === projId);
+    // Set approval status to rejected with note
+    setApprovalQueue(prev => ({ ...prev, [projId]: { ...prev[projId], status: "rejected", rejectionNote: note } }));
+    // Set project back to active
+    if (proj) {
+      const updatedProj = { ...proj, status: "active" as const };
+      setProjects(prev => prev.map(p => p.id === projId ? updatedProj : p));
+      const idx = mockProjects.findIndex(p => p.id === projId);
+      if (idx >= 0) mockProjects[idx] = updatedProj;
+    }
+    logXBotEvent({
+      kind: "project_rejected",
+      title: `Project rejected: ${proj?.title}`,
+      body: note || "No reason provided",
+      contextType: "project",
+      contextId: projId,
+    });
+    saveAndToast([saveProjects], "Project sent back with rejection note");
+  };
+
+  // Rejection note state for the approval queue UI
+  const [rejectionNotes, setRejectionNotes] = useState<Record<string, string>>({});
 
   // ── Checkpoint handlers ───────────────────────────────────────────────────
 
@@ -1097,6 +1244,179 @@ export default function TaskManagement() {
           ))}
         </div>
 
+        {/* ══════════════════ FINE SETTINGS PANEL ══════════════════ */}
+        <div style={{ marginBottom: "20px" }}>
+          <button onClick={() => { playClick(); setFineSettingsOpen(!fineSettingsOpen); }}
+            style={{
+              padding: "8px 18px", borderRadius: "10px", fontSize: "12px", fontWeight: 700,
+              background: fineSettingsOpen ? "rgba(239,68,68,0.15)" : "rgba(239,68,68,0.06)",
+              border: `1px solid ${fineSettingsOpen ? "rgba(239,68,68,0.4)" : "rgba(239,68,68,0.15)"}`,
+              color: "#ef4444", cursor: "pointer", transition: "all 0.2s",
+              display: "inline-flex", alignItems: "center", gap: "6px",
+            }}>
+            {fineSettingsOpen ? "▾" : "▸"} Fine Settings
+          </button>
+          {fineSettingsOpen && (
+            <div style={{
+              marginTop: "12px", padding: "20px 24px", borderRadius: "14px",
+              background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.15)",
+            }}>
+              <h3 style={{ margin: "0 0 16px", fontSize: "15px", fontWeight: 800, color: "#ef4444",
+                display: "flex", alignItems: "center", gap: "8px" }}>
+                Auto-Fine System
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "rgba(239,68,68,0.5)" }}>Missed deadline penalties</span>
+              </h3>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "16px" }}>
+                <div>
+                  <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px" }}>Base Daily Fine (XC)</p>
+                  <input type="number" value={fineSettings.baseDailyFine} min={0} max={1000}
+                    onChange={e => setFineSettings(prev => ({ ...prev, baseDailyFine: Number(e.target.value) || 0 }))}
+                    style={{ ...inputSx, maxWidth: "140px" }} />
+                  <p style={{ margin: "4px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>Day 1 = base, Day 2 = base x 2, etc.</p>
+                </div>
+                <div>
+                  <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px" }}>Transfer Multiplier</p>
+                  <input type="number" value={fineSettings.transferMultiplier} min={1} max={10} step={0.1}
+                    onChange={e => setFineSettings(prev => ({ ...prev, transferMultiplier: Number(e.target.value) || 1 }))}
+                    style={{ ...inputSx, maxWidth: "140px" }} />
+                  <p style={{ margin: "4px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>Escalation for reassigned tasks/jobs</p>
+                </div>
+                <div>
+                  <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px" }}>Max Daily Fine (XC)</p>
+                  <input type="number" value={fineSettings.maxDailyFine} min={0} max={10000}
+                    onChange={e => setFineSettings(prev => ({ ...prev, maxDailyFine: Number(e.target.value) || 0 }))}
+                    style={{ ...inputSx, maxWidth: "140px" }} />
+                  <p style={{ margin: "4px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>Cap on any single day&apos;s fine</p>
+                </div>
+                <div>
+                  <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px" }}>Grace Period (Days)</p>
+                  <input type="number" value={fineSettings.gracePeriodDays} min={0} max={30}
+                    onChange={e => setFineSettings(prev => ({ ...prev, gracePeriodDays: Number(e.target.value) || 0 }))}
+                    style={{ ...inputSx, maxWidth: "140px" }} />
+                  <p style={{ margin: "4px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>Days after deadline before fines begin</p>
+                </div>
+              </div>
+              <div style={{ marginTop: "14px", display: "flex", gap: "10px", alignItems: "center" }}>
+                <button onClick={() => { setFineSettings({ ...FINE_SETTINGS_DEFAULTS }); playClick(); }}
+                  style={{ padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer",
+                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.4)" }}>
+                  Reset to Defaults
+                </button>
+                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.25)" }}>
+                  Preview: 3 days overdue = <span style={{ color: "#ef4444", fontWeight: 700 }}>{Math.min(fineSettings.baseDailyFine * 3, fineSettings.maxDailyFine)} XC/day</span>,
+                  total = <span style={{ color: "#ef4444", fontWeight: 700 }}>{(() => { let t = 0; for (let d = 1; d <= 3; d++) t += Math.min(fineSettings.baseDailyFine * d, fineSettings.maxDailyFine); return t; })()} XC</span>
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ══════════════════ APPROVAL QUEUE PANEL ══════════════════ */}
+        {(() => {
+          const pendingProjects = projects.filter(p => approvalQueue[p.id]?.status === "pending_approval");
+          if (pendingProjects.length === 0) return null;
+          return (
+            <div style={{
+              marginBottom: "24px", padding: "20px 24px", borderRadius: "16px",
+              background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.2)",
+            }}>
+              <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 900, color: "#a78bfa",
+                display: "flex", alignItems: "center", gap: "8px" }}>
+                Approval Queue
+                <span style={{
+                  padding: "2px 10px", borderRadius: "10px", fontSize: "12px", fontWeight: 800,
+                  background: "rgba(167,139,250,0.15)", color: "#a78bfa",
+                }}>{pendingProjects.length}</span>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "rgba(167,139,250,0.5)", marginLeft: "4px" }}>
+                  Director/Producer submissions awaiting Master Admin approval
+                </span>
+              </h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {pendingProjects.map(proj => {
+                  const submitter = approvalQueue[proj.id]?.submittedBy;
+                  const submitterUser = mockUsers.find(u => u.id === submitter);
+                  const submittedAt = approvalQueue[proj.id]?.submittedAt;
+                  const projTasks = tasks.filter(t => proj.taskIds.includes(t.id));
+                  const completedTasks = projTasks.filter(t => t.status === "approved").length;
+                  const projTotalXC = (proj.xcRewardPool || 0) + calcBadgeXC((proj as any).rewardBadges);
+                  return (
+                    <div key={proj.id} style={{
+                      padding: "16px 20px", borderRadius: "12px",
+                      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(167,139,250,0.15)",
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px" }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                            <span style={{
+                              padding: "3px 10px", borderRadius: "8px", fontSize: "10px", fontWeight: 800,
+                              background: "rgba(245,200,66,0.12)", border: "1px solid rgba(245,200,66,0.3)", color: "#f5c842",
+                              textTransform: "uppercase", letterSpacing: "0.06em",
+                            }}>PENDING APPROVAL</span>
+                            {submitterUser && (
+                              <span style={{ fontSize: "12px", color: "rgba(0,212,255,0.5)" }}>
+                                by {submitterUser.brandName || submitterUser.name}
+                              </span>
+                            )}
+                            {submittedAt && (
+                              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.25)" }}>
+                                {new Date(submittedAt).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                          <h4 style={{ margin: "0 0 4px", fontSize: "15px", fontWeight: 800, color: "#f0f0ff" }}>
+                            {proj.title}
+                          </h4>
+                          {proj.description && (
+                            <p style={{ margin: "0 0 8px", fontSize: "12px", color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
+                              {proj.description.length > 120 ? proj.description.slice(0, 120) + "..." : proj.description}
+                            </p>
+                          )}
+                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", fontSize: "11px", fontWeight: 700 }}>
+                            <span style={{ background: "rgba(79,142,247,0.1)", padding: "3px 10px", borderRadius: "8px", color: "#4f8ef7" }}>
+                              {completedTasks}/{projTasks.length} tasks done
+                            </span>
+                            <span style={{ background: "rgba(245,200,66,0.1)", padding: "3px 10px", borderRadius: "8px", color: "#f5c842" }}>
+                              {fmtXC(projTotalXC)} XC pool
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", minWidth: "160px" }}>
+                          <button onClick={() => approveProject(proj.id)}
+                            style={{
+                              padding: "8px 18px", borderRadius: "10px", fontSize: "12px", fontWeight: 800,
+                              background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                              border: "none", color: "white", cursor: "pointer",
+                              boxShadow: "0 2px 10px rgba(34,197,94,0.3)",
+                            }}>
+                            Approve + Distribute
+                          </button>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <input
+                              value={rejectionNotes[proj.id] || ""}
+                              onChange={e => setRejectionNotes(prev => ({ ...prev, [proj.id]: e.target.value }))}
+                              placeholder="Rejection note..."
+                              style={{ ...inputSx, fontSize: "11px", padding: "6px 10px", flex: 1 }}
+                              onClick={e => e.stopPropagation()}
+                            />
+                            <button onClick={() => rejectProject(proj.id, rejectionNotes[proj.id] || "")}
+                              style={{
+                                padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700,
+                                background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)",
+                                color: "#ef4444", cursor: "pointer", whiteSpace: "nowrap",
+                              }}>
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ══════════════════ CHECKPOINTS TAB ══════════════════ */}
         {tab === "checkpoints" && (
           <div>
@@ -1225,7 +1545,10 @@ export default function TaskManagement() {
                       return (
                         <tr key={task.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                           <td style={{ padding: "14px 18px" }}>
-                            <p style={{ margin: 0, fontWeight: 700, color: "white", fontSize: "14px" }}>{task.title}</p>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                              <p style={{ margin: 0, fontWeight: 700, color: "white", fontSize: "14px" }}>{task.title}</p>
+                              <OverdueBadge item={task} />
+                            </div>
                             {task.description && <p style={{ margin: "2px 0 0", fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>{task.description}</p>}
                           </td>
                           <td style={{ padding: "14px 18px" }}>
@@ -1413,7 +1736,10 @@ export default function TaskManagement() {
                                   </span>
                                 )}
                               </div>
-                              <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#f0f0ff" }}>{job.title}</h3>
+                              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#f0f0ff" }}>{job.title}</h3>
+                                <OverdueBadge item={job} />
+                              </div>
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
                               <span style={{ fontSize: "20px", fontWeight: 900, color: "#f5c842" }}>
@@ -1552,9 +1878,33 @@ export default function TaskManagement() {
                     <div key={proj.id} style={{ ...cardSx, padding: "22px", cursor: "pointer" }}
                       onClick={() => openEditProject(proj)}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
-                        <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#f0f0ff", flex: 1 }}>
-                          🗂 {proj.title}
-                        </h3>
+                        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#f0f0ff" }}>
+                            🗂 {proj.title}
+                          </h3>
+                          <OverdueBadge item={proj} />
+                          {approvalQueue[proj.id]?.status === "pending_approval" && (
+                            <span style={{
+                              padding: "3px 10px", borderRadius: "8px", fontSize: "10px", fontWeight: 800,
+                              background: "rgba(245,200,66,0.12)", border: "1px solid rgba(245,200,66,0.3)", color: "#f5c842",
+                              textTransform: "uppercase", letterSpacing: "0.06em",
+                            }}>AWAITING APPROVAL</span>
+                          )}
+                          {approvalQueue[proj.id]?.status === "approved" && (
+                            <span style={{
+                              padding: "3px 10px", borderRadius: "8px", fontSize: "10px", fontWeight: 800,
+                              background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)", color: "#22c55e",
+                              textTransform: "uppercase", letterSpacing: "0.06em",
+                            }}>APPROVED</span>
+                          )}
+                          {approvalQueue[proj.id]?.status === "rejected" && (
+                            <span title={approvalQueue[proj.id]?.rejectionNote || ""} style={{
+                              padding: "3px 10px", borderRadius: "8px", fontSize: "10px", fontWeight: 800,
+                              background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444",
+                              textTransform: "uppercase", letterSpacing: "0.06em", cursor: "help",
+                            }}>REJECTED</span>
+                          )}
+                        </div>
                         <span style={pill(proj.status, sc)}>{proj.status}</span>
                       </div>
                       {proj.description && (
@@ -1585,12 +1935,33 @@ export default function TaskManagement() {
                           ))}
                         </div>
                       )}
-                      {/* Duplicate button */}
-                      <button onClick={(e) => { e.stopPropagation(); duplicateProject(proj); }}
-                        style={{ padding: "5px 12px", background: "rgba(0,212,255,0.08)", border: "1px solid rgba(0,212,255,0.2)",
-                          borderRadius: "8px", color: "#00d4ff", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
-                        📋 Duplicate
-                      </button>
+                      {/* Project action buttons */}
+                      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                        <button onClick={(e) => { e.stopPropagation(); duplicateProject(proj); }}
+                          style={{ padding: "5px 12px", background: "rgba(0,212,255,0.08)", border: "1px solid rgba(0,212,255,0.2)",
+                            borderRadius: "8px", color: "#00d4ff", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
+                          📋 Duplicate
+                        </button>
+                        {/* Submit for Approval — visible when project is active and not yet in approval queue */}
+                        {proj.status === "active" && !approvalQueue[proj.id]?.status && (
+                          <button onClick={(e) => { e.stopPropagation(); submitProjectForApproval(proj.id); }}
+                            style={{
+                              padding: "5px 12px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer",
+                              background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.3)", color: "#a78bfa",
+                            }}>
+                            Submit for Approval
+                          </button>
+                        )}
+                        {approvalQueue[proj.id]?.status === "rejected" && (
+                          <button onClick={(e) => { e.stopPropagation(); submitProjectForApproval(proj.id); }}
+                            style={{
+                              padding: "5px 12px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer",
+                              background: "rgba(245,200,66,0.08)", border: "1px solid rgba(245,200,66,0.2)", color: "#f5c842",
+                            }}>
+                            Resubmit for Approval
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
