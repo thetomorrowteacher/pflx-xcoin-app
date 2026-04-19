@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
-import { User, PFLXModifier, mockModifiers, mockPlayerModifiers, PlayerModifier, mockTransactions, getCurrentRank } from "../../lib/data";
+import { User, PFLXModifier, mockModifiers, mockPlayerModifiers, PlayerModifier, mockTransactions, getCurrentRank, SHIP_TIERS, ShipTier, PlayerShipState, getDefaultShipState } from "../../lib/data";
 import { playSuccess, playError, playCashRegister } from "../../lib/sounds";
 
 export default function PlayerMarketplace() {
@@ -11,14 +11,16 @@ export default function PlayerMarketplace() {
   const [upgrades, setUpgrades] = useState<PFLXModifier[]>([]);
   const [myModifiers, setMyModifiers] = useState<PlayerModifier[]>([]);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const [activeTab, setActiveTab] = useState<"upgrades" | "shipbay">("upgrades");
+  const [shipState, setShipState] = useState<PlayerShipState>(getDefaultShipState());
+  const [selectedShip, setSelectedShip] = useState<ShipTier | null>(null);
+  const [customizing, setCustomizing] = useState<string | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
     if (!stored) { router.push("/"); return; }
     const u = JSON.parse(stored) as User;
-    // When Platform has toggled to player mode, allow host users on player pages
-    const activeRole = localStorage.getItem("pflx_active_role");
-    if (u.role !== "player" && activeRole !== "player") { router.push("/admin"); return; }
+    if (u.role !== "player") { router.push("/admin"); return; }
     // Onboarding now owned by PFLX Platform SSO — no per-route gate needed
     setUser(u);
     // Filter upgrades by availability restrictions
@@ -39,6 +41,12 @@ export default function PlayerMarketplace() {
     });
     setUpgrades(visibleUpgrades);
     setMyModifiers(mockPlayerModifiers.filter(m => m.playerId === u.id));
+
+    // Load ship state
+    try {
+      const saved = localStorage.getItem("pflx_ship_state");
+      if (saved) setShipState(JSON.parse(saved));
+    } catch(e) {}
   }, [router]);
 
   const showToast = (msg: string, type: "success" | "error") => {
@@ -86,6 +94,77 @@ export default function PlayerMarketplace() {
     playCashRegister();
     showToast(`Successfully purchased ${mod.name}! 🚀`, "success");
   };
+
+  const saveShipState = (newState: PlayerShipState) => {
+    setShipState(newState);
+    localStorage.setItem("pflx_ship_state", JSON.stringify(newState));
+    localStorage.setItem("pflx_ship_upgrades", JSON.stringify(newState)); // Cross-app compat
+    // Notify pathway page via postMessage
+    try {
+      window.parent.postMessage({ type: "pflx_ship_state_update", state: newState }, "*");
+    } catch(e) {}
+  };
+
+  const purchaseShip = (ship: ShipTier) => {
+    if (!user) return;
+    if (shipState.ownedTiers.includes(ship.id)) {
+      // Already owned — equip it
+      const ns = { ...shipState, equippedTier: ship.id, equippedHull: ship.hullOptions[0].id, equippedEngine: ship.engineOptions[0].id, equippedTrail: ship.trailOptions[0].id };
+      saveShipState(ns);
+      playSuccess();
+      showToast(`Equipped ${ship.name}! 🚀`, "success");
+      return;
+    }
+    if (user.xcoin < ship.costXC) {
+      playError();
+      showToast("Not enough XC for this ship.", "error");
+      return;
+    }
+    const rank = getCurrentRank(user.totalXcoin, user).level;
+    if (rank < ship.minRank) {
+      playError();
+      showToast(`Requires Rank ${ship.minRank}+ to purchase.`, "error");
+      return;
+    }
+    // Deduct XC
+    const updatedUser = { ...user, xcoin: user.xcoin - ship.costXC };
+    setUser(updatedUser);
+    localStorage.setItem("pflx_user", JSON.stringify(updatedUser));
+    // Record transaction
+    mockTransactions.push({
+      id: `tx-${Date.now()}`,
+      userId: user.id,
+      type: "spent",
+      amount: ship.costXC,
+      currency: "xcoin",
+      description: `Purchased Ship: ${ship.name}`,
+      createdAt: new Date().toISOString().split("T")[0]
+    });
+    // Update ship state
+    const ns = {
+      ...shipState,
+      ownedTiers: [...shipState.ownedTiers, ship.id],
+      equippedTier: ship.id,
+      equippedHull: ship.hullOptions[0].id,
+      equippedEngine: ship.engineOptions[0].id,
+      equippedTrail: ship.trailOptions[0].id,
+    };
+    saveShipState(ns);
+    playCashRegister();
+    showToast(`${ship.name} acquired and equipped! 🚀`, "success");
+  };
+
+  const equipCustomization = (type: "hull" | "engine" | "trail", optionId: string) => {
+    const ns = { ...shipState };
+    if (type === "hull") ns.equippedHull = optionId;
+    else if (type === "engine") ns.equippedEngine = optionId;
+    else if (type === "trail") ns.equippedTrail = optionId;
+    saveShipState(ns);
+    playSuccess();
+  };
+
+  const currentShip = SHIP_TIERS.find(s => s.id === shipState.equippedTier) || SHIP_TIERS[0];
+  const playerRank = user ? getCurrentRank(user.totalXcoin, user).level : 1;
 
   if (!user) return null;
 
@@ -137,6 +216,247 @@ export default function PlayerMarketplace() {
           </div>
         </div>
 
+        {/* ── Tab Switcher ── */}
+        <div style={{ display: "flex", gap: "4px", marginBottom: "28px" }}>
+          {(["upgrades", "shipbay"] as const).map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)} style={{
+              padding: "10px 24px", borderRadius: "10px", fontWeight: 700, fontSize: "13px",
+              letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer",
+              border: activeTab === tab ? "1px solid rgba(0,212,255,0.5)" : "1px solid rgba(255,255,255,0.08)",
+              background: activeTab === tab ? "rgba(0,212,255,0.12)" : "rgba(255,255,255,0.03)",
+              color: activeTab === tab ? "#00d4ff" : "rgba(255,255,255,0.4)",
+              textShadow: activeTab === tab ? "0 0 10px rgba(0,212,255,0.4)" : "none",
+              boxShadow: activeTab === tab ? "0 0 15px rgba(0,212,255,0.15)" : "none",
+              transition: "all 0.3s",
+            }}>{tab === "upgrades" ? "🛒 Upgrades" : "🚀 Ship Bay"}</button>
+          ))}
+        </div>
+
+        {/* ═══════ SHIP BAY TAB ═══════ */}
+        {activeTab === "shipbay" && (
+          <div>
+            {/* Current Ship Banner */}
+            <div style={{
+              marginBottom: "32px", padding: "24px",
+              background: `linear-gradient(135deg, rgba(0,212,255,0.06), rgba(167,139,250,0.04))`,
+              border: "1px solid rgba(0,212,255,0.25)", borderRadius: "16px",
+              display: "flex", alignItems: "center", gap: "24px",
+              boxShadow: "0 0 30px rgba(0,212,255,0.08)"
+            }}>
+              <div style={{
+                width: "80px", height: "80px", borderRadius: "20px",
+                background: `radial-gradient(circle at 30% 30%, ${currentShip.hullColor}40, transparent)`,
+                border: `2px solid ${currentShip.hullColor}60`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "36px",
+                boxShadow: `0 0 25px ${currentShip.hullColor}30`
+              }}>🚀</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: "10px", color: "rgba(0,212,255,0.5)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "4px" }}>CURRENT SHIP</div>
+                <div style={{ fontSize: "22px", fontWeight: 900, color: currentShip.hullColor, textShadow: `0 0 15px ${currentShip.hullColor}60`, letterSpacing: "0.05em" }}>{currentShip.name}</div>
+                <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", fontStyle: "italic", marginTop: "2px" }}>{currentShip.tagline}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "10px", color: "rgba(0,212,255,0.5)", letterSpacing: "0.1em" }}>TIER {currentShip.tier} / 6</div>
+                <button onClick={() => setCustomizing(customizing ? null : currentShip.id)} style={{
+                  marginTop: "8px", padding: "6px 14px", borderRadius: "8px", cursor: "pointer",
+                  background: "rgba(0,212,255,0.1)", border: "1px solid rgba(0,212,255,0.3)",
+                  color: "#00d4ff", fontSize: "11px", fontWeight: 700, letterSpacing: "0.05em",
+                }}>CUSTOMIZE</button>
+              </div>
+            </div>
+
+            {/* Customization Panel */}
+            {customizing && (() => {
+              const ship = SHIP_TIERS.find(s => s.id === customizing);
+              if (!ship || !shipState.ownedTiers.includes(ship.id)) return null;
+              return (
+                <div style={{
+                  marginBottom: "32px", padding: "20px",
+                  background: "rgba(0,212,255,0.04)", border: "1px solid rgba(0,212,255,0.15)",
+                  borderRadius: "14px"
+                }}>
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: "#00d4ff", marginBottom: "16px", letterSpacing: "0.08em" }}>CUSTOMIZE {ship.name.toUpperCase()}</div>
+
+                  {/* Hull Colors */}
+                  <div style={{ marginBottom: "16px" }}>
+                    <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginBottom: "8px", letterSpacing: "0.1em" }}>HULL COLOR</div>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      {ship.hullOptions.map(h => (
+                        <button key={h.id} onClick={() => equipCustomization("hull", h.id)} style={{
+                          width: "40px", height: "40px", borderRadius: "10px", cursor: "pointer",
+                          background: h.color, border: shipState.equippedHull === h.id ? "3px solid white" : "2px solid rgba(255,255,255,0.15)",
+                          boxShadow: shipState.equippedHull === h.id ? `0 0 15px ${h.color}80` : "none",
+                          transition: "all 0.2s",
+                        }} title={h.name} />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Engine Glow */}
+                  <div style={{ marginBottom: "16px" }}>
+                    <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginBottom: "8px", letterSpacing: "0.1em" }}>ENGINE GLOW</div>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      {ship.engineOptions.map(e => (
+                        <button key={e.id} onClick={() => equipCustomization("engine", e.id)} style={{
+                          width: "40px", height: "40px", borderRadius: "10px", cursor: "pointer",
+                          background: `radial-gradient(circle, ${e.color}, ${e.color}40)`,
+                          border: shipState.equippedEngine === e.id ? "3px solid white" : "2px solid rgba(255,255,255,0.15)",
+                          boxShadow: shipState.equippedEngine === e.id ? `0 0 15px ${e.color}80` : "none",
+                          transition: "all 0.2s",
+                        }} title={e.name} />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Trail Effect */}
+                  <div>
+                    <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginBottom: "8px", letterSpacing: "0.1em" }}>TRAIL EFFECT</div>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      {ship.trailOptions.map(t => (
+                        <button key={t.id} onClick={() => equipCustomization("trail", t.id)} style={{
+                          padding: "8px 14px", borderRadius: "10px", cursor: "pointer",
+                          background: shipState.equippedTrail === t.id ? "rgba(0,212,255,0.15)" : "rgba(255,255,255,0.04)",
+                          border: shipState.equippedTrail === t.id ? "2px solid rgba(0,212,255,0.5)" : "1px solid rgba(255,255,255,0.1)",
+                          color: shipState.equippedTrail === t.id ? "#00d4ff" : "rgba(255,255,255,0.5)",
+                          fontSize: "12px", fontWeight: 600, transition: "all 0.2s",
+                        }}>{t.emoji} {t.name}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Ship Tier Cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "20px" }}>
+              {SHIP_TIERS.map(ship => {
+                const owned = shipState.ownedTiers.includes(ship.id);
+                const equipped = shipState.equippedTier === ship.id;
+                const canAfford = user.xcoin >= ship.costXC;
+                const rankOk = playerRank >= ship.minRank;
+                const canBuy = !owned && canAfford && rankOk;
+                const isNeon = ship.id === "ship-t6-fx824";
+
+                return (
+                  <div key={ship.id} style={{
+                    background: isNeon
+                      ? "linear-gradient(135deg, rgba(255,0,255,0.08), rgba(0,255,255,0.05), rgba(255,0,255,0.08))"
+                      : "rgba(0,212,255,0.04)",
+                    border: equipped ? `2px solid ${ship.hullColor}` : owned ? "1px solid rgba(0,212,255,0.3)" : "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: "20px", padding: "24px",
+                    position: "relative", overflow: "hidden",
+                    boxShadow: equipped ? `0 0 30px ${ship.hullColor}25, inset 0 0 30px ${ship.hullColor}08` : "none",
+                    transition: "all 0.3s",
+                    animation: isNeon && owned ? "neonShipGlow 3s ease-in-out infinite alternate" : "none",
+                  }}>
+                    {/* Tier badge */}
+                    <div style={{
+                      position: "absolute", top: "12px", right: "12px",
+                      background: `${ship.hullColor}20`, border: `1px solid ${ship.hullColor}40`,
+                      borderRadius: "8px", padding: "4px 10px",
+                      fontSize: "10px", fontWeight: 800, color: ship.hullColor,
+                      letterSpacing: "0.15em",
+                    }}>TIER {ship.tier}</div>
+
+                    {/* Ship icon + name */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "12px" }}>
+                      <div style={{
+                        width: "56px", height: "56px", borderRadius: "14px",
+                        background: `radial-gradient(circle at 30% 30%, ${ship.hullColor}50, ${ship.hullColor}10)`,
+                        border: `1px solid ${ship.hullColor}40`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "28px",
+                        boxShadow: `0 0 20px ${ship.hullColor}20`,
+                      }}>🚀</div>
+                      <div>
+                        <div style={{
+                          fontSize: "20px", fontWeight: 900,
+                          color: ship.hullColor,
+                          textShadow: `0 0 12px ${ship.hullColor}50`,
+                          letterSpacing: "0.04em",
+                        }}>{ship.name}</div>
+                        <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontStyle: "italic" }}>{ship.tagline}</div>
+                      </div>
+                    </div>
+
+                    <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: 1.5, marginBottom: "16px" }}>{ship.description}</p>
+
+                    {/* Features */}
+                    <div style={{ marginBottom: "16px" }}>
+                      <div style={{ fontSize: "10px", color: "rgba(0,212,255,0.5)", letterSpacing: "0.1em", marginBottom: "6px" }}>FEATURES</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                        {ship.features.map((f, i) => (
+                          <span key={i} style={{
+                            fontSize: "10px", padding: "3px 8px", borderRadius: "6px",
+                            background: "rgba(0,212,255,0.08)", border: "1px solid rgba(0,212,255,0.15)",
+                            color: "rgba(0,212,255,0.7)", letterSpacing: "0.02em",
+                          }}>{f}</span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Cosmetics preview */}
+                    <div style={{ display: "flex", gap: "6px", marginBottom: "16px" }}>
+                      {ship.hullOptions.map(h => (
+                        <div key={h.id} style={{
+                          width: "18px", height: "18px", borderRadius: "5px",
+                          background: h.color, border: "1px solid rgba(255,255,255,0.2)",
+                        }} title={h.name} />
+                      ))}
+                    </div>
+
+                    {/* Price + action */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        {ship.costXC === 0 ? (
+                          <span style={{ fontSize: "14px", fontWeight: 800, color: "#22c55e" }}>FREE</span>
+                        ) : (
+                          <span style={{
+                            padding: "6px 12px", borderRadius: "8px",
+                            background: "rgba(245,200,66,0.1)", border: "1px solid rgba(245,200,66,0.3)",
+                            color: "#f5c842", fontSize: "14px", fontWeight: 800,
+                          }}>🪙 {ship.costXC.toLocaleString()} XC</span>
+                        )}
+                        {ship.minRank > 1 && (
+                          <span style={{ marginLeft: "8px", fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>Rank {ship.minRank}+</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => equipped ? setCustomizing(customizing === ship.id ? null : ship.id) : purchaseShip(ship)}
+                        disabled={!owned && !canBuy}
+                        style={{
+                          padding: "8px 18px", borderRadius: "10px", fontWeight: 700, fontSize: "12px",
+                          cursor: (owned || canBuy) ? "pointer" : "not-allowed",
+                          background: equipped ? "rgba(0,212,255,0.15)" : owned ? "rgba(34,197,94,0.12)" : canBuy ? `linear-gradient(135deg, ${ship.hullColor}20, ${ship.hullColor}10)` : "rgba(255,255,255,0.03)",
+                          color: equipped ? "#00d4ff" : owned ? "#22c55e" : canBuy ? ship.hullColor : "rgba(255,255,255,0.2)",
+                          border: equipped ? "1px solid rgba(0,212,255,0.4)" : owned ? "1px solid rgba(34,197,94,0.3)" : canBuy ? `1px solid ${ship.hullColor}40` : "1px solid rgba(255,255,255,0.08)",
+                          letterSpacing: "0.08em",
+                          transition: "all 0.3s",
+                        }}
+                      >
+                        {equipped ? "CUSTOMIZE" : owned ? "EQUIP" : canBuy ? "PURCHASE" : !rankOk ? `RANK ${ship.minRank}+` : "NOT ENOUGH XC"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Neon glow keyframe for FX-824 */}
+            <style>{`
+              @keyframes neonShipGlow {
+                0% { box-shadow: 0 0 20px rgba(255,0,255,0.15), 0 0 40px rgba(0,255,255,0.08), inset 0 0 20px rgba(255,0,255,0.05); }
+                33% { box-shadow: 0 0 25px rgba(0,255,255,0.15), 0 0 50px rgba(255,0,255,0.1), inset 0 0 25px rgba(0,255,255,0.05); }
+                66% { box-shadow: 0 0 20px rgba(255,200,0,0.12), 0 0 40px rgba(255,0,255,0.08), inset 0 0 20px rgba(255,200,0,0.04); }
+                100% { box-shadow: 0 0 25px rgba(255,0,255,0.18), 0 0 50px rgba(0,255,255,0.1), inset 0 0 25px rgba(255,0,255,0.06); }
+              }
+            `}</style>
+          </div>
+        )}
+
+        {/* ═══════ UPGRADES TAB ═══════ */}
+        {activeTab === "upgrades" && <>
         {/* My Active Modifiers Banner */}
         {myModifiers.length > 0 && (
           <div style={{
@@ -343,6 +663,7 @@ export default function PlayerMarketplace() {
             );
           })}
         </div>
+        </>}
       </main>
     </div>
   );

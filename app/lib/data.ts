@@ -127,6 +127,8 @@ export interface Task {
   completionMode?: "one-time" | "unlimited"; // one-time = once per player, unlimited = repeatable
   fromJobId?: string; // If this task was created from a job posting
   requirement?: "required" | "available"; // required = mandatory (in checkpoint), available = optional (cohort-wide)
+  isBonus?: boolean; // Marks this task as a bonus/optional task inside a Project or Checkpoint (grants bonusXC on top of xcReward)
+  bonusXC?: number; // Extra XC granted when an optional/bonus task is completed (0 = none)
   // ── LMS extensions (Season>Checkpoint>Project>Tasks hierarchy) ──
   projectId?: string; // Parent Project (Tasks live under Projects; checkpoint is derived via project.checkpointId)
   criteria?: { id: string; label: string }[]; // Up to 10 host-defined criteria (peer reviewer rates each 1–5)
@@ -891,16 +893,15 @@ export function getBadgeBreakdown(user: User): BadgeBreakdown {
 // Composite Status Score — determines leaderboard position
 // Weights: Evolution Rank > Signature > Executive > Premium > Primary > XC (tiebreaker)
 export function getStatusScore(user: User): number {
-  if (!user) return 0;
-  const rankLevel = getCurrentRank(user.totalXcoin ?? 0, user).level;
+  const rankLevel = getCurrentRank(user.totalXcoin, user).level;
   const b = getBadgeBreakdown(user);
   return (
     (rankLevel - 1) * 100000 +
-    (b.signature  ?? 0) * 10000  +
-    (b.executive  ?? 0) * 1000   +
-    (b.premium    ?? 0) * 100    +
-    (b.primary    ?? 0) * 10     +
-    Math.floor((user.xcoin ?? 0) / 100)
+    b.signature     * 10000  +
+    b.executive     * 1000   +
+    b.premium       * 100    +
+    b.primary       * 10     +
+    Math.floor(user.xcoin / 100)
   );
 }
 
@@ -1228,14 +1229,9 @@ function playerHasBadgeType(badgeCounts: BadgeBreakdown | undefined, typeName: s
 
 /** Full rank calculation — evaluates ALL requirements, not just XC */
 export function getCurrentRank(totalXcoin: number, user?: User): PFLXRank {
-  const xc = totalXcoin ?? 0;
-  // Safety: if ranks array is empty (Supabase returned nothing), return a safe default
-  if (!mockPflxRanks || mockPflxRanks.length === 0) {
-    return { level: 1, name: "Rookie", title: "Beginner", xcoinUnlock: 0, image: "", description: "", checkpointsRequired: 0, badgeTypeRequirements: [], specificBadgeRequirements: [] } as any;
-  }
   // If no user context provided, fall back to XC-only check (backward compat)
   if (!user) {
-    return [...mockPflxRanks].reverse().find(r => xc >= r.xcoinUnlock) || mockPflxRanks[0];
+    return [...mockPflxRanks].reverse().find(r => totalXcoin >= r.xcoinUnlock) || mockPflxRanks[0];
   }
 
   const checkpointsCompleted = getPlayerCheckpointsCompleted(user.id);
@@ -1246,13 +1242,13 @@ export function getCurrentRank(totalXcoin: number, user?: User): PFLXRank {
     const rank = mockPflxRanks[i];
 
     // 1. XC requirement
-    if (xc < rank.xcoinUnlock) continue;
+    if (totalXcoin < rank.xcoinUnlock) continue;
 
     // 2. Checkpoints requirement
     if (checkpointsCompleted < rank.checkpointsRequired) continue;
 
     // 3. Badge type requirements — must have at least 1 badge in each required type
-    const badgeTypeMet = (Array.isArray(rank.badgeTypeRequirements) ? rank.badgeTypeRequirements : []).every(
+    const badgeTypeMet = rank.badgeTypeRequirements.every(
       type => playerHasBadgeType(user.badgeCounts, type)
     );
     if (!badgeTypeMet) continue;
@@ -1291,10 +1287,10 @@ export function getRankRequirements(rank: PFLXRank, user: User): RankRequirement
   const checkpointsCurrent = getPlayerCheckpointsCompleted(user.id);
   const earnedBadgeNames = getPlayerEarnedBadgeNames(user.id);
 
-  const xcMet = (user.totalXcoin ?? 0) >= rank.xcoinUnlock;
+  const xcMet = user.totalXcoin >= rank.xcoinUnlock;
   const checkpointsMet = checkpointsCurrent >= rank.checkpointsRequired;
 
-  const badgeTypesDetail = (Array.isArray(rank.badgeTypeRequirements) ? rank.badgeTypeRequirements : []).map(type => {
+  const badgeTypesDetail = rank.badgeTypeRequirements.map(type => {
     const map: Record<string, keyof BadgeBreakdown> = { "Primary": "primary", "Premium": "premium", "Executive": "executive", "Signature": "signature" };
     const key = map[type];
     const count = key && user.badgeCounts ? (user.badgeCounts[key] ?? 0) : 0;
@@ -1310,7 +1306,7 @@ export function getRankRequirements(rank: PFLXRank, user: User): RankRequirement
 
   return {
     rank,
-    xcMet, xcCurrent: user.totalXcoin ?? 0,
+    xcMet, xcCurrent: user.totalXcoin,
     checkpointsMet, checkpointsCurrent,
     badgeTypesMet, badgeTypesDetail,
     specificBadgesMet, specificBadgesDetail,
@@ -1319,15 +1315,12 @@ export function getRankRequirements(rank: PFLXRank, user: User): RankRequirement
 }
 
 export function getRankProgress(totalXcoin: number, user?: User): number {
-  const xc = totalXcoin ?? 0;
-  const current = getCurrentRank(xc, user);
-  if (!mockPflxRanks || mockPflxRanks.length === 0) return 0;
+  const current = getCurrentRank(totalXcoin, user);
   const nextIdx = mockPflxRanks.findIndex(r => r.level === current.level) + 1;
   if (nextIdx >= mockPflxRanks.length) return 100;
   const next = mockPflxRanks[nextIdx];
   const range = next.xcoinUnlock - current.xcoinUnlock;
-  if (range <= 0) return 100;
-  const progress = xc - current.xcoinUnlock;
+  const progress = totalXcoin - current.xcoinUnlock;
   return Math.min(100, Math.max(0, (progress / range) * 100));
 }
 
@@ -1443,6 +1436,8 @@ export interface Project {
   assignedTo?: "all" | string[];
   studioId?: string;         // If adopted by a studio
   xcRewardPool?: number;     // Total XC available if project fully completed
+  bonusXCPool?: number;      // Separate XC pool distributed across bonus/optional tasks inside this project
+  requiredLeadRank?: "manager" | "director" | "mentor" | "associate" | "senior" | "chief" | "partner"; // Minimum rank to lead this Project (canonical: Manager+; host-configurable)
   image?: string;
   link?: string; // Optional resource link
   rewardBadges?: { name: string; xc: number }[]; // Multi-badge rewards for project completion
@@ -1604,12 +1599,67 @@ export let mockProjects: Project[] = [
   },
 ];
 
-// ─── Studio Assignment ───────────────────────────────────────────
-// NOTE: `assignStudioFromDiagnostic` was removed when the diagnostic flow
-// migrated to PFLX Platform (pflx-overlay) as the official SSO onboarding.
-// The Platform owns the diagnostic → studio mapping now. X-Coin only keeps
-// `assignStudioFromVisionText` below, which is still used by the player
-// options page's "edit vision" feature (post-onboarding).
+// ─── Studio Assignment Algorithm ─────────────────────────────────
+// Maps diagnostic results → one of the 4 Startup Studios
+export function assignStudioFromDiagnostic(result: DiagnosticResult): string {
+  const studioScores: Record<string, number> = {
+    "studio-mindforge": 0,
+    "studio-emagination": 0,
+    "studio-gentech": 0,
+    "studio-innov8": 0,
+  };
+
+  // Pathway → studio affinity matrix
+  const pathwayMatrix: Record<string, Record<string, number>> = {
+    "content-creator":    { "studio-mindforge": 3, "studio-emagination": 3, "studio-gentech": 0, "studio-innov8": 1 },
+    "digital-artist":     { "studio-mindforge": 3, "studio-emagination": 2, "studio-gentech": 0, "studio-innov8": 1 },
+    "sound-designer":     { "studio-mindforge": 2, "studio-emagination": 3, "studio-gentech": 0, "studio-innov8": 2 },
+    "game-designer":      { "studio-mindforge": 0, "studio-emagination": 2, "studio-gentech": 2, "studio-innov8": 3 },
+    "computer-programmer":{ "studio-mindforge": 0, "studio-emagination": 0, "studio-gentech": 3, "studio-innov8": 2 },
+    "3d-modeler":         { "studio-mindforge": 0, "studio-emagination": 1, "studio-gentech": 2, "studio-innov8": 3 },
+  };
+
+  // Score by top pathways (weighted: 1st = ×3, 2nd = ×2, 3rd = ×1)
+  result.topPathways.slice(0, 3).forEach((pathway, i) => {
+    const weight = 3 - i;
+    const affinities = pathwayMatrix[pathway] || {};
+    Object.entries(affinities).forEach(([studio, pts]) => {
+      studioScores[studio] += pts * weight;
+    });
+  });
+
+  // Storyteller vs Technologist axis
+  if (result.scores.storyteller > result.scores.technologist) {
+    studioScores["studio-mindforge"] += 4;
+    studioScores["studio-emagination"] += 4;
+  } else {
+    studioScores["studio-gentech"] += 4;
+    studioScores["studio-innov8"] += 4;
+  }
+
+  // Within storyteller: MindForge (identity/advocacy) vs eMagination (worlds/fantasy)
+  if (result.scores.storyteller >= result.scores.technologist) {
+    const visionCreate = result.visionStatement?.create || "";
+    const isImpactDriven = /divers|cultur|justic|equit|community|impact|voice|change/i.test(visionCreate);
+    if (isImpactDriven || result.brandType === "creative-director") {
+      studioScores["studio-mindforge"] += 3;
+    } else {
+      studioScores["studio-emagination"] += 3;
+    }
+  }
+
+  // Within tech: Gentech (build/execute) vs Innov8 (speculative/visionary)
+  if (result.scores.technologist >= result.scores.storyteller) {
+    if (result.scores.visionary > result.scores.maker || result.brandType === "digital-innovator") {
+      studioScores["studio-innov8"] += 3;
+    } else {
+      studioScores["studio-gentech"] += 3;
+    }
+  }
+
+  // Return studio with highest score
+  return Object.entries(studioScores).sort(([, a], [, b]) => b - a)[0][0];
+}
 
 // AI-powered studio assignment from vision statement text alone (for skip/manual-entry flow)
 export function assignStudioFromVisionText(visionText: string): string {
@@ -1759,30 +1809,243 @@ export function processEntryFee(
   return { playerPaid: entryFeeXC, creatorShare, studioShare };
 }
 
-// ─── Core Pathways constant ─────────────────────────────────────────
-export const CORE_PATHWAYS = [
-  { slug: "digital-artist", name: "Digital Artist", icon: "🎨" },
-  { slug: "music-producer", name: "Music Producer", icon: "🎵" },
-  { slug: "videographer", name: "Videographer", icon: "🎬" },
-  { slug: "professional-entrepreneur", name: "Professional Entrepreneur", icon: "💼" },
-  { slug: "graphic-designer", name: "Graphic Designer", icon: "🖌️" },
-  { slug: "web-developer", name: "Web Developer", icon: "💻" },
-  { slug: "content-creator", name: "Content Creator", icon: "📱" },
-  { slug: "industrial-designer", name: "Industrial Designer", icon: "🏗️" },
-] as const;
+// ==================== SHIP TIER SYSTEM ====================
+// 6-tier ship progression for Core Pathway exploration
 
-// ─── Community Contributions ─────────────────────────────────────────
-export interface CommunityContribution {
+export interface ShipTier {
   id: string;
-  playerId: string;
-  taskId: string;
-  title: string;
+  tier: number;
+  name: string;
+  tagline: string;
   description: string;
-  pathwaySlug: string;
-  evidenceUrl?: string;
-  status: "pending" | "approved" | "rejected";
-  submittedAt: string;
-  reviewedAt?: string;
-  hostNotes?: string;
+  costXC: number;
+  minRank: number;
+  // Visual config
+  hullColor: string;      // Primary hull gradient color
+  engineColor: string;    // Engine glow color
+  trailStyle: string;     // Trail effect key
+  glowEffect: string;     // Special glow/aura effect
+  svgVariant: string;     // Ship SVG shape key
+  // Features unlocked at this tier
+  features: string[];
+  // Customization options included with this tier
+  hullOptions: { id: string; name: string; color: string }[];
+  engineOptions: { id: string; name: string; color: string }[];
+  trailOptions: { id: string; name: string; emoji: string }[];
 }
-export let mockCommunityContributions: CommunityContribution[] = [];
+
+export const SHIP_TIERS: ShipTier[] = [
+  {
+    id: "ship-t1-scout",
+    tier: 1,
+    name: "Scout MK-I",
+    tagline: "Every journey begins with a single launch.",
+    description: "The standard-issue PFLX exploration vessel. Basic navigation, guided flight, and a single engine trail. Your gateway to the pathways.",
+    costXC: 0,
+    minRank: 1,
+    hullColor: "#00e5ff",
+    engineColor: "#00d4ff",
+    trailStyle: "basic",
+    glowEffect: "none",
+    svgVariant: "standard",
+    features: ["Guided flight", "Basic minimap", "Node navigation"],
+    hullOptions: [
+      { id: "h1-cyan", name: "Cyan", color: "#00e5ff" },
+    ],
+    engineOptions: [
+      { id: "e1-standard", name: "Standard", color: "#00d4ff" },
+    ],
+    trailOptions: [
+      { id: "t1-basic", name: "Basic Streak", emoji: "✦" },
+    ],
+  },
+  {
+    id: "ship-t2-xcaliber",
+    tier: 2,
+    name: "X-Caliber",
+    tagline: "Forged in the fires of ambition.",
+    description: "A sleek interceptor with improved speed, free-roam capability, and a wider discovery radar. Unlocks the Crimson and Nebula hull skins.",
+    costXC: 500,
+    minRank: 2,
+    hullColor: "#ff2040",
+    engineColor: "#00aaff",
+    trailStyle: "comet",
+    glowEffect: "subtle",
+    svgVariant: "swept",
+    features: ["Free roam mode", "Speed Boost Lv1 (1.7x)", "Discovery radar (250px)", "Comet trail"],
+    hullOptions: [
+      { id: "h2-cyan", name: "Cyan", color: "#00e5ff" },
+      { id: "h2-crimson", name: "Crimson", color: "#ff2040" },
+      { id: "h2-nebula", name: "Nebula Purple", color: "#a855f7" },
+    ],
+    engineOptions: [
+      { id: "e2-standard", name: "Standard", color: "#00d4ff" },
+      { id: "e2-plasma", name: "Plasma Blue", color: "#00aaff" },
+    ],
+    trailOptions: [
+      { id: "t2-basic", name: "Basic Streak", emoji: "✦" },
+      { id: "t2-comet", name: "Comet Trail", emoji: "☄️" },
+    ],
+  },
+  {
+    id: "ship-t3-poseidon",
+    tier: 3,
+    name: "The Poseidon",
+    tagline: "Command the deep currents of knowledge.",
+    description: "A heavy cruiser built for deep exploration. Shield aura, extended radar, and the ability to scan secret nodes from further away. Unlocks Solar Gold hull.",
+    costXC: 1500,
+    minRank: 3,
+    hullColor: "#f5c842",
+    engineColor: "#8b00ff",
+    trailStyle: "quantum",
+    glowEffect: "shield",
+    svgVariant: "heavy",
+    features: ["Shield aura", "Speed Boost Lv2 (2.5x)", "Extended radar (350px)", "Quantum wake trail", "Secret node scanner"],
+    hullOptions: [
+      { id: "h3-cyan", name: "Cyan", color: "#00e5ff" },
+      { id: "h3-crimson", name: "Crimson", color: "#ff2040" },
+      { id: "h3-nebula", name: "Nebula Purple", color: "#a855f7" },
+      { id: "h3-gold", name: "Solar Gold", color: "#f5c842" },
+    ],
+    engineOptions: [
+      { id: "e3-standard", name: "Standard", color: "#00d4ff" },
+      { id: "e3-plasma", name: "Plasma Blue", color: "#00aaff" },
+      { id: "e3-void", name: "Void Purple", color: "#8b00ff" },
+    ],
+    trailOptions: [
+      { id: "t3-basic", name: "Basic Streak", emoji: "✦" },
+      { id: "t3-comet", name: "Comet Trail", emoji: "☄️" },
+      { id: "t3-quantum", name: "Quantum Wake", emoji: "⚡" },
+    ],
+  },
+  {
+    id: "ship-t4-xodus",
+    tier: 4,
+    name: "The Xodus",
+    tagline: "Leave the known universe behind.",
+    description: "An advanced research vessel with AI navigation assist, territory search bar, and warp drive capability. Your ship's onboard AI highlights optimal routes and undiscovered regions.",
+    costXC: 2500,
+    minRank: 4,
+    hullColor: "#a855f7",
+    engineColor: "#ff6600",
+    trailStyle: "rainbow",
+    glowEffect: "ai-aura",
+    svgVariant: "delta",
+    features: ["Warp Drive (instant teleport)", "Territory search bar", "AI route suggestions", "Full radar (500px)", "Rainbow nova trail", "Chase camera mode"],
+    hullOptions: [
+      { id: "h4-cyan", name: "Cyan", color: "#00e5ff" },
+      { id: "h4-crimson", name: "Crimson", color: "#ff2040" },
+      { id: "h4-nebula", name: "Nebula Purple", color: "#a855f7" },
+      { id: "h4-gold", name: "Solar Gold", color: "#f5c842" },
+      { id: "h4-stealth", name: "Stealth Black", color: "#1a1e2e" },
+    ],
+    engineOptions: [
+      { id: "e4-standard", name: "Standard", color: "#00d4ff" },
+      { id: "e4-plasma", name: "Plasma Blue", color: "#00aaff" },
+      { id: "e4-void", name: "Void Purple", color: "#8b00ff" },
+      { id: "e4-solar", name: "Solar Flare", color: "#ff6600" },
+    ],
+    trailOptions: [
+      { id: "t4-basic", name: "Basic Streak", emoji: "✦" },
+      { id: "t4-comet", name: "Comet Trail", emoji: "☄️" },
+      { id: "t4-quantum", name: "Quantum Wake", emoji: "⚡" },
+      { id: "t4-rainbow", name: "Rainbow Nova", emoji: "🌈" },
+    ],
+  },
+  {
+    id: "ship-t5-xr-cruiser",
+    tier: 5,
+    name: "XR Cruiser",
+    tagline: "Reality bends around you.",
+    description: "An elite-class flagship with cockpit first-person view, AI co-pilot that briefs you on upcoming nodes, expanded node clusters, and enhanced discovery rewards. The pinnacle of standard progression.",
+    costXC: 5000,
+    minRank: 5,
+    hullColor: "#00ffc8",
+    engineColor: "#ff00ff",
+    trailStyle: "aurora",
+    glowEffect: "holographic",
+    svgVariant: "phantom",
+    features: ["Cockpit first-person view", "AI co-pilot briefings", "Expanded node clusters visible", "2x discovery rewards", "Aurora trail", "All camera modes"],
+    hullOptions: [
+      { id: "h5-cyan", name: "Cyan", color: "#00e5ff" },
+      { id: "h5-crimson", name: "Crimson", color: "#ff2040" },
+      { id: "h5-nebula", name: "Nebula Purple", color: "#a855f7" },
+      { id: "h5-gold", name: "Solar Gold", color: "#f5c842" },
+      { id: "h5-stealth", name: "Stealth Black", color: "#1a1e2e" },
+      { id: "h5-emerald", name: "Emerald", color: "#00ffc8" },
+    ],
+    engineOptions: [
+      { id: "e5-standard", name: "Standard", color: "#00d4ff" },
+      { id: "e5-plasma", name: "Plasma Blue", color: "#00aaff" },
+      { id: "e5-void", name: "Void Purple", color: "#8b00ff" },
+      { id: "e5-solar", name: "Solar Flare", color: "#ff6600" },
+      { id: "e5-magenta", name: "Magenta Pulse", color: "#ff00ff" },
+    ],
+    trailOptions: [
+      { id: "t5-basic", name: "Basic Streak", emoji: "✦" },
+      { id: "t5-comet", name: "Comet Trail", emoji: "☄️" },
+      { id: "t5-quantum", name: "Quantum Wake", emoji: "⚡" },
+      { id: "t5-rainbow", name: "Rainbow Nova", emoji: "🌈" },
+      { id: "t5-aurora", name: "Aurora Stream", emoji: "🌌" },
+    ],
+  },
+  {
+    id: "ship-t6-fx824",
+    tier: 6,
+    name: "FX-824",
+    tagline: "The future has a serial number.",
+    description: "Legendary prototype vessel with Neon Pulse hull effects, pulsing LED color-cycling glow, AI-powered predictive navigation, and exclusive access to hidden omega sectors. Only the most dedicated explorers earn this ship.",
+    costXC: 7500,
+    minRank: 6,
+    hullColor: "#ff00ff",
+    engineColor: "#00ffff",
+    trailStyle: "neonPulse",
+    glowEffect: "neonPulse",
+    svgVariant: "fx824",
+    features: ["Neon Pulse hull glow (color-cycling LEDs)", "AI predictive navigation", "Omega sector access", "3x discovery rewards", "Neon Pulse trail", "Territory auto-mapper", "All camera modes + cinematic"],
+    hullOptions: [
+      { id: "h6-cyan", name: "Cyan", color: "#00e5ff" },
+      { id: "h6-crimson", name: "Crimson", color: "#ff2040" },
+      { id: "h6-nebula", name: "Nebula Purple", color: "#a855f7" },
+      { id: "h6-gold", name: "Solar Gold", color: "#f5c842" },
+      { id: "h6-stealth", name: "Stealth Black", color: "#1a1e2e" },
+      { id: "h6-emerald", name: "Emerald", color: "#00ffc8" },
+      { id: "h6-neon", name: "Neon Flux", color: "#ff00ff" },
+    ],
+    engineOptions: [
+      { id: "e6-standard", name: "Standard", color: "#00d4ff" },
+      { id: "e6-plasma", name: "Plasma Blue", color: "#00aaff" },
+      { id: "e6-void", name: "Void Purple", color: "#8b00ff" },
+      { id: "e6-solar", name: "Solar Flare", color: "#ff6600" },
+      { id: "e6-magenta", name: "Magenta Pulse", color: "#ff00ff" },
+      { id: "e6-neon", name: "Neon Shift", color: "#00ffff" },
+    ],
+    trailOptions: [
+      { id: "t6-basic", name: "Basic Streak", emoji: "✦" },
+      { id: "t6-comet", name: "Comet Trail", emoji: "☄️" },
+      { id: "t6-quantum", name: "Quantum Wake", emoji: "⚡" },
+      { id: "t6-rainbow", name: "Rainbow Nova", emoji: "🌈" },
+      { id: "t6-aurora", name: "Aurora Stream", emoji: "🌌" },
+      { id: "t6-neonPulse", name: "Neon Pulse", emoji: "💜" },
+    ],
+  },
+];
+
+// Player's equipped ship state (persisted via localStorage + Supabase)
+export interface PlayerShipState {
+  equippedTier: string;        // Ship tier ID
+  equippedHull: string;        // Hull option ID
+  equippedEngine: string;      // Engine option ID
+  equippedTrail: string;       // Trail option ID
+  ownedTiers: string[];        // IDs of purchased ship tiers
+}
+
+export function getDefaultShipState(): PlayerShipState {
+  return {
+    equippedTier: "ship-t1-scout",
+    equippedHull: "h1-cyan",
+    equippedEngine: "e1-standard",
+    equippedTrail: "t1-basic",
+    ownedTiers: ["ship-t1-scout"],
+  };
+}
