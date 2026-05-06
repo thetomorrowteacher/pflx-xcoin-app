@@ -31,6 +31,19 @@ function resolveKey(key: string): string {
  */
 export default function PflxBridge() {
   useEffect(() => {
+    // ── Iframe detection: when running inside the PFLX Platform shell,
+    //    the Platform owns identity. We mark the body so CSS can hide the
+    //    local login screen, request the active session, and listen for
+    //    identity/XC broadcasts from the parent. ──
+    const inIframe = window.parent !== window;
+    if (inIframe) {
+      document.body.classList.add("pflx-in-iframe");
+      // Tell the Platform "I'm here, send me the active session"
+      try {
+        window.parent.postMessage(JSON.stringify({ type: "pflx_identity_request" }), "*");
+      } catch {}
+    }
+
     // ── Send readiness signal to parent once store is initialized ──
     async function signalReady() {
       try {
@@ -93,6 +106,74 @@ export default function PflxBridge() {
     function handleMessage(event: MessageEvent) {
       try {
         const msg = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+
+        // ── Identity broadcast from Platform → adopt as the active user ──
+        // Replaces any local cache so X-Coin is rendered for the SAME player
+        // the Platform shell shows. Custom event lets the rest of the app
+        // listen via window.addEventListener('pflx-identity-changed', ...).
+        if ((msg.type === "pflx_identity_broadcast" || msg.type === "pflx_identity_response") && msg.user) {
+          try {
+            const u = msg.user;
+            const profile = {
+              id:             u.id || "",
+              brandName:      u.brand || u.brandName || u.name || "",
+              brand:          u.brand || u.brandName || "",
+              name:           u.name || u.brand || "Player",
+              role:           u.role || "Student",
+              cohort:         u.cohort || "PlayerPool",
+              email:          u.email || "",
+              image:          u.image || "",
+              level:          typeof u.level === "number" ? u.level : 1,
+              xcoin:          typeof u.xc === "number" ? u.xc : (typeof u.xcoin === "number" ? u.xcoin : 0),
+              totalXcoin:     typeof u.totalXcoin === "number" ? u.totalXcoin : (typeof u.xc === "number" ? u.xc : 0),
+              digitalBadges:  typeof u.digitalBadges === "number" ? u.digitalBadges : 0,
+              badgeCounts:    u.badgeCounts || null,
+              studioId:       u.studioId || "",
+              pathway:        u.pathway || "",
+              __pflxFromPlatform: true,
+            };
+            localStorage.setItem("pflx_user", JSON.stringify(profile));
+            window.dispatchEvent(new CustomEvent("pflx-identity-changed", { detail: profile }));
+            console.log("[X-Coin Bridge] ✓ Adopted Platform identity:", profile.brand);
+          } catch (e) {
+            console.warn("[X-Coin Bridge] identity adopt failed", e);
+          }
+        }
+
+        // ── Force-sync from Platform → drop local identity cache, re-request ──
+        if (msg.type === "pflx_force_identity_sync") {
+          try {
+            localStorage.removeItem("pflx_user");
+            window.dispatchEvent(new CustomEvent("pflx-identity-cleared"));
+            if (window.parent !== window) {
+              window.parent.postMessage(JSON.stringify({ type: "pflx_identity_request" }), "*");
+            }
+          } catch (e) {
+            console.warn("[X-Coin Bridge] force-sync failed", e);
+          }
+        }
+
+        // ── XC update pushed by Platform (someone else moved the balance) ──
+        if (msg.type === "pflx_xc_update" && typeof msg.xc === "number") {
+          try {
+            const cached = JSON.parse(localStorage.getItem("pflx_user") || "{}");
+            cached.xcoin = msg.xc;
+            cached.totalXcoin = Math.max(cached.totalXcoin || 0, msg.xc);
+            localStorage.setItem("pflx_user", JSON.stringify(cached));
+            window.dispatchEvent(new CustomEvent("pflx-xc-update", { detail: { xc: msg.xc, reason: msg.reason || "" } }));
+            console.log("[X-Coin Bridge] ✓ XC update from Platform:", msg.xc, msg.reason || "");
+          } catch (e) {
+            console.warn("[X-Coin Bridge] xc update failed", e);
+          }
+        }
+
+        // ── Role change from Platform ──
+        if (msg.type === "pflx_role_changed" && msg.role) {
+          try {
+            document.body.classList.toggle("pflx-as-player", msg.role === "player");
+            window.dispatchEvent(new CustomEvent("pflx-role-changed", { detail: { role: msg.role } }));
+          } catch {}
+        }
 
         // ── Cloud Save: MC pushes data to X-Coin for Supabase persistence ──
         if (msg.type === "pflx_cloud_save" && msg.key && msg.data) {
@@ -217,6 +298,31 @@ export default function PflxBridge() {
     }
 
     window.addEventListener("message", handleMessage);
+
+    // ── Expose a helper any X-Coin code can call when XC moves locally
+    //    (store purchase, transfer, awarded badge, etc). The Platform listens
+    //    for pflx_xc_changed and re-broadcasts pflx_xc_update so other sub-apps
+    //    + the toolbar update too. Safe to call when not in iframe. ──
+    (window as unknown as Record<string, unknown>).pflxNotifyXcChange = function (newXc: number, reason?: string) {
+      try {
+        const xc = typeof newXc === "number" ? newXc : parseInt(String(newXc), 10) || 0;
+        // Always update local cache first
+        const cached = JSON.parse(localStorage.getItem("pflx_user") || "{}");
+        cached.xcoin = xc;
+        cached.totalXcoin = Math.max(cached.totalXcoin || 0, xc);
+        localStorage.setItem("pflx_user", JSON.stringify(cached));
+        // Notify Platform
+        if (window.parent !== window) {
+          window.parent.postMessage(JSON.stringify({
+            type: "pflx_xc_changed",
+            xc: xc,
+            reason: reason || "",
+          }), "*");
+        }
+      } catch (e) {
+        console.warn("[X-Coin Bridge] pflxNotifyXcChange failed", e);
+      }
+    };
 
     // ── Process any queued requests once store is ready ──
     const readyCheck = setInterval(() => {
