@@ -110,6 +110,78 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ═══ PFLX PLATFORM IFRAME SSO ═══
+  // When X-Coin runs inside the Platform iframe, the PflxBridge dispatches a
+  // `pflx-identity-changed` event with the active player. We trust the Platform
+  // (already authenticated) and skip PIN validation entirely. No local login.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.parent === window) return; // standalone — local login flow OK
+    function adoptFromPlatform(detailUser?: { brand?: string; brandName?: string; id?: string; role?: string; xc?: number; cohort?: string; image?: string; }) {
+      try {
+        let u = detailUser as any;
+        if (!u) {
+          const cached = localStorage.getItem("pflx_user");
+          if (cached) u = JSON.parse(cached);
+        }
+        if (!u) return false;
+        const brand = (u.brand || u.brandName || "").toString();
+        if (!brand) return false;
+        // Find matching mockUser; if not found, synthesize a minimal one so
+        // the rest of X-Coin has something to render against.
+        let user = mockUsers.find(m => (m.brandName || "").toLowerCase() === brand.toLowerCase());
+        if (!user && u.id) user = mockUsers.find(m => m.id === u.id);
+        if (!user) {
+          // Synthesize and push into mockUsers so downstream pages render
+          const synthesized: any = {
+            id: u.id || ("platform-" + Date.now()),
+            name: u.name || brand,
+            brandName: brand,
+            role: (u.role && /admin|host|teacher|instructor|master/i.test(String(u.role))) ? "admin" : "player",
+            avatar: "",
+            digitalBadges: u.digitalBadges || 0,
+            xcoin: u.xc || u.xcoin || 0,
+            totalXcoin: u.totalXcoin || u.xc || 0,
+            level: u.level || 1, rank: 1,
+            cohort: u.cohort || "PlayerPool", pathway: "",
+            joinedAt: new Date().toISOString(),
+            email: u.email || "", image: u.image || "",
+            pin: u.pin || "", claimed: true,
+            isHost: /admin|host|teacher|instructor|master/i.test(String(u.role || "")),
+            studioId: "", badgeCounts: u.badgeCounts || { primary: 0, premium: 0, executive: 0, signature: 0 },
+            onboardingComplete: true, pinChanged: true,
+          };
+          mockUsers.push(synthesized);
+          user = synthesized;
+        }
+        // Mark complete + persist
+        (user as any).onboardingComplete = true;
+        (user as any).pinChanged = true;
+        if (typeof u.xc === "number") (user as any).xcoin = u.xc;
+        if (typeof u.totalXcoin === "number") (user as any).totalXcoin = u.totalXcoin;
+        if (u.cohort) (user as any).cohort = u.cohort;
+        if (u.image) (user as any).image = u.image;
+        localStorage.setItem("pflx_user", JSON.stringify(user));
+        localStorage.setItem("pflx_keep_signed_in", "true");
+        const activeRole = isHostUser(user as any) ? "host" : "player";
+        localStorage.setItem("pflx_active_role", activeRole);
+        document.body.dataset.pflxRole = activeRole;
+        localStorage.setItem("pflx_sso_active", "true");
+        console.log("[X-Coin] Platform iframe SSO — adopting", brand, "as", activeRole);
+        setRedirecting(true);
+        if (isHostUser(user as any)) router.push("/admin"); else router.push("/player");
+        setTimeout(() => { try { localStorage.removeItem("pflx_sso_active"); } catch(e) {} }, 3000);
+        return true;
+      } catch (e) { console.warn("[X-Coin] iframe SSO adopt failed", e); return false; }
+    }
+    const onIdent = (ev: Event) => { adoptFromPlatform((ev as CustomEvent).detail); };
+    window.addEventListener("pflx-identity-changed", onIdent as EventListener);
+    // Also try immediately — pflx_user may already be cached from a prior broadcast
+    setTimeout(() => { adoptFromPlatform(); }, 100);
+    return () => window.removeEventListener("pflx-identity-changed", onIdent as EventListener);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const players = mockUsers.filter(u => u.role === "player" && !u.isHost);
   const hosts = mockUsers.filter(u => isHostUser(u));
   const selectedUser = mockUsers.find(u => u.id === selectedId) ?? null;
