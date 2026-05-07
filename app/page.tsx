@@ -430,8 +430,9 @@ export default function Home() {
                     </optgroup>
                     <optgroup label="── Players ──" style={{ background: "#0a1218", color: CYAN_DIM }}>
                       {players.map(p => (
+                        // Privacy: brand-only. Never show another player's real name.
                         <option key={p.id} value={p.id} style={{ background: "#0a1218", color: "#fff" }}>
-                          {p.brandName ?? p.name}
+                          {p.brandName || "Player"}
                         </option>
                       ))}
                     </optgroup>
