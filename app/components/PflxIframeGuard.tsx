@@ -27,6 +27,15 @@ export default function PflxIframeGuard() {
       setState("blocked"); // standalone access — block permanently
       return;
     }
+    // Fast-path: if the Console included sso=pflx&brand=... in the iframe URL,
+    // identity is available immediately. Skip the spinner entirely.
+    try {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("sso") === "pflx" && p.get("brand")) {
+        setState("ready");
+        return;
+      }
+    } catch {}
     setState("syncing");
     let cleared = false;
     const reveal = () => {
