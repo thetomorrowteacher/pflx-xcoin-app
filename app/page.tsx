@@ -340,463 +340,78 @@ export default function Home() {
     );
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  // PFLX PLATFORM GATE — X-Coin no longer owns login.
+  // ═══════════════════════════════════════════════════════════════════
+  // The legacy local login UI (brand-select dropdown + PIN entry) below
+  // is dead code retained for rollback. Identity now comes exclusively
+  // from the PFLX Platform — either via SSO URL params (handled by the
+  // first useEffect, which redirects to /player or /admin) or via the
+  // postMessage bridge (handled by the second useEffect, same redirect).
+  //
+  // If neither path resolved by the time we get here, render the gate:
+  //   standalone → "Access via PFLX Platform" block screen
+  //   iframed    → "Syncing with Platform" splash (waiting for handshake)
+  const inIframe = typeof window !== "undefined" && window.parent !== window;
+  if (!inIframe) {
+    // Standalone visit — block and direct to the Platform.
+    return (
+      <div style={{
+        position: "fixed", inset: 0,
+        display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column",
+        background: "linear-gradient(135deg, #02060f 0%, #0a1228 60%, #0f1830 100%)",
+        fontFamily: "Orbitron, monospace", color: "#e0e6ff", zIndex: 2147483647,
+      }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18, maxWidth: 460, padding: 32, textAlign: "center" }}>
+          <div style={{ fontSize: 56, lineHeight: 1 }}>🛰️</div>
+          <div style={{ color: "#00f0ff", fontSize: 18, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700 }}>
+            Access via PFLX Platform
+          </div>
+          <div style={{ color: "#8a92b0", fontSize: 13, lineHeight: 1.6, fontFamily: "Rajdhani, sans-serif" }}>
+            X-Coin runs inside the PFLX Platform. Your profile, balance, badges, and rank are all managed there.
+            Open the Platform and launch this app from inside.
+          </div>
+          <a href="https://www.prototypeflx.com/" style={{
+            marginTop: 8, padding: "12px 28px",
+            background: "linear-gradient(135deg,#00d4ff,#7c3aed)",
+            color: "#fff", textDecoration: "none", borderRadius: 10,
+            fontFamily: "Orbitron, sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 700,
+            boxShadow: "0 4px 24px rgba(0,212,255,0.35)",
+          }}>OPEN PFLX PLATFORM →</a>
+        </div>
+      </div>
+    );
+  }
+
+  // Iframed but neither URL params nor cached identity worked — wait for
+  // the postMessage handshake. PflxBridge will dispatch pflx-identity-changed
+  // when the Console pushes identity, and adoptFromPlatform redirects.
   return (
     <div style={{
-      minHeight: "100vh",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      background: BG,
-      padding: "24px",
-      fontFamily: "'Inter','Segoe UI',sans-serif",
-      position: "relative",
-      overflow: "hidden",
+      position: "fixed", inset: 0,
+      display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column",
+      background: "linear-gradient(135deg, #02060f 0%, #0a1228 60%, #0f1830 100%)",
+      fontFamily: "Orbitron, monospace", color: "#e0e6ff", zIndex: 2147483647,
     }}>
-      {/* Background grid lines */}
-      <div style={{
-        position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
-        backgroundImage: `
-          linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px)
-        `,
-        backgroundSize: "60px 60px",
-      }} />
-      {/* Glow blobs */}
-      <div style={{ position: "fixed", top: "-200px", left: "50%", transform: "translateX(-50%)", width: "600px", height: "600px", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,212,255,0.07) 0%, transparent 70%)", pointerEvents: "none", zIndex: 0 }} />
-      <div style={{ position: "fixed", bottom: "-150px", right: "-150px", width: "500px", height: "500px", borderRadius: "50%", background: "radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%)", pointerEvents: "none", zIndex: 0 }} />
-
-      <div style={{ width: "100%", maxWidth: "400px", position: "relative", zIndex: 1 }}>
-
-        {/* ── Logo & Title ─────────────────────────────────────────────── */}
-        <div style={{ textAlign: "center", marginBottom: "28px" }}>
-          <div style={{
-            width: "110px", height: "110px", borderRadius: "50%",
-            margin: "0 auto 20px",
-            overflow: "hidden",
-            boxShadow: `0 0 40px ${CYAN_GLOW}, 0 0 80px rgba(0,212,255,0.08), 0 8px 32px rgba(0,0,0,0.6)`,
-            border: `2px solid rgba(0,212,255,0.3)`,
-            background: "rgba(0,212,255,0.05)",
-          }}>
-            <Image src="/xcoin-logo.png" alt="X-Coin" width={110} height={110} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          </div>
-          <h1 style={{
-            fontSize: "36px", fontWeight: 900, margin: "0 0 6px", color: "#ffffff",
-            letterSpacing: "0.08em", textTransform: "uppercase",
-          }}>
-            X-COIN
-          </h1>
-          <p style={{
-            fontSize: "11px", fontWeight: 700, color: CYAN,
-            letterSpacing: "0.18em", margin: 0, textTransform: "uppercase",
-          }}>
-            EXPERIENCE MANAGEMENT SYSTEM
-          </p>
-        </div>
-
-        {/* ── Card ─────────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
         <div style={{
-          background: CARD_BG,
-          border: `1px solid ${CARD_BORDER}`,
-          borderRadius: "16px",
-          padding: "28px 28px 24px",
-          boxShadow: `0 0 40px rgba(0,212,255,0.06), 0 20px 60px rgba(0,0,0,0.6)`,
-          backdropFilter: "blur(20px)",
-        }}>
-
-          {/* ══ STEP 1: BRAND SELECT ══════════════════════════════════ */}
-          {step === "select" && (
-            <>
-              {/* Brand dropdown — primary login */}
-              <div style={{ marginBottom: "20px" }}>
-                <label style={labelStyle}>Select Your Brand</label>
-                <div style={{ position: "relative" }}>
-                  <select
-                    defaultValue=""
-                    onChange={e => { if (e.target.value) handleBrandSelect(e.target.value); }}
-                    style={{
-                      ...inputStyle,
-                      appearance: "none", paddingRight: "36px", cursor: "pointer",
-                      color: "rgba(255,255,255,0.55)",
-                    }}
-                  >
-                    <option value="" disabled style={{ background: "#0a1218" }}>Select your brand name&hellip;</option>
-                    <optgroup label="── Host ──" style={{ background: "#0a1218", color: CYAN_DIM }}>
-                      {hosts.map(h => (
-                        <option key={h.id} value={h.id} style={{ background: "#0a1218", color: "#fff" }}>
-                          {h.brandName ?? h.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="── Players ──" style={{ background: "#0a1218", color: CYAN_DIM }}>
-                      {players.map(p => (
-                        // Privacy: brand-only. Never show another player's real name.
-                        <option key={p.id} value={p.id} style={{ background: "#0a1218", color: "#fff" }}>
-                          {p.brandName || "Player"}
-                        </option>
-                      ))}
-                    </optgroup>
-                  </select>
-                  <span style={{ position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: CYAN_DIM, fontSize: "11px" }}>&#x25BE;</span>
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "24px 0" }}>
-                <div style={{ flex: 1, height: "1px", background: "rgba(0,212,255,0.12)" }} />
-                <span style={{ fontSize: "10px", color: "rgba(0,212,255,0.4)", fontWeight: 700, letterSpacing: "0.1em" }}>NEW PLAYER?</span>
-                <div style={{ flex: 1, height: "1px", background: "rgba(0,212,255,0.12)" }} />
-              </div>
-
-              {/* Claim account */}
-              <button
-                onClick={() => { setStep("claim"); setClaimEmail(""); setClaimError(""); setClaimSuccess(false); setTempPin(""); }}
-                style={{
-                  width: "100%", padding: "12px",
-                  borderRadius: "8px",
-                  background: "transparent",
-                  border: `1px solid rgba(0,212,255,0.2)`,
-                  color: CYAN_DIM,
-                  fontSize: "12px", fontWeight: 700,
-                  letterSpacing: "0.1em", textTransform: "uppercase",
-                  cursor: "pointer", transition: "all .2s",
-                }}>
-                Claim Player Account
-              </button>
-            </>
-          )}
-
-          {/* ══ STEP 2: PIN ═════════════════════════════════════════════ */}
-          {step === "pin" && selectedUser && (
-            <>
-              {/* Player preview — brand name only */}
-              <div style={{
-                display: "flex", alignItems: "center", gap: "12px",
-                padding: "12px 14px", marginBottom: "22px",
-                background: "rgba(0,212,255,0.05)",
-                border: `1px solid rgba(0,212,255,0.15)`,
-                borderRadius: "10px",
-              }}>
-                <div style={{
-                  width: "40px", height: "40px", borderRadius: "8px", flexShrink: 0,
-                  overflow: "hidden",
-                  background: "linear-gradient(135deg, #00d4ff, #7c3aed)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "13px", fontWeight: 800, color: "#fff",
-                  boxShadow: "0 0 12px rgba(0,212,255,0.3)",
-                }}>
-                  {selectedUser.image
-                    ? <img src={selectedUser.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    : selectedUser.avatar}
-                </div>
-                <div style={{ flex: 1, overflow: "hidden" }}>
-                  <div style={{ fontWeight: 700, fontSize: "14px", color: "#ffffff", letterSpacing: "0.02em" }}>{selectedUser.brandName ?? selectedUser.name}</div>
-                  <div style={{ fontSize: "11px", color: CYAN_DIM, letterSpacing: "0.05em" }}>{isHostUser(selectedUser) ? "System Host" : "Player"}</div>
-                </div>
-                <button onClick={goBack} style={{ background: "none", border: "none", color: CYAN_DIM, cursor: "pointer", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                  Change
-                </button>
-              </div>
-
-              {/* Security PIN */}
-              <div style={{ marginBottom: "16px" }}>
-                <label style={labelStyle}>Security PIN</label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type={showPin ? "text" : "password"}
-                    value={pin}
-                    onChange={e => { setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6)); setPinError(""); }}
-                    onKeyDown={e => e.key === "Enter" && pin.length >= 4 && handleSignIn()}
-                    placeholder="&#x2022;&#x2022;&#x2022;&#x2022;"
-                    maxLength={6}
-                    style={{
-                      ...(pinError ? inputErr : inputStyle),
-                      letterSpacing: showPin ? "0.2em" : "0.5em",
-                      fontSize: "20px",
-                      paddingRight: "48px",
-                      textAlign: "center",
-                    }}
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => setShowPin(s => !s)}
-                    style={{ position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: CYAN_DIM, fontSize: "16px" }}
-                  >
-                    {showPin ? "\uD83D\uDE48" : "\uD83D\uDC41"}
-                  </button>
-                </div>
-                {pinError && <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#ff6b6b", letterSpacing: "0.02em" }}>{pinError}</p>}
-              </div>
-
-              {/* Keep signed in + Reset PIN */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "22px" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "11px", color: "rgba(255,255,255,0.35)", letterSpacing: "0.05em" }}>
-                  <div
-                    onClick={() => setKeepSignedIn(k => !k)}
-                    style={{
-                      width: "15px", height: "15px", borderRadius: "3px", flexShrink: 0,
-                      border: `1.5px solid ${keepSignedIn ? CYAN : "rgba(255,255,255,0.2)"}`,
-                      background: keepSignedIn ? "rgba(0,212,255,0.2)" : "transparent",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      cursor: "pointer", transition: "all .15s",
-                    }}
-                  >
-                    {keepSignedIn && <span style={{ color: CYAN, fontSize: "9px", fontWeight: 900 }}>&#x2713;</span>}
-                  </div>
-                  KEEP ME SIGNED IN
-                </label>
-                <button
-                  onClick={() => alert("Use 'Claim Player Account' on the login screen to reset your PIN.")}
-                  style={{ background: "none", border: "none", color: CYAN_DIM, fontSize: "11px", fontWeight: 700, cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                  Reset PIN
-                </button>
-              </div>
-
-              {/* Initialize Session */}
-              <button
-                onClick={handleSignIn}
-                disabled={pin.length < 4}
-                onMouseEnter={() => setBtnHover(true)}
-                onMouseLeave={() => setBtnHover(false)}
-                style={{
-                  width: "100%", padding: "14px",
-                  borderRadius: "8px", border: "none",
-                  background: pin.length >= 4
-                    ? "linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%)"
-                    : "rgba(255,255,255,0.06)",
-                  color: pin.length >= 4 ? "#ffffff" : "rgba(255,255,255,0.2)",
-                  fontSize: "13px", fontWeight: 800,
-                  letterSpacing: "0.12em", textTransform: "uppercase",
-                  cursor: pin.length >= 4 ? "pointer" : "default",
-                  transition: "all .2s",
-                  boxShadow: pin.length >= 4 && btnHover ? "0 0 24px rgba(0,212,255,0.3)" : "none",
-                  transform: pin.length >= 4 && btnHover ? "translateY(-1px)" : "none",
-                }}>
-                Initialize Session
-              </button>
-            </>
-          )}
-
-          {/* ══ STEP 3: CHANGE PIN ══════════════════════════════════════ */}
-          {step === "change-pin" && selectedUser && (
-            <>
-              <div style={{
-                display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px",
-                background: "rgba(245,200,66,0.08)", border: "1px solid rgba(245,200,66,0.25)",
-                borderRadius: "10px", marginBottom: "20px",
-              }}>
-                <span style={{ fontSize: "18px" }}>&#x1F510;</span>
-                <div>
-                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#f5c842", letterSpacing: "0.05em" }}>CREATE YOUR PERSONAL PIN</div>
-                  <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>
-                    Replace your temporary PIN with one you&apos;ll remember
-                  </div>
-                </div>
-              </div>
-
-              {/* New PIN */}
-              <div style={{ marginBottom: "16px" }}>
-                <label style={labelStyle}>New PIN (4-6 digits)</label>
-                <input
-                  type="password"
-                  value={newPin}
-                  onChange={e => { setNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6)); setChangePinError(""); }}
-                  placeholder="Enter new PIN"
-                  maxLength={6}
-                  style={{
-                    ...inputStyle,
-                    letterSpacing: "0.3em",
-                    fontSize: "20px",
-                    textAlign: "center",
-                  }}
-                  autoFocus
-                />
-              </div>
-
-              {/* Confirm PIN */}
-              <div style={{ marginBottom: "16px" }}>
-                <label style={labelStyle}>Confirm PIN</label>
-                <input
-                  type="password"
-                  value={confirmPin}
-                  onChange={e => { setConfirmPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6)); setChangePinError(""); }}
-                  onKeyDown={e => e.key === "Enter" && newPin.length >= 4 && confirmPin.length >= 4 && handleChangePin()}
-                  placeholder="Re-enter new PIN"
-                  maxLength={6}
-                  style={{
-                    ...inputStyle,
-                    letterSpacing: "0.3em",
-                    fontSize: "20px",
-                    textAlign: "center",
-                  }}
-                />
-              </div>
-
-              {changePinError && (
-                <p style={{ margin: "0 0 16px", fontSize: "12px", color: "#ff6b6b", textAlign: "center" }}>{changePinError}</p>
-              )}
-
-              <button
-                onClick={handleChangePin}
-                disabled={newPin.length < 4 || confirmPin.length < 4}
-                onMouseEnter={() => setBtnHover(true)}
-                onMouseLeave={() => setBtnHover(false)}
-                style={{
-                  width: "100%", padding: "14px",
-                  borderRadius: "8px", border: "none",
-                  background: newPin.length >= 4 && confirmPin.length >= 4
-                    ? "linear-gradient(135deg, #f5c842 0%, #f97316 100%)"
-                    : "rgba(255,255,255,0.06)",
-                  color: newPin.length >= 4 && confirmPin.length >= 4 ? "#000" : "rgba(255,255,255,0.2)",
-                  fontSize: "13px", fontWeight: 800,
-                  letterSpacing: "0.12em", textTransform: "uppercase",
-                  cursor: newPin.length >= 4 && confirmPin.length >= 4 ? "pointer" : "default",
-                  transition: "all .2s",
-                  boxShadow: newPin.length >= 4 && confirmPin.length >= 4 && btnHover ? "0 0 24px rgba(245,200,66,0.3)" : "none",
-                }}>
-                Set My PIN &amp; Continue
-              </button>
-            </>
-          )}
-
-          {/* ══ STEP 4: CLAIM ACCOUNT ═══════════════════════════════════ */}
-          {step === "claim" && (
-            <>
-              {!claimSuccess ? (
-                <>
-                  {/* Back link */}
-                  <button
-                    onClick={goBackFromClaim}
-                    style={{
-                      background: "none", border: "none", color: CYAN_DIM, cursor: "pointer",
-                      fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em",
-                      textTransform: "uppercase", marginBottom: "18px", padding: 0,
-                      display: "flex", alignItems: "center", gap: "6px",
-                    }}
-                  >
-                    &#x2190; Back to Login
-                  </button>
-
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px",
-                    background: "rgba(0,212,255,0.05)", border: "1px solid rgba(0,212,255,0.15)",
-                    borderRadius: "10px", marginBottom: "20px",
-                  }}>
-                    <span style={{ fontSize: "18px" }}>&#x1F4E7;</span>
-                    <div>
-                      <div style={{ fontSize: "12px", fontWeight: 700, color: CYAN, letterSpacing: "0.05em" }}>CLAIM YOUR ACCOUNT</div>
-                      <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>
-                        Enter your email to receive a temporary PIN
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Email field */}
-                  <div style={{ marginBottom: "20px" }}>
-                    <label style={labelStyle}>Email Address</label>
-                    <input
-                      type="email"
-                      value={claimEmail}
-                      onChange={e => { setClaimEmail(e.target.value); setClaimError(""); }}
-                      onKeyDown={e => e.key === "Enter" && handleClaimAccount()}
-                      placeholder="Enter your email..."
-                      style={claimError ? inputErr : inputStyle}
-                      autoFocus
-                    />
-                    {claimError && (
-                      <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#ff6b6b", letterSpacing: "0.02em" }}>{claimError}</p>
-                    )}
-                  </div>
-
-                  {/* Claim button */}
-                  <button
-                    onClick={handleClaimAccount}
-                    disabled={!claimEmail.trim()}
-                    onMouseEnter={() => setBtnHover(true)}
-                    onMouseLeave={() => setBtnHover(false)}
-                    style={{
-                      width: "100%", padding: "14px",
-                      borderRadius: "8px", border: "none",
-                      background: claimEmail.trim()
-                        ? "linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%)"
-                        : "rgba(255,255,255,0.06)",
-                      color: claimEmail.trim() ? "#ffffff" : "rgba(255,255,255,0.2)",
-                      fontSize: "13px", fontWeight: 800,
-                      letterSpacing: "0.12em", textTransform: "uppercase",
-                      cursor: claimEmail.trim() ? "pointer" : "default",
-                      transition: "all .2s",
-                      boxShadow: claimEmail.trim() && btnHover ? "0 0 24px rgba(0,212,255,0.3)" : "none",
-                      transform: claimEmail.trim() && btnHover ? "translateY(-1px)" : "none",
-                    }}>
-                    Generate Temporary PIN
-                  </button>
-                </>
-              ) : (
-                <>
-                  {/* Success — show temp PIN */}
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: "10px", padding: "14px 16px",
-                    background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.3)",
-                    borderRadius: "10px", marginBottom: "20px",
-                  }}>
-                    <span style={{ fontSize: "20px" }}>&#x2705;</span>
-                    <div>
-                      <div style={{ fontSize: "12px", fontWeight: 700, color: "#4ade80", letterSpacing: "0.05em" }}>ACCOUNT CLAIMED</div>
-                      <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>
-                        Your temporary PIN has been generated
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Display temp PIN */}
-                  <div style={{
-                    textAlign: "center", padding: "20px",
-                    background: "rgba(0,212,255,0.05)",
-                    border: "1px solid rgba(0,212,255,0.2)",
-                    borderRadius: "12px", marginBottom: "14px",
-                  }}>
-                    <div style={{ fontSize: "11px", color: CYAN_DIM, letterSpacing: "0.12em", marginBottom: "8px", fontWeight: 700 }}>YOUR TEMPORARY PIN</div>
-                    <div style={{ fontSize: "36px", fontWeight: 900, color: "#fff", letterSpacing: "0.3em", fontFamily: "monospace" }}>{tempPin}</div>
-                  </div>
-
-                  <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", textAlign: "center", margin: "0 0 20px", lineHeight: 1.5 }}>
-                    Write this down. Select your brand name on the login screen and enter this PIN. You&apos;ll be prompted to create a personal PIN.
-                  </p>
-
-                  {/* Go to login */}
-                  <button
-                    onClick={goBackFromClaim}
-                    onMouseEnter={() => setBtnHover(true)}
-                    onMouseLeave={() => setBtnHover(false)}
-                    style={{
-                      width: "100%", padding: "14px",
-                      borderRadius: "8px", border: "none",
-                      background: "linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%)",
-                      color: "#ffffff",
-                      fontSize: "13px", fontWeight: 800,
-                      letterSpacing: "0.12em", textTransform: "uppercase",
-                      cursor: "pointer",
-                      transition: "all .2s",
-                      boxShadow: btnHover ? "0 0 24px rgba(0,212,255,0.3)" : "none",
-                      transform: btnHover ? "translateY(-1px)" : "none",
-                    }}>
-                    Go to Login
-                  </button>
-                </>
-              )}
-            </>
-          )}
+          width: 38, height: 38, borderRadius: "50%",
+          border: "2px solid rgba(0,240,255,0.18)",
+          borderTopColor: "#00f0ff",
+          animation: "pflx-xcoin-spin 0.9s linear infinite",
+        }} />
+        <div style={{ color: "#00f0ff", fontSize: 11, letterSpacing: 3, textTransform: "uppercase" }}>
+          Syncing with Platform
         </div>
-
-        {/* Footer */}
-        <p style={{
-          textAlign: "center", marginTop: "20px",
-          fontSize: "10px", color: "rgba(0,212,255,0.25)",
-          letterSpacing: "0.12em", fontFamily: "monospace",
-        }}>
-          SYSTEM VERSION 1.0.0 // BETA // SECURE CONNECTION
-        </p>
+        <div style={{ color: "#6a7290", fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase" }}>
+          Loading your profile across all apps
+        </div>
       </div>
+      <style>{`@keyframes pflx-xcoin-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
+
+  // ── Legacy local login JSX fully removed ─────────────────────────────
+  // The PFLX Platform is the sole login surface for the entire suite.
+  // See git history (pre-commit d3d2b6b) for the brand-select + PIN form.
 }
