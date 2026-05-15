@@ -140,6 +140,64 @@ export default function PflxBridge() {
           }
         }
 
+        // ── PflxDataBus: canonical pflx_player_changed broadcast from Console ──
+        // Console sends this for EVERY player record change (not just the active
+        // session). Update mockUsers so leaderboards / roster views stay live.
+        if (msg.type === "pflx_player_changed" && msg.player) {
+          try {
+            const p = msg.player;
+            const idx = D.mockUsers.findIndex(u => u.id === p.id);
+            const mapped = {
+              id:             p.id,
+              name:           p.name || p.brand || "Unknown",
+              brandName:      p.brand || p.brandName || p.name || "",
+              role:           (p.role === "admin" ? "admin" : "player") as "admin" | "player",
+              avatar:         "",
+              digitalBadges:  typeof p.digitalBadges === "number" ? p.digitalBadges : 0,
+              xcoin:          typeof p.xc === "number" ? p.xc : (typeof p.xcoin === "number" ? p.xcoin : 0),
+              totalXcoin:     typeof p.totalXcoin === "number" ? p.totalXcoin : (typeof p.xc === "number" ? p.xc : 0),
+              level:          typeof p.level === "number" ? p.level : 1,
+              rank:           typeof p.rank === "number" ? p.rank : 1,
+              cohort:         p.cohort || "",
+              pathway:        p.pathway || "",
+              joinedAt:       p.joinedAt || new Date().toISOString(),
+              email:          p.email || "",
+              image:          p.image || "",
+              pin:            p.pin || "",
+              claimed:        !!p.claimed,
+              isHost:         p.role === "admin",
+              studioId:       p.studioId || "",
+              badgeCounts:    p.badgeCounts || { primary: 0, premium: 0, executive: 0, signature: 0 },
+            };
+            if (idx >= 0) D.mockUsers[idx] = mapped as typeof D.mockUsers[number];
+            else D.mockUsers.push(mapped as typeof D.mockUsers[number]);
+            // If this is the logged-in player, also update pflx_user so the UI updates
+            try {
+              const raw = localStorage.getItem("pflx_user");
+              if (raw) {
+                const cur = JSON.parse(raw);
+                if (cur && cur.id === p.id) {
+                  localStorage.setItem("pflx_user", JSON.stringify({ ...cur, ...mapped, __pflxFromPlatform: true }));
+                  window.dispatchEvent(new CustomEvent("pflx-identity-changed", { detail: mapped }));
+                }
+              }
+            } catch {}
+            window.dispatchEvent(new CustomEvent("pflx-player-changed", { detail: mapped }));
+          } catch (e) {
+            console.warn("[X-Coin Bridge] player_changed apply failed", e);
+          }
+        }
+
+        // ── PflxDataBus: response to a pflx_player_get we sent ──
+        if (msg.type === "pflx_player_data" && msg.player) {
+          window.dispatchEvent(new CustomEvent("pflx-player-data", { detail: { player: msg.player, ackId: msg.ackId || null } }));
+        }
+
+        // ── PflxDataBus: roster from Console ──
+        if (msg.type === "pflx_players_list" && Array.isArray(msg.players)) {
+          window.dispatchEvent(new CustomEvent("pflx-players-list", { detail: { players: msg.players, ackId: msg.ackId || null } }));
+        }
+
         // ── Force-sync from Platform → drop local identity cache, re-request ──
         if (msg.type === "pflx_force_identity_sync") {
           try {

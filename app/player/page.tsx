@@ -69,21 +69,51 @@ export default function PlayerHome() {
       if (u.role !== "player" && activeRole !== "player") { router.push("/admin"); return; }
       // Onboarding now owned by PFLX Platform SSO — no per-route gate needed
 
-      // Merge with live mockUsers to pick up any admin changes this session
-      const fresh = mockUsers.find(mu => mu.id === u.id);
-      if (fresh) {
-        u.xcoin = fresh.xcoin;
-        u.totalXcoin = fresh.totalXcoin;
-        u.digitalBadges = fresh.digitalBadges;
-        u.level = fresh.level;
-        u.rank = fresh.rank;
-        if (fresh.studioId) u.studioId = fresh.studioId;
-        if (fresh.diagnosticResult) u.diagnosticResult = fresh.diagnosticResult;
-        if (fresh.diagnosticComplete !== undefined) u.diagnosticComplete = fresh.diagnosticComplete;
-      }
+      // ── Per-player isolation ─────────────────────────────────────────
+      // When Platform writes pflx_user it includes a __pflxFromPlatform flag
+      // (or the values arrive via URL params via PflxBridge). In that case the
+      // Console is the authoritative source — do NOT let mockUsers / persisted
+      // stats override the just-written values, otherwise a stale mockUser or
+      // a leftover pflx_player_stats entry from a previous player will leak
+      // into this session (e.g. CrossTech inheriting Neuroflux's 1,000 XC).
+      // Trust the Platform when:
+      //   1) the pflx_user record carries the __pflxFromPlatform marker, OR
+      //   2) we're running inside an iframe (Console embeds X-Coin as one), OR
+      //   3) the URL includes sso=pflx (Console always appends this when launching).
+      const inIframe = typeof window !== "undefined" && window.parent !== window;
+      const urlHasSso = typeof window !== "undefined"
+        && new URLSearchParams(window.location.search).get("sso") === "pflx";
+      const fromPlatform = !!(u as User & { __pflxFromPlatform?: boolean }).__pflxFromPlatform
+        || inIframe
+        || urlHasSso;
 
-      // Also merge persisted stats (survives refresh, works cross-route)
-      u = mergePlayerStats(u);
+      if (!fromPlatform) {
+        // Standalone X-Coin session — fall back to the legacy merge so demo data
+        // still works when X-Coin is opened directly without Platform SSO.
+        const fresh = mockUsers.find(mu => mu.id === u.id);
+        if (fresh) {
+          u.xcoin = fresh.xcoin;
+          u.totalXcoin = fresh.totalXcoin;
+          u.digitalBadges = fresh.digitalBadges;
+          u.level = fresh.level;
+          u.rank = fresh.rank;
+          if (fresh.studioId) u.studioId = fresh.studioId;
+          if (fresh.diagnosticResult) u.diagnosticResult = fresh.diagnosticResult;
+          if (fresh.diagnosticComplete !== undefined) u.diagnosticComplete = fresh.diagnosticComplete;
+        }
+        // Persisted stats only merged for standalone — same reason as above.
+        u = mergePlayerStats(u);
+      } else {
+        // Platform-driven session — only fill in fields the Console didn't pass
+        // (studioId, diagnosticResult). Never overwrite xc / totalXcoin / image
+        // because the Console already wrote the truth for THIS player.
+        const fresh = mockUsers.find(mu => mu.id === u.id);
+        if (fresh) {
+          if (u.studioId === undefined && fresh.studioId) u.studioId = fresh.studioId;
+          if (u.diagnosticResult === undefined && fresh.diagnosticResult) u.diagnosticResult = fresh.diagnosticResult;
+          if (u.diagnosticComplete === undefined && fresh.diagnosticComplete !== undefined) u.diagnosticComplete = fresh.diagnosticComplete;
+        }
+      }
 
       // Write merged state back so pflx_user stays current
       localStorage.setItem("pflx_user", JSON.stringify(u));

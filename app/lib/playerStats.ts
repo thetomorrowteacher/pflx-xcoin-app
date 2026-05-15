@@ -66,6 +66,29 @@ export function updatePlayerStats(playerId: string, updates: Partial<PlayerStats
       }
     }
   } catch {}
+
+  // ── PflxDataBus: propagate the change to the Console (parent frame). ──
+  // The Console will apply the update to its canonical PLAYERS record and
+  // re-broadcast pflx_player_changed to every sub-app. Without this hop, the
+  // toolbar / hero / portfolio / Pathways card stay stale until the user
+  // reloads. Field names are mapped to the Console's convention (xc, not xcoin).
+  try {
+    if (typeof window !== "undefined" && window.parent !== window) {
+      const changes: Record<string, number> = {};
+      if (typeof updates.xcoin === "number")         changes.xc = updates.xcoin;
+      if (typeof updates.totalXcoin === "number")    changes.totalXcoin = updates.totalXcoin;
+      if (typeof updates.digitalBadges === "number") changes.digitalBadges = updates.digitalBadges;
+      if (typeof updates.level === "number")         changes.level = updates.level;
+      if (Object.keys(changes).length > 0) {
+        window.parent.postMessage(JSON.stringify({
+          type: "pflx_player_update",
+          playerId,
+          changes,
+          source: "xcoin",
+        }), "*");
+      }
+    }
+  } catch {}
 }
 
 /**
