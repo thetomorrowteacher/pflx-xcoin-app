@@ -59,6 +59,23 @@ export default function PlayerHome() {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState("");
 
+  // ── Live MC data via PflxDataBus ─────────────────────────────────
+  // When running inside the PFLX Platform iframe, every dashboard widget
+  // pulls its game state from Mission Control through the bus rather than
+  // X-Coin's local mock arrays. mockTasks / mockCheckpoints / mockProjects /
+  // mockJobs / mockGamePeriods are kept only as a standalone-mode fallback
+  // so opening pflx-xcoin-app.vercel.app directly still shows a demo.
+  //
+  // null = haven't received a bus reply yet (show skeleton/empty state)
+  // []   = MC has nothing for this player yet (show empty CTA)
+  const [liveCheckpoint, setLiveCheckpoint] = useState<Checkpoint | null | undefined>(undefined);
+  const [liveProjects, setLiveProjects] = useState<Project[] | undefined>(undefined);
+  const [liveTasks, setLiveTasks] = useState<Task[] | undefined>(undefined);
+  const [liveJobs, setLiveJobs] = useState<Job[] | undefined>(undefined);
+  const [liveSeason, setLiveSeason] = useState<GamePeriod | null | undefined>(undefined);
+
+  const inPlatform = typeof window !== "undefined" && window.parent !== window;
+
   useEffect(() => {
     const stored = localStorage.getItem("pflx_user");
     if (!stored) { router.push("/"); return; }
@@ -119,24 +136,106 @@ export default function PlayerHome() {
       localStorage.setItem("pflx_user", JSON.stringify(u));
       setUser(u);
       setTransactions(mockTransactions.filter(t => t.userId === u.id).slice().reverse().slice(0, 8));
-      setActiveSeason(mockGamePeriods.find(p => p.isActive) ?? mockGamePeriods[0] ?? null);
       setCurrentRank(getCurrentRank(u.totalXcoin, u));
-      setMyTasks(mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, u.id, u.cohort)).slice(0, 3));
-      setMyJobs(mockJobs.filter(j => isAssignedToPlayer(j.assignedTo, u.id, u.cohort)).slice(0, 3));
+      // Standalone fallback — only used when NOT iframed by the Platform.
+      // Inside the Platform, the bus subscription below populates these.
+      if (!inPlatform) {
+        setActiveSeason(mockGamePeriods.find(p => p.isActive) ?? mockGamePeriods[0] ?? null);
+        setMyTasks(mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, u.id, u.cohort)).slice(0, 3));
+        setMyJobs(mockJobs.filter(j => isAssignedToPlayer(j.assignedTo, u.id, u.cohort)).slice(0, 3));
+      }
     } catch {
       router.push("/");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Pull live MC data from the bus ───────────────────────────────
+  // Sends pflx_mc_get for each canonical key. Listens for pflx-mc-data
+  // (response) and pflx-mc-changed (live updates). Re-fires every fetch
+  // when MC mutates so the dashboard tracks the host's edits in real time.
+  useEffect(() => {
+    if (!user || !inPlatform) return;
+    const pid = user.id;
+
+    function request(key: string, opts: Record<string, unknown> = {}) {
+      try {
+        window.parent.postMessage(JSON.stringify({ type: "pflx_mc_get", key, opts }), "*");
+      } catch { /* ignore */ }
+    }
+
+    function refreshAll() {
+      request("tasks",       { playerId: pid });
+      request("jobs",        { playerId: pid });
+      request("checkpoints", { playerId: pid });
+      request("projects",    { playerId: pid });
+      request("seasons",     { activeOnly: true });
+    }
+
+    type McEvt = CustomEvent<{ key: string; items: unknown[]; opts?: Record<string, unknown> | null }>;
+
+    function onData(ev: Event) {
+      const e = ev as McEvt;
+      const { key, items } = e.detail;
+      if (key === "tasks")        setLiveTasks(items as Task[]);
+      else if (key === "jobs")    setLiveJobs(items as Job[]);
+      else if (key === "projects") setLiveProjects(items as Project[]);
+      else if (key === "checkpoints") {
+        const arr = (items as Checkpoint[]) ?? [];
+        const active = arr.find(c => c.status === "active") ?? arr[0] ?? null;
+        setLiveCheckpoint(active);
+      } else if (key === "seasons") {
+        const arr = (items as GamePeriod[]) ?? [];
+        const active = arr.find(s => s.isActive) ?? arr[0] ?? null;
+        setLiveSeason(active);
+        setActiveSeason(active);
+      }
+    }
+
+    function onChanged(ev: Event) {
+      const e = ev as CustomEvent<{ key: string }>;
+      const key = e.detail.key;
+      // Re-fetch the player-filtered version for this key so the dashboard
+      // converges on the host's latest edits without a page reload.
+      if (key === "tasks")        request("tasks",       { playerId: pid });
+      if (key === "jobs")         request("jobs",        { playerId: pid });
+      if (key === "checkpoints")  request("checkpoints", { playerId: pid });
+      if (key === "projects")     request("projects",    { playerId: pid });
+      if (key === "seasons")      request("seasons",     { activeOnly: true });
+    }
+
+    window.addEventListener("pflx-mc-data",    onData    as EventListener);
+    window.addEventListener("pflx-mc-changed", onChanged as EventListener);
+    refreshAll();
+
+    return () => {
+      window.removeEventListener("pflx-mc-data",    onData    as EventListener);
+      window.removeEventListener("pflx-mc-changed", onChanged as EventListener);
+    };
+  }, [user, inPlatform]);
+
+  // Mirror live results into the legacy state used by other widgets so the
+  // header/Daily Briefing don't need conditional branches everywhere.
+  useEffect(() => { if (Array.isArray(liveTasks)) setMyTasks(liveTasks.slice(0, 3)); }, [liveTasks]);
+  useEffect(() => { if (Array.isArray(liveJobs))  setMyJobs(liveJobs.slice(0, 3));  }, [liveJobs]);
+
   // Fetch X-Bot daily report
   const fetchDailyReport = useCallback(async (u: User) => {
     setReportLoading(true);
     setReportError("");
     try {
-      const playerTasks = mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, u.id, u.cohort));
-      const playerJobs = mockJobs.filter(j => isAssignedToPlayer(j.assignedTo, u.id, u.cohort));
-      const activeCP = mockCheckpoints.find(c => c.status === "active");
+      // Prefer live (bus) data when running inside the PFLX Platform, fall
+      // back to mock arrays in standalone demo mode. Empty arrays are fine —
+      // X-Bot will just say "no tasks assigned yet".
+      const playerTasks = inPlatform
+        ? (liveTasks ?? [])
+        : mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, u.id, u.cohort));
+      const playerJobs = inPlatform
+        ? (liveJobs ?? [])
+        : mockJobs.filter(j => isAssignedToPlayer(j.assignedTo, u.id, u.cohort));
+      const activeCP = inPlatform
+        ? liveCheckpoint
+        : mockCheckpoints.find(c => c.status === "active");
       const mode = u.workEthicMode || "medium";
 
       const taskSummary = playerTasks.slice(0, 10).map(t =>
@@ -188,7 +287,8 @@ Return ONLY valid JSON with this exact format (no markdown, no code blocks):
     } finally {
       setReportLoading(false);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inPlatform, liveTasks, liveJobs, liveCheckpoint]);
 
   // Auto-fetch daily report on mount (ONCE per user — no retry loop on error)
   const reportFetchedForRef = useRef<string | null>(null);
@@ -470,19 +570,49 @@ Return ONLY valid JSON with this exact format (no markdown, no code blocks):
         })()}
 
         {/* Active Checkpoint Card */}
+        {/* Sources its data from the PFLX Data Bus when iframed (canonical),
+            falls back to mockCheckpoints/mockProjects/mockTasks in standalone mode. */}
         {(() => {
-          const cp = mockCheckpoints.find(c => c.status === "active");
+          // Source: live (bus) when in Platform, mock when standalone
+          const cp = inPlatform
+            ? liveCheckpoint
+            : (mockCheckpoints.find(c => c.status === "active") ?? null);
+
+          // Inside Platform: if MC hasn't pushed checkpoints yet (undefined),
+          // render nothing (skeleton). If MC has no active checkpoint (null),
+          // show a "no active checkpoint" placeholder so the player knows the
+          // host hasn't created one yet.
+          if (inPlatform && liveCheckpoint === undefined) return null;
+          if (inPlatform && !cp) {
+            return (
+              <div style={{
+                marginBottom: "28px", padding: "20px 24px", borderRadius: "16px",
+                background: "rgba(22,22,31,0.5)", border: "1px dashed rgba(0,212,255,0.18)",
+              }}>
+                <div style={{ fontSize: "11px", color: "rgba(0,212,255,0.5)", letterSpacing: "0.12em", marginBottom: "6px" }}>🏁 NO ACTIVE CHECKPOINT</div>
+                <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>Your host hasn&apos;t opened a checkpoint yet. Watch this space.</div>
+              </div>
+            );
+          }
           if (!cp) return null;
+
+          // Project lookup — live array when in Platform, mockProjects otherwise.
+          const projectSource: Project[] = inPlatform
+            ? (liveProjects ?? [])
+            : mockProjects;
 
           // Gather projects linked to this checkpoint
           const cpProjects = (cp.projectIds ?? [])
-            .map(pid => mockProjects.find(p => p.id === pid))
+            .map(pid => projectSource.find(p => p.id === pid))
             .filter(Boolean) as Project[];
 
           // Gather tasks directly on the checkpoint (not via project)
           const cpProjectTaskIds = new Set(cpProjects.flatMap(p => p.taskIds));
-          const directTasks = mockTasks.filter(
-            t => t.roundId === cp.id && !cpProjectTaskIds.has(t.id) && isAssignedToPlayer(t.assignedTo, user.id, user.cohort)
+          const taskSource: Task[] = inPlatform
+            ? (liveTasks ?? [])
+            : mockTasks.filter(t => isAssignedToPlayer(t.assignedTo, user.id, user.cohort));
+          const directTasks = taskSource.filter(
+            t => t.roundId === cp.id && !cpProjectTaskIds.has(t.id)
           );
 
           // Build display items: projects first, then direct tasks — max 3 shown
