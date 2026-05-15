@@ -198,6 +198,23 @@ export default function PflxBridge() {
           window.dispatchEvent(new CustomEvent("pflx-players-list", { detail: { players: msg.players, ackId: msg.ackId || null } }));
         }
 
+        // ── PflxDataBus.mc: MC data response (tasks/checkpoints/projects/seasons/jobs/submissions) ──
+        if (msg.type === "pflx_mc_data" && msg.key && Array.isArray(msg.items)) {
+          window.dispatchEvent(new CustomEvent("pflx-mc-data", { detail: { key: msg.key, items: msg.items, opts: msg.opts || null, ackId: msg.ackId || null } }));
+        }
+
+        // ── PflxDataBus.mc: MC data mutated (broadcast from Console) ──
+        if (msg.type === "pflx_mc_changed" && msg.key && Array.isArray(msg.items)) {
+          window.dispatchEvent(new CustomEvent("pflx-mc-changed", { detail: { key: msg.key, items: msg.items } }));
+        }
+
+        // ── PflxDataBus.award: reward granted (animation / feed signal) ──
+        // The actual XC/badge state change arrives via pflx_player_changed above.
+        // This event is for UI flourishes — toasts, confetti, feed entries.
+        if (msg.type === "pflx_award_granted" && msg.playerId && msg.award) {
+          window.dispatchEvent(new CustomEvent("pflx-award-granted", { detail: { playerId: msg.playerId, award: msg.award, txId: msg.txId, player: msg.player || null } }));
+        }
+
         // ── Force-sync from Platform → drop local identity cache, re-request ──
         if (msg.type === "pflx_force_identity_sync") {
           try {
