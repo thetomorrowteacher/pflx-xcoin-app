@@ -51,8 +51,18 @@ interface TradeOffer {
   requestXc: number;
   requestService: string;
   notes: string;
-  status: "pending" | "accepted" | "declined" | "cancelled" | "completed";
+  // Trade lifecycle:
+  //   pending          — sender proposed, awaiting recipient
+  //   accepted         — recipient accepted, awaiting host approval
+  //   declined         — recipient declined
+  //   cancelled        — sender cancelled before recipient acted
+  //   host_approved    — host signed off, XC moved via bus, trade settled
+  //   host_denied      — host rejected the accepted trade
+  //   completed        — synonym of host_approved (rendered the same)
+  status: "pending" | "accepted" | "declined" | "cancelled" | "host_approved" | "host_denied" | "completed";
   createdAt: string;
+  actedAt?: string;
+  hostNote?: string;
 }
 
 interface RosterPlayer {
@@ -422,6 +432,50 @@ function PeerTradeTab({ user }: { user: User }) {
     setTrades(loadTrades().filter(t => t.fromPlayerId === user.id || t.toPlayerId === user.id));
   }, [user.id]);
 
+  // Listen for trade updates broadcast by the Console — covers:
+  //   pflx_trade_inbox    : recipient receives a fresh proposal
+  //   pflx_trade_updated  : status changed (accepted / declined / settled)
+  useEffect(() => {
+    function mergeTrade(t: TradeOffer) {
+      const all = loadTrades();
+      const idx = all.findIndex(x => x.id === t.id);
+      if (idx >= 0) all[idx] = t;
+      else all.unshift(t);
+      saveTrades(all);
+      setTrades(all.filter(x => x.fromPlayerId === user.id || x.toPlayerId === user.id));
+    }
+    function onMsg(ev: MessageEvent) {
+      let m: { type?: string; trade?: TradeOffer } | null = null;
+      try { m = typeof ev.data === "string" ? JSON.parse(ev.data) : ev.data; } catch { return; }
+      if (!m || typeof m !== "object") return;
+      if ((m.type === "pflx_trade_inbox" || m.type === "pflx_trade_updated") && m.trade) {
+        mergeTrade(m.trade);
+      }
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, [user.id]);
+
+  // Send a status-change action to the Console. The Console validates,
+  // updates the canonical trade record, and broadcasts pflx_trade_updated
+  // to both parties (and the host for host-approval steps).
+  const actOnTrade = useCallback((tradeId: string, action: "accept" | "decline" | "cancel") => {
+    postToParent({ type: "pflx_trade_action", tradeId, action });
+    // Optimistic local update so the buttons disappear instantly. The
+    // canonical record will arrive via pflx_trade_updated and overwrite.
+    const all = loadTrades();
+    const idx = all.findIndex(x => x.id === tradeId);
+    if (idx >= 0) {
+      const optimistic: TradeOffer["status"] =
+        action === "accept"  ? "accepted"
+        : action === "decline" ? "declined"
+        : "cancelled";
+      all[idx] = { ...all[idx], status: optimistic, actedAt: new Date().toISOString() };
+      saveTrades(all);
+      setTrades(all.filter(x => x.fromPlayerId === user.id || x.toPlayerId === user.id));
+    }
+  }, [user.id]);
+
   const submit = useCallback(() => {
     setMsg(null);
     if (!toPlayerId) { setMsg({ kind: "error", text: "Pick a player to trade with." }); return; }
@@ -536,6 +590,22 @@ function PeerTradeTab({ user }: { user: User }) {
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {trades.slice(0, 12).map(t => {
               const isMine = t.fromPlayerId === user.id;
+              // Status color + label
+              const statusInfo = (() => {
+                switch (t.status) {
+                  case "pending":       return { color: "#f5c842", label: "AWAITING RECIPIENT" };
+                  case "accepted":      return { color: "#3b82f6", label: "AWAITING HOST APPROVAL" };
+                  case "host_approved":
+                  case "completed":     return { color: "#22c55e", label: "COMPLETED" };
+                  case "declined":      return { color: "#ef4444", label: "DECLINED" };
+                  case "host_denied":   return { color: "#ef4444", label: "HOST DENIED" };
+                  case "cancelled":     return { color: "#6b7280", label: "CANCELLED" };
+                  default:              return { color: "#f5c842", label: String(t.status).toUpperCase() };
+                }
+              })();
+              // What actions can the active player take right now?
+              const canRecipientAct = !isMine && t.status === "pending";
+              const canSenderCancel =  isMine && t.status === "pending";
               return (
                 <div key={t.id} style={{
                   padding: "14px 16px", borderRadius: "12px",
@@ -547,11 +617,10 @@ function PeerTradeTab({ user }: { user: User }) {
                     </div>
                     <div style={{
                       padding: "3px 10px", borderRadius: "999px",
-                      background: t.status === "accepted" ? "rgba(34,197,94,0.15)" : t.status === "declined" ? "rgba(239,68,68,0.15)" : "rgba(245,200,66,0.15)",
-                      color: t.status === "accepted" ? "#22c55e" : t.status === "declined" ? "#ef4444" : "#f5c842",
+                      background: `${statusInfo.color}22`, color: statusInfo.color,
                       fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase",
                       fontFamily: "'Share Tech Mono', monospace",
-                    }}>{t.status}</div>
+                    }}>{statusInfo.label}</div>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "12px" }}>
                     <div style={{ color: "#22c55e" }}>
@@ -564,14 +633,53 @@ function PeerTradeTab({ user }: { user: User }) {
                     </div>
                   </div>
                   {t.notes && <div style={{ marginTop: "8px", fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>📝 {t.notes}</div>}
+                  {t.hostNote && (
+                    <div style={{ marginTop: "8px", fontSize: "11px", color: "#a78bfa", background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.15)", padding: "6px 10px", borderRadius: "6px" }}>
+                      🛡 Host: {t.hostNote}
+                    </div>
+                  )}
+                  {/* Action buttons */}
+                  {(canRecipientAct || canSenderCancel) && (
+                    <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
+                      {canRecipientAct && (
+                        <>
+                          <button onClick={() => actOnTrade(t.id, "accept")} style={{
+                            flex: 1, minWidth: "100px",
+                            padding: "8px 14px", borderRadius: "8px",
+                            background: "linear-gradient(135deg,#22c55e,#16a34a)",
+                            color: "#fff", border: "none", cursor: "pointer",
+                            fontFamily: "'Share Tech Mono', monospace", fontSize: "11px", fontWeight: 800, letterSpacing: "0.08em",
+                          }}>✓ ACCEPT</button>
+                          <button onClick={() => actOnTrade(t.id, "decline")} style={{
+                            flex: 1, minWidth: "100px",
+                            padding: "8px 14px", borderRadius: "8px",
+                            background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)",
+                            color: "#ef4444", cursor: "pointer",
+                            fontFamily: "'Share Tech Mono', monospace", fontSize: "11px", fontWeight: 800, letterSpacing: "0.08em",
+                          }}>✕ DECLINE</button>
+                        </>
+                      )}
+                      {canSenderCancel && (
+                        <button onClick={() => actOnTrade(t.id, "cancel")} style={{
+                          padding: "8px 14px", borderRadius: "8px",
+                          background: "rgba(107,114,128,0.1)", border: "1px solid rgba(107,114,128,0.3)",
+                          color: "rgba(255,255,255,0.5)", cursor: "pointer",
+                          fontFamily: "'Share Tech Mono', monospace", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em",
+                        }}>CANCEL OFFER</button>
+                      )}
+                    </div>
+                  )}
+                  {/* Helper text for awaiting-host state */}
+                  {t.status === "accepted" && (
+                    <div style={{ marginTop: "8px", fontSize: "10px", color: "rgba(59,130,246,0.7)", fontStyle: "italic" }}>
+                      🛡 Waiting for the host to approve the XC transfer. You'll be notified when it settles.
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
-        <div style={{ marginTop: "12px", fontSize: "10px", color: "rgba(255,255,255,0.25)", textAlign: "center" }}>
-          Accept/decline UI for incoming offers ships in the next pass — for now both parties see the proposal here.
-        </div>
       </div>
     </div>
   );
