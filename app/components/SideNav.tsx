@@ -60,13 +60,17 @@ const adminLinks = [
   { href: "/admin/settings", label: "Settings", icon: "⚙️" },
 ];
 
+// X-Coin player nav — economy-focused surfaces only.
+// Task Management, Project Pitch, My Projects, Job Board now live in
+// Mission Control. X-Coin still READS pending tasks/projects via the
+// PflxDataBus so the Home dashboard shows the player's queue, but the
+// authoring/management UI lives in MC. When the host approves a
+// submission in MC, X-Coin processes the resulting XC + badge rewards
+// through PflxDataBus.award() and broadcasts to every surface.
 const playerLinks = [
   { href: "/player", label: "Home", icon: "🏠" },
   { href: "/player/leaderboard", label: "Leaderboard", icon: "🏆" },
   { href: "/player/submit", label: "X-Tracker", icon: "🚀" },
-  { href: "/player/task-management", label: "Task Management", icon: "📋" },
-  { href: "/player/pitch", label: "Project Pitch", icon: "💡" },
-  { href: "/player/projects", label: "My Projects", icon: "🎬" },
   { href: "/player/marketplace", label: "Marketplace", icon: "🛒" },
   { href: "/player/wallet", label: "Wallet", icon: "🪙" },
   { href: "/player/options", label: "Options", icon: "⚙️" },
