@@ -1,805 +1,598 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
-import {
-  User, COIN_CATEGORIES, mockSubmissions, CoinSubmission,
-  mockStartupStudios, mockStudioInvestments, StudioInvestment,
-  getStudioMaxStakePercent,
-  CORE_PATHWAYS, mockCommunityContributions,
-} from "../../lib/data";
-import { saveCommunityContributions } from "../../lib/store";
+import { User } from "../../lib/data";
 
-interface RequestEntry {
+// ═══════════════════════════════════════════════════════════════════
+// X-Tracker — rebuilt for v2
+//   This is NOT the task-submission flow (that's in Mission Control).
+//   X-Tracker is two things:
+//     1. Request a Reward    — player asks the host for XC or a badge
+//                               with a description + proof link/upload.
+//                               Host approves in MC → bus fires award.
+//     2. Peer Trade          — player-to-player barter. Offer XC and/or
+//                               a service, request XC and/or a service
+//                               in return. Other player accepts/declines.
+//
+//   Requests + trades persist in localStorage and are posted to the
+//   PFLX Platform parent so the Console can stage them for host review
+//   (Approvals queue) or notify the trade recipient.
+// ═══════════════════════════════════════════════════════════════════
+
+// ─── Types ─────────────────────────────────────────────────────────
+type RewardType = "xc" | "badge";
+type BadgeCategory = "primary" | "premium" | "executive" | "signature";
+
+interface RewardRequest {
   id: string;
-  coinType: string;
-  amount: number;
-  reason: string;
-  fileName: string | null;
-  pathwaySlug: string;
-  proposeAsCourse: boolean;
-  courseTitle: string;
-  courseDescription: string;
+  playerId: string;
+  brand: string;
+  type: RewardType;
+  amount?: number;
+  badgeCategory?: BadgeCategory;
+  badgeName?: string;
+  description: string;
+  proofLink?: string;
+  proofFileName?: string;
+  status: "pending" | "approved" | "denied";
+  submittedAt: string;
+  reviewerNote?: string;
 }
 
-export default function PlayerSubmit() {
+interface TradeOffer {
+  id: string;
+  fromPlayerId: string;
+  fromBrand: string;
+  toPlayerId: string;
+  toBrand: string;
+  offerXc: number;
+  offerService: string;
+  requestXc: number;
+  requestService: string;
+  notes: string;
+  status: "pending" | "accepted" | "declined" | "cancelled" | "completed";
+  createdAt: string;
+}
+
+interface RosterPlayer {
+  id: string;
+  brand?: string;
+  brandName?: string;
+  name?: string;
+  role?: string;
+}
+
+const REQUESTS_KEY = "pflx_xtracker_requests";
+const TRADES_KEY = "pflx_xtracker_trades";
+
+const BADGE_CATEGORIES: { id: BadgeCategory; name: string; color: string; icon: string }[] = [
+  { id: "primary",   name: "Primary (Behavior)",        color: "#22c55e", icon: "🟢" },
+  { id: "premium",   name: "Premium (Achievement)",     color: "#3b82f6", icon: "🔵" },
+  { id: "executive", name: "Executive (Jobs)",          color: "#a78bfa", icon: "🟣" },
+  { id: "signature", name: "Signature (Skill Mastery)", color: "#f5c842", icon: "🟡" },
+];
+
+// ─── Helpers ───────────────────────────────────────────────────────
+function loadRequests(): RewardRequest[] {
+  try {
+    const raw = localStorage.getItem(REQUESTS_KEY);
+    return raw ? (JSON.parse(raw) as RewardRequest[]) : [];
+  } catch { return []; }
+}
+function saveRequests(list: RewardRequest[]) {
+  try { localStorage.setItem(REQUESTS_KEY, JSON.stringify(list)); } catch {}
+}
+function loadTrades(): TradeOffer[] {
+  try {
+    const raw = localStorage.getItem(TRADES_KEY);
+    return raw ? (JSON.parse(raw) as TradeOffer[]) : [];
+  } catch { return []; }
+}
+function saveTrades(list: TradeOffer[]) {
+  try { localStorage.setItem(TRADES_KEY, JSON.stringify(list)); } catch {}
+}
+function shortId(prefix: string) {
+  return prefix + "-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
+}
+
+// Post a message to the Platform parent — the Console picks these up via
+// its message router, stages the request, and (for reward requests) shows
+// it in the MC Approvals queue. For trades, the Console notifies the
+// other player via the bus.
+function postToParent(payload: Record<string, unknown>) {
+  try {
+    if (typeof window !== "undefined" && window.parent !== window) {
+      window.parent.postMessage(JSON.stringify(payload), "*");
+    }
+  } catch {}
+}
+
+// ─── Page ──────────────────────────────────────────────────────────
+export default function XTrackerPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<"request" | "trade" | "stake">("request");
-  const [allPlayers, setAllPlayers] = useState<User[]>([]);
-  const [allTasks, setAllTasks] = useState<any[]>([]);
+  const [tab, setTab] = useState<"request" | "trade">("request");
 
-  // Trade Form State
-  const [tradeData, setTradeData] = useState({ toId: "", amount: 0, note: "" });
-
-  // Studio Stake State
-  const [stakeAmount, setStakeAmount] = useState<number>(0);
-  const [stakeAction, setStakeAction] = useState<"stake" | "withdraw">("stake");
-  const [studioInvestments, setStudioInvestments] = useState<StudioInvestment[]>([...mockStudioInvestments]);
-
-  const [entries, setEntries] = useState<RequestEntry[]>([
-    { id: Math.random().toString(36).substr(2, 9), coinType: "", amount: 1, reason: "", fileName: null, pathwaySlug: "", proposeAsCourse: false, courseTitle: "", courseDescription: "" }
-  ]);
-  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
-  const [history, setHistory] = useState<any[]>([]);
-
+  // ── Auth gate ──────────────────────────────────────────────────
   useEffect(() => {
-    const stored = localStorage.getItem("pflx_user");
-    if (!stored) { router.push("/"); return; }
-    const userData = JSON.parse(stored) as User;
-    // Onboarding now owned by PFLX Platform SSO — no per-route gate needed
-    setUser(userData);
-
-    // Filter all activities for this player
-    import("../../lib/data").then(data => {
-      const subs = data.mockSubmissions.filter(s => s.playerId === userData.id).map(s => ({ ...s, type: 'coin', date: s.submittedAt }));
-      const trades = data.mockTrades.filter(t => t.fromId === userData.id).map(t => ({ ...t, type: 'trade', date: t.createdAt }));
-      const stakeInvs = data.mockStudioInvestments.filter(i => i.playerId === userData.id).map(i => ({ ...i, type: 'stake', date: i.createdAt }));
-
-      const combined = [...subs, ...trades, ...stakeInvs].sort((a, b) =>
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-      setHistory(combined);
-      
-      setAllPlayers(data.mockUsers.filter(u => u.role === "player" && u.id !== userData.id));
-      setAllTasks([...data.mockTasks, ...data.mockJobs]);
-    });
+    const raw = localStorage.getItem("pflx_user");
+    if (!raw) { router.push("/"); return; }
+    try {
+      const u = JSON.parse(raw) as User;
+      const role = localStorage.getItem("pflx_active_role");
+      if (u.role !== "player" && role !== "player") { router.push("/admin"); return; }
+      setUser(u);
+    } catch { router.push("/"); }
   }, [router]);
-
-  const showToast = (msg: string, type: "success" | "error") => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const addEntry = () => {
-    setEntries([...entries, { id: Math.random().toString(36).substr(2, 9), coinType: "", amount: 1, reason: "", fileName: null, pathwaySlug: "", proposeAsCourse: false, courseTitle: "", courseDescription: "" }]);
-  };
-
-  const removeEntry = (id: string) => {
-    if (entries.length === 1) return;
-    setEntries(entries.filter(e => e.id !== id));
-  };
-
-  const updateEntry = (id: string, field: keyof RequestEntry, value: any) => {
-    setEntries(entries.map(e => e.id === id ? { ...e, [field]: value } : e));
-  };
-
-  const handleFileChange = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      updateEntry(id, "fileName", file.name);
-      showToast(`Evidence attached: ${file.name}`, "success");
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-
-    const invalid = entries.some(e => !e.coinType || !e.reason);
-    if (invalid) {
-      showToast("Please fill out all fields for each coin request.", "error");
-      return;
-    }
-
-    // In a real app, this would be an API call to Supabase
-    showToast(`${entries.length} submission(s) successful! Waiting for teacher review. 🚀`, "success");
-
-    const newSubs = entries.map(entry => ({
-      id: Math.random().toString(36).substr(2, 9),
-      playerId: user.id,
-      coinType: entry.coinType,
-      amount: entry.amount,
-      reason: entry.reason,
-      status: "pending",
-      submittedAt: new Date().toISOString(),
-      date: new Date().toISOString(),
-      type: 'coin'
-    }));
-
-    setHistory([...newSubs, ...history]);
-
-    // Create community contributions for entries with proposeAsCourse checked
-    const courseEntries = entries.filter(e => e.proposeAsCourse && e.pathwaySlug);
-    if (courseEntries.length > 0) {
-      courseEntries.forEach(entry => {
-        const contrib = {
-          id: `cc_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-          playerId: user.id,
-          taskId: entry.coinType, // Using coinType as a reference since there is no direct taskId
-          title: entry.courseTitle || `Course proposal: ${entry.coinType}`,
-          description: entry.courseDescription || entry.reason,
-          pathwaySlug: entry.pathwaySlug,
-          evidenceUrl: "",
-          status: "pending" as const,
-          submittedAt: new Date().toISOString(),
-        };
-        mockCommunityContributions.push(contrib);
-      });
-      saveCommunityContributions();
-    }
-
-    // Clear form
-    setEntries([{ id: Math.random().toString(36).substr(2, 9), coinType: "", amount: 1, reason: "", fileName: null, pathwaySlug: "", proposeAsCourse: false, courseTitle: "", courseDescription: "" }]);
-  };
-
-  const statusStyle = (status: string) => {
-    switch (status) {
-      case "approved": return { color: "#22c55e", bg: "rgba(34,197,94,0.1)", border: "rgba(34,197,94,0.3)" };
-      case "rejected": return { color: "#ef4444", bg: "rgba(239,68,68,0.1)", border: "rgba(239,68,68,0.3)" };
-      default: return { color: "#f5c842", bg: "rgba(245,200,66,0.1)", border: "rgba(245,200,66,0.3)" };
-    }
-  };
 
   if (!user) return null;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#0a0a0f" }}>
       <SideNav user={user} />
-      <main style={{ flex: 1, padding: "32px", overflow: "auto" }}>
-        {toast && (
-          <div style={{
-            position: "fixed", top: "24px", right: "24px", zIndex: 9999,
-            padding: "12px 20px", borderRadius: "12px",
-            background: toast.type === "success" ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)",
-            border: `1px solid ${toast.type === "success" ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`,
-            color: toast.type === "success" ? "#22c55e" : "#ef4444",
-            fontSize: "13px", fontWeight: 600, backdropFilter: "blur(10px)"
-          }}>{toast.msg}</div>
-        )}
-
+      <main style={{ flex: 1, padding: "32px", overflow: "auto", paddingBottom: "60px" }}>
+        {/* Header */}
         <div style={{ marginBottom: "28px" }}>
-          <h1 style={{ fontSize: "28px", fontWeight: 900, margin: "0 0 4px", letterSpacing: "0.08em",
+          <h1 style={{
+            fontSize: "28px", fontWeight: 900, margin: "0 0 4px", letterSpacing: "0.08em",
             background: "linear-gradient(90deg, #00d4ff, #a78bfa, #00d4ff)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
             filter: "drop-shadow(0 0 10px rgba(0,212,255,0.4))"
           }}>🚀 X-TRACKER</h1>
-          <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.1em" }}>[ MANAGE YOUR XP, TRADE WITH PEERS, AND INVEST ]</p>
+          <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.1em" }}>
+            [ REQUEST REWARDS · TRADE WITH PEERS ]
+          </p>
         </div>
 
-        {/* Tab Navigation */}
-        <div style={{ display: "flex", gap: "24px", marginBottom: "32px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-          {[
-            { id: "request", label: "Coin Request", icon: "🪙" },
-            { id: "trade", label: "Barter & Trade", icon: "🤝" },
-            { id: "stake", label: "Investments", icon: "📈" }
-          ].map(tab => (
+        {/* Tabs */}
+        <div style={{ display: "flex", gap: "6px", marginBottom: "24px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          {([
+            { id: "request" as const, label: "REQUEST REWARD", icon: "🎯" },
+            { id: "trade" as const,   label: "PEER TRADE",     icon: "🤝" },
+          ]).map(t => (
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              key={t.id}
+              onClick={() => setTab(t.id)}
               style={{
-                background: "none", border: "none", padding: "12px 16px", cursor: "pointer",
-                color: activeTab === tab.id ? "#f5c842" : "rgba(255,255,255,0.4)",
-                fontSize: "14px", fontWeight: 700, transition: "all 0.2s",
-                borderBottom: `2px solid ${activeTab === tab.id ? "#f5c842" : "transparent"}`,
-                display: "flex", alignItems: "center", gap: "8px"
+                padding: "12px 22px", background: "none",
+                border: "none", borderBottom: tab === t.id ? "2px solid #00d4ff" : "2px solid transparent",
+                color: tab === t.id ? "#00d4ff" : "rgba(255,255,255,0.4)",
+                fontFamily: "'Share Tech Mono', monospace", fontSize: "12px", fontWeight: 700,
+                letterSpacing: "0.1em", cursor: "pointer", marginBottom: "-1px",
               }}
-            >
-              <span>{tab.icon}</span> {tab.label}
-            </button>
+            >{t.icon} {t.label}</button>
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "40px", maxWidth: "1200px" }}>
-          {/* Main Area */}
-          <div>
-            {activeTab === "request" && (
-              <form onSubmit={handleSubmit}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-                {entries.map((entry, index) => (
-                  <div key={entry.id} style={{
-                    background: "rgba(0,212,255,0.04)", border: "1px solid rgba(0,212,255,0.2)",
-                    borderRadius: "20px", padding: "28px",
-                    position: "relative",
-                    boxShadow: "0 0 20px rgba(0,212,255,0.08), inset 0 0 20px rgba(0,212,255,0.03)",
-                    transition: "all 0.3s ease"
-                  }}>
-                    <div style={{ position: "absolute", top: "8px", left: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderRight: "none", borderBottom: "none", borderRadius: "2px", pointerEvents: "none" }} />
-                    <div style={{ position: "absolute", top: "8px", right: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderLeft: "none", borderBottom: "none", borderRadius: "2px", pointerEvents: "none" }} />
-                    <div style={{ position: "absolute", bottom: "8px", left: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderRight: "none", borderTop: "none", borderRadius: "2px", pointerEvents: "none" }} />
-                    <div style={{ position: "absolute", bottom: "8px", right: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderLeft: "none", borderTop: "none", borderRadius: "2px", pointerEvents: "none" }} />
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                      <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#f5c842", textTransform: "uppercase", letterSpacing: "1px" }}>
-                        Coin #{index + 1}
-                      </h3>
-                      {entries.length > 1 && (
-                        <button 
-                          type="button" 
-                          onClick={() => removeEntry(entry.id)}
-                          style={{ background: "rgba(239,68,68,0.1)", border: "none", color: "#ef4444", padding: "4px 8px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", fontWeight: 700 }}
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-
-                    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "16px", marginBottom: "16px" }}>
-                      <div>
-                        <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.3)", marginBottom: "8px", textTransform: "uppercase" }}>COIN TYPE</label>
-                        <select
-                          value={entry.coinType}
-                          onChange={(e) => updateEntry(entry.id, "coinType", e.target.value)}
-                          className="input-field"
-                          style={{ borderRadius: "12px", background: "rgba(255,255,255,0.03)" }}
-                        >
-                          <option value="" disabled>Select a coin...</option>
-                          {COIN_CATEGORIES.map((cat) => (
-                            <optgroup key={cat.name} label={cat.name}>
-                              {cat.coins.map((coin) => (
-                                <option key={coin.name} value={coin.name}>
-                                  {coin.name} ({coin.xc} XP)
-                                </option>
-                              ))}
-                            </optgroup>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.3)", marginBottom: "8px", textTransform: "uppercase" }}>AMOUNT</label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="10"
-                          value={entry.amount}
-                          onChange={(e) => updateEntry(entry.id, "amount", Number(e.target.value))}
-                          className="input-field"
-                          style={{ borderRadius: "12px", background: "rgba(255,255,255,0.03)" }}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ marginBottom: "20px" }}>
-                      <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.3)", marginBottom: "8px", textTransform: "uppercase" }}>REASON / EVIDENCE</label>
-                      <textarea
-                        value={entry.reason}
-                        onChange={(e) => updateEntry(entry.id, "reason", e.target.value)}
-                        placeholder="Explain what you did to earn this..."
-                        className="input-field"
-                        style={{ minHeight: "80px", resize: "vertical", borderRadius: "12px", background: "rgba(255,255,255,0.03)" }}
-                      />
-                    </div>
-
-                    {/* Evidence Upload for this request */}
-                    <div style={{ position: "relative" }}>
-                      <input 
-                        type="file" 
-                        id={`file-${entry.id}`}
-                        onChange={(e) => handleFileChange(entry.id, e)}
-                        style={{ display: "none" }} 
-                      />
-                      <label 
-                        htmlFor={`file-${entry.id}`}
-                        style={{
-                          display: "flex", alignItems: "center", gap: "12px", 
-                          padding: "16px", borderRadius: "12px", border: "1px dashed rgba(255,255,255,0.1)",
-                          background: entry.fileName ? "rgba(34,197,94,0.05)" : "rgba(255,255,255,0.02)",
-                          cursor: "pointer", transition: "all 0.2s",
-                          borderColor: entry.fileName ? "#22c55e" : "rgba(255,255,255,0.1)"
-                        }}
-                      >
-                        <span style={{ fontSize: "20px" }}>{entry.fileName ? "✅" : "📁"}</span>
-                        <div style={{ flex: 1 }}>
-                          <p style={{ margin: 0, fontSize: "13px", fontWeight: 600, color: entry.fileName ? "#22c55e" : "rgba(255,255,255,0.5)" }}>
-                            {entry.fileName ? entry.fileName : "Attach Evidence"}
-                          </p>
-                          <p style={{ margin: 0, fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>
-                            Upload image, PDF, or video
-                          </p>
-                        </div>
-                      </label>
-                    </div>
-
-                    {/* Pathway Tag & Propose as Course */}
-                    <div style={{ marginTop: "16px", padding: "16px", borderRadius: "12px", background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.15)" }}>
-                      <div style={{ marginBottom: "12px" }}>
-                        <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "rgba(167,139,250,0.6)", marginBottom: "8px", textTransform: "uppercase" }}>CORE PATHWAY TAG</label>
-                        <select
-                          value={entry.pathwaySlug}
-                          onChange={(e) => updateEntry(entry.id, "pathwaySlug", e.target.value)}
-                          className="input-field"
-                          style={{ borderRadius: "12px", background: "rgba(255,255,255,0.03)" }}
-                        >
-                          <option value="">None (optional)</option>
-                          {CORE_PATHWAYS.map(pw => (
-                            <option key={pw.slug} value={pw.slug}>{pw.icon} {pw.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
-                        <input type="checkbox"
-                          checked={entry.proposeAsCourse}
-                          onChange={(e) => updateEntry(entry.id, "proposeAsCourse", e.target.checked)}
-                          style={{ width: "16px", height: "16px", accentColor: "#a78bfa", cursor: "pointer" }} />
-                        <div>
-                          <span style={{ fontSize: "12px", fontWeight: 700, color: "#a78bfa" }}>Propose as Course</span>
-                          <p style={{ margin: "2px 0 0", fontSize: "10px", color: "rgba(255,255,255,0.35)" }}>
-                            Suggest this as a new course for the pathway. Your host will review it.
-                          </p>
-                        </div>
-                      </label>
-                      {entry.proposeAsCourse && (
-                        <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
-                          <div>
-                            <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.3)", marginBottom: "6px", textTransform: "uppercase" }}>PROPOSED COURSE TITLE</label>
-                            <input
-                              value={entry.courseTitle}
-                              onChange={(e) => updateEntry(entry.id, "courseTitle", e.target.value)}
-                              placeholder="What should this course be called?"
-                              className="input-field"
-                              style={{ borderRadius: "12px", background: "rgba(255,255,255,0.03)" }}
-                            />
-                          </div>
-                          <div>
-                            <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.3)", marginBottom: "6px", textTransform: "uppercase" }}>WHAT DID YOU LEARN?</label>
-                            <textarea
-                              value={entry.courseDescription}
-                              onChange={(e) => updateEntry(entry.id, "courseDescription", e.target.value)}
-                              placeholder="Describe what this course could teach others..."
-                              className="input-field"
-                              style={{ minHeight: "60px", resize: "vertical", borderRadius: "12px", background: "rgba(255,255,255,0.03)" }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={addEntry}
-                  style={{
-                    background: "rgba(245,200,66,0.05)", border: "1px dashed rgba(245,200,66,0.2)",
-                    borderRadius: "16px", padding: "16px", color: "#f5c842",
-                    fontSize: "13px", fontWeight: 700, cursor: "pointer", transition: "all 0.2s"
-                  }}
-                >
-                  + Add Another Coin Request
-                </button>
-
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  style={{ padding: "18px", fontSize: "16px", fontWeight: 800, marginTop: "12px" }}
-                >
-                  Submit {entries.length} Request{entries.length > 1 ? "s" : ""} for Review 🚀
-                </button>
-              </div>
-              </form>
-            )}
-
-            {activeTab === "trade" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-                <div style={{
-                  background: "rgba(0,212,255,0.04)", border: "1px solid rgba(0,212,255,0.2)",
-                  borderRadius: "20px", padding: "28px",
-                  boxShadow: "0 0 20px rgba(0,212,255,0.08), inset 0 0 20px rgba(0,212,255,0.03)",
-                  position: "relative"
-                }}>
-                  <div style={{ position: "absolute", top: "8px", left: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderRight: "none", borderBottom: "none", borderRadius: "2px", pointerEvents: "none" }} />
-                  <div style={{ position: "absolute", top: "8px", right: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderLeft: "none", borderBottom: "none", borderRadius: "2px", pointerEvents: "none" }} />
-                  <div style={{ position: "absolute", bottom: "8px", left: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderRight: "none", borderTop: "none", borderRadius: "2px", pointerEvents: "none" }} />
-                  <div style={{ position: "absolute", bottom: "8px", right: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderLeft: "none", borderTop: "none", borderRadius: "2px", pointerEvents: "none" }} />
-                  <h3 style={{ margin: "0 0 20px", fontSize: "16px", fontWeight: 700, color: "#f5c842" }}>Peer-to-Peer XP Trade</h3>
-                  <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)", marginBottom: "24px" }}>
-                    Transfer XP to another player for collaboration or assistance. Note: All trades require Admin approval.
-                  </p>
-                  
-                  <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                    <div>
-                      <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.3)", marginBottom: "8px" }}>RECIPIENT BRANDNAME</label>
-                      <select 
-                        className="input-field" 
-                        value={tradeData.toId}
-                        onChange={(e) => setTradeData({...tradeData, toId: e.target.value})}
-                      >
-                        <option value="">Select Player...</option>
-                        {allPlayers.map(s => <option key={s.id} value={s.id}>@{s.brandName}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.3)", marginBottom: "8px" }}>XP AMOUNT</label>
-                      <input 
-                        type="number" className="input-field" placeholder="0" 
-                        value={tradeData.amount || ""}
-                        onChange={(e) => setTradeData({...tradeData, amount: parseInt(e.target.value) || 0})}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.3)", marginBottom: "8px" }}>ADD A NOTE</label>
-                      <textarea 
-                        className="input-field" placeholder="Why are you trading this XP?" 
-                        value={tradeData.note}
-                        onChange={(e) => setTradeData({...tradeData, note: e.target.value})}
-                      />
-                    </div>
-                    <button 
-                      className="btn-primary" 
-                      onClick={() => {
-                        if (!tradeData.toId || tradeData.amount <= 0) return showToast("Please fill all trade details", "error");
-                        
-                        const newTrade = {
-                          id: Math.random().toString(36).substr(2, 9),
-                          fromId: user.id,
-                          toId: tradeData.toId,
-                          amount: tradeData.amount,
-                          note: tradeData.note,
-                          status: "pending",
-                          createdAt: new Date().toISOString(),
-                          date: new Date().toISOString(),
-                          type: 'trade'
-                        };
-                        
-                        setHistory([newTrade, ...history]);
-                        showToast("Trade request sent! Waiting for Admin approval.", "success");
-                        setTradeData({ toId: "", amount: 0, note: "" });
-                      }}
-                    >Send Trade Request 🤝</button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "stake" && (() => {
-              const myStudio = mockStartupStudios.find(s => s.id === user?.studioId);
-              const myActiveStake = studioInvestments.find(i => i.playerId === user?.id && i.studioId === user?.studioId && i.status === "active");
-              const maxStakePct = user ? getStudioMaxStakePercent(user.rank) : 5;
-              const maxStakeXC = myStudio ? Math.floor(myStudio.xcPool * maxStakePct / 100) : 0;
-              const estimatedReturn = myStudio && stakeAmount > 0 ? Math.floor((myStudio.xcPool * (stakeAmount / myStudio.xcPool)) * 0.05) : 0;
-
-              if (!myStudio) {
-                return (
-                  <div style={{
-                    background: "rgba(0,212,255,0.04)", border: "1px solid rgba(0,212,255,0.2)",
-                    borderRadius: "20px", padding: "40px 28px", textAlign: "center",
-                    position: "relative",
-                    boxShadow: "0 0 20px rgba(0,212,255,0.08), inset 0 0 20px rgba(0,212,255,0.03)",
-                  }}>
-                    <div style={{ position: "absolute", top: "8px", left: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderRight: "none", borderBottom: "none", borderRadius: "2px" }} />
-                    <div style={{ position: "absolute", top: "8px", right: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderLeft: "none", borderBottom: "none", borderRadius: "2px" }} />
-                    <div style={{ position: "absolute", bottom: "8px", left: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderRight: "none", borderTop: "none", borderRadius: "2px" }} />
-                    <div style={{ position: "absolute", bottom: "8px", right: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderLeft: "none", borderTop: "none", borderRadius: "2px" }} />
-                    <div style={{ fontSize: "40px", marginBottom: "16px" }}>🏢</div>
-                    <h3 style={{ margin: "0 0 8px", fontSize: "18px", fontWeight: 700, color: "#fff" }}>No Studio Assigned</h3>
-                    <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>
-                      Complete the Checkpoint Alpha Diagnostic to be placed in a Startup Studio.
-                    </p>
-                  </div>
-                );
-              }
-
-              return (
-                <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                  {/* Studio identity card */}
-                  <div style={{
-                    background: `rgba(${myStudio.colorRgb},0.06)`,
-                    border: `1px solid rgba(${myStudio.colorRgb},0.3)`,
-                    borderRadius: "20px", padding: "24px",
-                    position: "relative",
-                    boxShadow: `0 0 20px rgba(${myStudio.colorRgb},0.08), inset 0 0 20px rgba(${myStudio.colorRgb},0.03)`,
-                  }}>
-                    {[
-                      { top: "8px", left: "8px", borderRight: "none", borderBottom: "none" },
-                      { top: "8px", right: "8px", borderLeft: "none", borderBottom: "none" },
-                      { bottom: "8px", left: "8px", borderRight: "none", borderTop: "none" },
-                      { bottom: "8px", right: "8px", borderLeft: "none", borderTop: "none" },
-                    ].map((pos, i) => (
-                      <div key={i} style={{ position: "absolute", width: "14px", height: "14px", ...pos, border: `2px solid rgba(${myStudio.colorRgb},0.5)`, borderRadius: "2px", pointerEvents: "none" }} />
-                    ))}
-                    <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "18px" }}>
-                      <div style={{
-                        width: "56px", height: "56px", borderRadius: "14px",
-                        background: `rgba(${myStudio.colorRgb},0.15)`,
-                        border: `1px solid rgba(${myStudio.colorRgb},0.35)`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: "26px",
-                        boxShadow: `0 0 16px rgba(${myStudio.colorRgb},0.2)`,
-                      }}>{myStudio.icon}</div>
-                      <div>
-                        <div style={{ fontSize: "18px", fontWeight: 800, color: myStudio.color, marginBottom: "2px" }}>{myStudio.name}</div>
-                        <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontStyle: "italic" }}>{myStudio.tagline}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "10px" }}>
-                      {[
-                        { label: "STUDIO POOL", value: `${myStudio.xcPool.toLocaleString()} XC`, icon: "⚡" },
-                        { label: "YOUR MAX STAKE", value: `${maxStakePct}%`, icon: "📊" },
-                        { label: "TAX RATE", value: `${Math.round(myStudio.corporateTaxRate * 100)}%/season`, icon: "🏛" },
-                      ].map(stat => (
-                        <div key={stat.label} style={{
-                          background: `rgba(${myStudio.colorRgb},0.08)`,
-                          border: `1px solid rgba(${myStudio.colorRgb},0.15)`,
-                          borderRadius: "10px", padding: "12px 10px", textAlign: "center",
-                        }}>
-                          <div style={{ fontSize: "14px", marginBottom: "4px" }}>{stat.icon}</div>
-                          <div style={{ fontSize: "14px", fontWeight: 800, color: myStudio.color }}>{stat.value}</div>
-                          <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.3)", fontWeight: 700, letterSpacing: "0.1em" }}>{stat.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Current stake status */}
-                  {myActiveStake && (
-                    <div style={{
-                      background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.25)",
-                      borderRadius: "14px", padding: "16px 20px",
-                      display: "flex", justifyContent: "space-between", alignItems: "center",
-                    }}>
-                      <div>
-                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#22c55e", marginBottom: "2px" }}>✅ Active Stake</div>
-                        <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>
-                          {myActiveStake.stakeXC.toLocaleString()} XC staked · {myActiveStake.stakePercent}% of pool
-                        </div>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: "14px", fontWeight: 800, color: "#22c55e" }}>+{myActiveStake.earnedReturn || 0} XC</div>
-                        <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em" }}>EARNED RETURNS</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Stake / Withdraw form */}
-                  <div style={{
-                    background: "rgba(0,212,255,0.04)", border: "1px solid rgba(0,212,255,0.18)",
-                    borderRadius: "20px", padding: "24px",
-                    position: "relative",
-                    boxShadow: "0 0 16px rgba(0,212,255,0.06), inset 0 0 16px rgba(0,212,255,0.03)",
-                  }}>
-                    <div style={{ position: "absolute", top: "8px", left: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderRight: "none", borderBottom: "none", borderRadius: "2px" }} />
-                    <div style={{ position: "absolute", top: "8px", right: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderLeft: "none", borderBottom: "none", borderRadius: "2px" }} />
-                    <div style={{ position: "absolute", bottom: "8px", left: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderRight: "none", borderTop: "none", borderRadius: "2px" }} />
-                    <div style={{ position: "absolute", bottom: "8px", right: "8px", width: "14px", height: "14px", border: "2px solid rgba(0,212,255,0.38)", borderLeft: "none", borderTop: "none", borderRadius: "2px" }} />
-
-                    {/* Action toggle */}
-                    <div style={{ display: "flex", gap: "8px", marginBottom: "22px" }}>
-                      {(["stake", "withdraw"] as const).map(action => (
-                        <button key={action} onClick={() => setStakeAction(action)} style={{
-                          flex: 1, padding: "10px", borderRadius: "10px", border: "none",
-                          background: stakeAction === action ? (action === "stake" ? `rgba(${myStudio.colorRgb},0.2)` : "rgba(239,68,68,0.15)") : "rgba(255,255,255,0.04)",
-                          color: stakeAction === action ? (action === "stake" ? myStudio.color : "#ef4444") : "rgba(255,255,255,0.35)",
-                          fontSize: "12px", fontWeight: 700, cursor: "pointer",
-                          border: `1px solid ${stakeAction === action ? (action === "stake" ? `rgba(${myStudio.colorRgb},0.4)` : "rgba(239,68,68,0.3)") : "rgba(255,255,255,0.08)"}`,
-                          letterSpacing: "0.08em", textTransform: "uppercase", transition: "all 0.2s",
-                        }}>
-                          {action === "stake" ? "📈 Place Stake" : "📤 Withdraw"}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div style={{ marginBottom: "16px" }}>
-                      <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.3)", marginBottom: "8px" }}>
-                        {stakeAction === "stake" ? "STAKE AMOUNT (XC)" : "WITHDRAW AMOUNT (XC)"}
-                      </label>
-                      <input
-                        type="number" className="input-field" placeholder="0"
-                        min="1" max={stakeAction === "stake" ? (user?.xcoin ?? 0) : (myActiveStake?.stakeXC ?? 0)}
-                        value={stakeAmount || ""}
-                        onChange={e => setStakeAmount(parseInt(e.target.value) || 0)}
-                      />
-                      {stakeAction === "stake" && (
-                        <div style={{ marginTop: "6px", fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>
-                          Max stake based on your Evo Rank: <strong style={{ color: myStudio.color }}>{maxStakeXC.toLocaleString()} XC ({maxStakePct}% of pool)</strong>
-                        </div>
-                      )}
-                    </div>
-
-                    {stakeAction === "stake" && stakeAmount > 0 && (
-                      <div style={{
-                        background: `rgba(${myStudio.colorRgb},0.08)`,
-                        border: `1px solid rgba(${myStudio.colorRgb},0.2)`,
-                        borderRadius: "10px", padding: "14px 16px", marginBottom: "16px",
-                      }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-                          <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)" }}>Pool share</span>
-                          <span style={{ fontSize: "12px", color: myStudio.color, fontWeight: 700 }}>
-                            {((stakeAmount / myStudio.xcPool) * 100).toFixed(2)}%
-                          </span>
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-                          <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)" }}>Estimated return</span>
-                          <span style={{ fontSize: "12px", color: "#4ade80", fontWeight: 700 }}>+{estimatedReturn} XC/season</span>
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)" }}>Corporate tax</span>
-                          <span style={{ fontSize: "12px", color: "#f59e0b", fontWeight: 700 }}>
-                            -{Math.floor(estimatedReturn * myStudio.corporateTaxRate)} XC/season
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={() => {
-                        if (!user || stakeAmount <= 0) return showToast("Enter a valid amount", "error");
-                        if (stakeAction === "stake") {
-                          if (stakeAmount > (user.xcoin ?? 0)) return showToast("Insufficient XC balance", "error");
-                          if (stakeAmount > maxStakeXC) return showToast(`Max stake at your rank is ${maxStakeXC} XC`, "error");
-                          const newStake: StudioInvestment & { type: string; date: string } = {
-                            id: Math.random().toString(36).substr(2, 9),
-                            playerId: user.id,
-                            studioId: myStudio.id,
-                            stakeXC: stakeAmount,
-                            stakePercent: parseFloat(((stakeAmount / myStudio.xcPool) * 100).toFixed(2)),
-                            status: "active",
-                            createdAt: new Date().toISOString(),
-                            earnedReturn: 0,
-                            type: "stake",
-                            date: new Date().toISOString(),
-                          };
-                          mockStudioInvestments.push(newStake);
-                          setStudioInvestments([...mockStudioInvestments]);
-                          setHistory([newStake, ...history]);
-                          setStakeAmount(0);
-                          showToast(`Staked ${stakeAmount} XC in ${myStudio.name}! 🏢`, "success");
-                        } else {
-                          if (!myActiveStake) return showToast("No active stake to withdraw", "error");
-                          if (stakeAmount > myActiveStake.stakeXC) return showToast("Withdrawal exceeds current stake", "error");
-                          myActiveStake.stakeXC -= stakeAmount;
-                          if (myActiveStake.stakeXC <= 0) myActiveStake.status = "withdrawn";
-                          setStudioInvestments([...mockStudioInvestments]);
-                          setStakeAmount(0);
-                          showToast(`Withdrew ${stakeAmount} XC from ${myStudio.name}`, "success");
-                        }
-                      }}
-                      className="btn-primary"
-                      style={{
-                        background: stakeAction === "stake"
-                          ? `linear-gradient(135deg, rgba(${myStudio.colorRgb},0.8), rgba(${myStudio.colorRgb},0.5))`
-                          : "rgba(239,68,68,0.15)",
-                        border: stakeAction === "stake" ? "none" : "1px solid rgba(239,68,68,0.3)",
-                        color: stakeAction === "stake" ? "#fff" : "#ef4444",
-                        width: "100%",
-                      }}
-                    >
-                      {stakeAction === "stake" ? `Place Stake of ${stakeAmount || 0} XC 🏢` : `Withdraw ${stakeAmount || 0} XC 📤`}
-                    </button>
-                  </div>
-
-                  {/* Rank abilities info */}
-                  <div style={{
-                    background: "rgba(245,200,66,0.05)", border: "1px solid rgba(245,200,66,0.15)",
-                    borderRadius: "14px", padding: "16px 18px",
-                    display: "flex", gap: "14px", alignItems: "flex-start",
-                  }}>
-                    <span style={{ fontSize: "22px", flexShrink: 0 }}>🏆</span>
-                    <div>
-                      <div style={{ fontSize: "13px", fontWeight: 700, color: "#f5c842", marginBottom: "4px" }}>Rank Stake Limits</div>
-                      <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", lineHeight: 1.6 }}>
-                        Evo Rank 1–2: 5% · Rank 3–4: 10% · Rank 5–6: 20% · Rank 7–8: 35% · Rank 9–10: 50%
-                        {user && <span style={{ color: "#f5c842" }}> — Your current max: <strong>{maxStakePct}%</strong></span>}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Info Card */}
-            <div style={{
-              marginTop: "40px", background: "rgba(79,142,247,0.05)", border: "1px solid rgba(79,142,247,0.2)",
-              borderRadius: "20px", padding: "24px", display: "flex", gap: "20px"
-            }}>
-              <span style={{ fontSize: "28px" }}>📘</span>
-              <div>
-                <p style={{ margin: "0 0 6px", fontSize: "14px", fontWeight: 700, color: "#4f8ef7" }}>X-Tracker Protocol</p>
-                <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.4)", lineHeight: 1.6 }}>
-                  Instructors review each coin separately. Make sure you attach the correct evidence for each request to ensure a smooth approval process!
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Panel: Recent Submissions */}
-          <aside>
-            <div style={{
-              background: "rgba(22,22,31,0.6)", border: "1px solid rgba(255,255,255,0.05)",
-              borderRadius: "24px", padding: "24px", position: "sticky", top: "32px"
-            }}>
-              <h2 style={{ margin: "0 0 20px", fontSize: "18px", fontWeight: 700, color: "#f0f0ff" }}>Recent Submissions</h2>
-              
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {history.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "40px 0", opacity: 0.3 }}>
-                    <p style={{ margin: 0, fontSize: "13px" }}>No recent activity</p>
-                  </div>
-                ) : (
-                  history.map((item) => {
-                    const style = statusStyle(item.status);
-                    const isTrade = item.type === 'trade';
-                    const isStake = item.type === 'stake';
-                    const isCoin = item.type === 'coin';
-
-                    let title = "";
-                    let subtitle = "";
-                    let amountLabel = "";
-                    let amountValue = "";
-                    let icon = "";
-
-                    if (isCoin) {
-                      title = item.coinType;
-                      subtitle = item.reason;
-                      amountLabel = "XC";
-                      amountValue = `+${(COIN_CATEGORIES.flatMap(c => c.coins).find(c => c.name === item.coinType)?.xc || 0) * item.amount} XC`;
-                      icon = "🪙";
-                    } else if (isTrade) {
-                      const recipient = allPlayers.find(s => s.id === item.toId);
-                      title = `Trade to @${recipient?.brandName || 'Player'}`;
-                      subtitle = item.note || "No note";
-                      amountLabel = "Transfer";
-                      amountValue = `-${item.amount} XP`;
-                      icon = "🤝";
-                    } else if (isStake) {
-                      const studio = mockStartupStudios.find(s => s.id === item.studioId);
-                      title = `Studio Stake: ${studio?.name || 'Studio'}`;
-                      subtitle = `${item.stakePercent}% pool share · ${item.earnedReturn ?? 0} XC returned`;
-                      amountLabel = "Staked";
-                      amountValue = `-${item.stakeXC} XC`;
-                      icon = "🏢";
-                    }
-
-                    return (
-                      <div key={`${item.type}-${item.id}`} style={{
-                        padding: "16px", background: "rgba(255,255,255,0.02)",
-                        border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px"
-                      }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-                          <p style={{ margin: 0, fontSize: "12px", fontWeight: 700, color: "#f0f0ff", display: "flex", alignItems: "center", gap: "6px" }}>
-                            <span>{icon}</span> {title}
-                          </p>
-                          <span style={{ 
-                            fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "100px",
-                            background: style.bg, color: style.color, border: `1px solid ${style.border}`,
-                            textTransform: "uppercase"
-                          }}>
-                            {item.status}
-                          </span>
-                        </div>
-                        <p style={{ margin: "0 0 12px", fontSize: "11px", color: "rgba(255,255,255,0.3)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                          {subtitle}
-                        </p>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)" }}>
-                            {new Date(item.date).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                          </span>
-                          <div style={{ textAlign: "right" }}>
-                            <p style={{ margin: 0, fontSize: "12px", fontWeight: 800, color: isCoin ? "#f5c842" : isStake ? "#a78bfa" : "#4f8ef7" }}>
-                              {amountValue}
-                            </p>
-                            <p style={{ margin: 0, fontSize: "9px", color: "rgba(255,255,255,0.3)", fontWeight: 600 }}>
-                              {isCoin ? `${item.amount} ${amountLabel}` : `${amountLabel}: ${isStake ? item.stakeXC : item.amount}`}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </aside>
-        </div>
+        {tab === "request" ? <RequestRewardTab user={user} /> : <PeerTradeTab user={user} />}
       </main>
     </div>
   );
 }
+
+// ─── Tab 1 — Request a Reward ──────────────────────────────────────
+function RequestRewardTab({ user }: { user: User }) {
+  const [type, setType] = useState<RewardType>("xc");
+  const [amount, setAmount] = useState<string>("100");
+  const [badgeCat, setBadgeCat] = useState<BadgeCategory>("primary");
+  const [badgeName, setBadgeName] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
+  const [proofLink, setProofLink] = useState<string>("");
+  const [proofFileName, setProofFileName] = useState<string>("");
+  const [proofData, setProofData] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
+  const [msg, setMsg] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const [requests, setRequests] = useState<RewardRequest[]>([]);
+
+  useEffect(() => { setRequests(loadRequests().filter(r => r.playerId === user.id)); }, [user.id]);
+
+  const onFile = useCallback((f: File | null) => {
+    if (!f) { setProofFileName(""); setProofData(""); return; }
+    if (f.size > 2 * 1024 * 1024) {
+      setMsg({ kind: "error", text: "File too large. Pick something under 2MB." });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setProofFileName(f.name);
+      setProofData(String(e.target?.result || ""));
+    };
+    reader.readAsDataURL(f);
+  }, []);
+
+  const submit = useCallback(() => {
+    setMsg(null);
+    if (!description.trim()) { setMsg({ kind: "error", text: "A description is required." }); return; }
+    if (type === "xc") {
+      const n = parseInt(amount, 10);
+      if (!Number.isFinite(n) || n <= 0) { setMsg({ kind: "error", text: "Enter a positive XC amount." }); return; }
+    }
+    if (!proofLink.trim() && !proofFileName) {
+      setMsg({ kind: "error", text: "Add a link or upload a file as proof." });
+      return;
+    }
+    setSubmitting(true);
+    const req: RewardRequest = {
+      id: shortId("req"),
+      playerId: user.id,
+      brand: (user.brandName as string) || (user.name as string) || "Player",
+      type,
+      amount: type === "xc" ? parseInt(amount, 10) : undefined,
+      badgeCategory: type === "badge" ? badgeCat : undefined,
+      badgeName: type === "badge" ? (badgeName.trim() || undefined) : undefined,
+      description: description.trim(),
+      proofLink: proofLink.trim() || undefined,
+      proofFileName: proofFileName || undefined,
+      status: "pending",
+      submittedAt: new Date().toISOString(),
+    };
+    const next = [req, ...loadRequests()];
+    saveRequests(next);
+    setRequests(next.filter(r => r.playerId === user.id));
+    // Notify the Console — its message router stages this in the MC Approvals queue.
+    postToParent({
+      type: "pflx_reward_request_submitted",
+      request: req,
+      // attachment is split out so the Console can choose whether to persist
+      // the data URL or just keep the file name as a reference.
+      attachmentDataUrl: proofData || null,
+    });
+    // Reset form
+    setDescription("");
+    setProofLink("");
+    setProofFileName("");
+    setProofData("");
+    setSubmitting(false);
+    setMsg({ kind: "success", text: "Request sent to your host for review. You'll see the result on your Home dashboard." });
+  }, [user, type, amount, badgeCat, badgeName, description, proofLink, proofFileName, proofData]);
+
+  return (
+    <div>
+      {/* Form card */}
+      <div style={cardStyle}>
+        <div style={cardTitleStyle}>Submit a reward request</div>
+
+        {/* Type toggle */}
+        <div style={{ display: "flex", gap: "8px", marginBottom: "18px" }}>
+          {(["xc", "badge"] as const).map(t => (
+            <button key={t} onClick={() => setType(t)} style={{
+              flex: 1, padding: "12px", borderRadius: "10px", cursor: "pointer",
+              background: type === t ? "rgba(0,212,255,0.12)" : "rgba(255,255,255,0.02)",
+              border: type === t ? "1px solid rgba(0,212,255,0.45)" : "1px solid rgba(255,255,255,0.06)",
+              color: type === t ? "#00d4ff" : "rgba(255,255,255,0.5)",
+              fontFamily: "'Share Tech Mono', monospace", fontSize: "12px", fontWeight: 700, letterSpacing: "0.08em",
+            }}>{t === "xc" ? "⚡ X-COIN" : "🏅 DIGITAL BADGE"}</button>
+          ))}
+        </div>
+
+        {/* XC amount or Badge picker */}
+        {type === "xc" ? (
+          <div style={{ marginBottom: "16px" }}>
+            <label style={labelStyle}>Amount Requested</label>
+            <input type="number" min={1} value={amount} onChange={e => setAmount(e.target.value)}
+              style={{ ...inputStyle, fontFamily: "'Share Tech Mono', monospace", fontSize: "16px", color: "#f5c842" }}
+              placeholder="100" />
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: "16px" }}>
+              <label style={labelStyle}>Badge Category</label>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "8px" }}>
+                {BADGE_CATEGORIES.map(b => (
+                  <button key={b.id} onClick={() => setBadgeCat(b.id)} style={{
+                    padding: "10px 12px", borderRadius: "10px", cursor: "pointer",
+                    background: badgeCat === b.id ? `${b.color}22` : "rgba(255,255,255,0.02)",
+                    border: badgeCat === b.id ? `1px solid ${b.color}` : "1px solid rgba(255,255,255,0.06)",
+                    color: badgeCat === b.id ? b.color : "rgba(255,255,255,0.5)",
+                    fontFamily: "'Share Tech Mono', monospace", fontSize: "11px", fontWeight: 700, letterSpacing: "0.05em",
+                    textAlign: "left",
+                  }}>{b.icon} {b.name}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom: "16px" }}>
+              <label style={labelStyle}>Specific badge name (optional)</label>
+              <input type="text" value={badgeName} onChange={e => setBadgeName(e.target.value)} style={inputStyle}
+                placeholder="e.g. Cipher Victor · Studio Founder · CS Mastery" />
+            </div>
+          </>
+        )}
+
+        {/* Description */}
+        <div style={{ marginBottom: "16px" }}>
+          <label style={labelStyle}>What did you do? (host will read this)</label>
+          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4}
+            style={{ ...inputStyle, resize: "vertical", fontFamily: "'Jura', sans-serif" }}
+            placeholder="Describe the achievement, project completion, or contribution you're claiming credit for." />
+        </div>
+
+        {/* Proof — link OR file */}
+        <div style={{ marginBottom: "16px" }}>
+          <label style={labelStyle}>Proof (link OR upload)</label>
+          <input type="url" value={proofLink} onChange={e => setProofLink(e.target.value)} style={inputStyle}
+            placeholder="https://… (Drive, Figma, GitHub, etc.)" />
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
+            <label style={{
+              padding: "8px 14px", borderRadius: "8px", cursor: "pointer",
+              background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.3)",
+              color: "#a78bfa", fontFamily: "'Share Tech Mono', monospace", fontSize: "11px", fontWeight: 700,
+            }}>
+              CHOOSE FILE
+              <input type="file" onChange={e => onFile(e.target.files?.[0] || null)} style={{ display: "none" }} />
+            </label>
+            {proofFileName && (
+              <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.6)" }}>
+                📎 {proofFileName} <button onClick={() => onFile(null)} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", marginLeft: "4px" }}>×</button>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {msg && (
+          <div style={{
+            padding: "10px 14px", borderRadius: "8px", marginBottom: "14px", fontSize: "12px",
+            background: msg.kind === "success" ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+            border: msg.kind === "success" ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(239,68,68,0.3)",
+            color: msg.kind === "success" ? "#22c55e" : "#ef4444",
+          }}>{msg.text}</div>
+        )}
+
+        <button onClick={submit} disabled={submitting}
+          style={{
+            width: "100%", padding: "12px", borderRadius: "10px",
+            background: "linear-gradient(135deg,#00d4ff,#7c3aed)",
+            color: "#fff", border: "none", cursor: submitting ? "default" : "pointer",
+            fontFamily: "'Share Tech Mono', monospace", fontSize: "13px", fontWeight: 800, letterSpacing: "0.08em",
+            opacity: submitting ? 0.5 : 1,
+          }}>{submitting ? "SUBMITTING…" : "SUBMIT TO HOST"}</button>
+      </div>
+
+      {/* My recent requests */}
+      <div style={{ marginTop: "28px" }}>
+        <div style={cardTitleStyle}>My recent requests</div>
+        {requests.length === 0 ? (
+          <div style={{ padding: "20px", textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>
+            No requests submitted yet. Use the form above to ask your host for XC or a badge.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {requests.slice(0, 10).map(r => (
+              <div key={r.id} style={{
+                padding: "12px 14px", borderRadius: "10px",
+                background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+                display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px",
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "13px", color: "#e0e0ff", marginBottom: "3px" }}>
+                    {r.type === "xc" ? `⚡ ${r.amount} XC` : `🏅 ${BADGE_CATEGORIES.find(b => b.id === r.badgeCategory)?.icon || "🏅"} ${r.badgeName || (r.badgeCategory || "Badge")}`}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {r.description}
+                  </div>
+                </div>
+                <div style={{
+                  padding: "3px 10px", borderRadius: "999px",
+                  background: r.status === "approved" ? "rgba(34,197,94,0.15)" : r.status === "denied" ? "rgba(239,68,68,0.15)" : "rgba(245,200,66,0.15)",
+                  color: r.status === "approved" ? "#22c55e" : r.status === "denied" ? "#ef4444" : "#f5c842",
+                  fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase",
+                  fontFamily: "'Share Tech Mono', monospace", flexShrink: 0,
+                }}>{r.status}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab 2 — Peer Trade ────────────────────────────────────────────
+function PeerTradeTab({ user }: { user: User }) {
+  const [roster, setRoster] = useState<RosterPlayer[]>([]);
+  const [toPlayerId, setToPlayerId] = useState<string>("");
+  const [offerXc, setOfferXc] = useState<string>("0");
+  const [offerService, setOfferService] = useState<string>("");
+  const [requestXc, setRequestXc] = useState<string>("0");
+  const [requestService, setRequestService] = useState<string>("");
+  const [notes, setNotes] = useState<string>("");
+  const [trades, setTrades] = useState<TradeOffer[]>([]);
+  const [msg, setMsg] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+
+  // Pull the roster from the Console via the canonical bus type.
+  useEffect(() => {
+    function onList(ev: Event) {
+      const e = ev as CustomEvent<{ players: RosterPlayer[] }>;
+      const list = (e.detail?.players || []).filter(p => p && p.id && p.id !== user.id);
+      setRoster(list);
+    }
+    window.addEventListener("pflx-players-list", onList as EventListener);
+    try {
+      if (window.parent !== window) {
+        window.parent.postMessage(JSON.stringify({
+          type: "pflx_players_list_request",
+          filter: { role: "player" },
+        }), "*");
+      }
+    } catch {}
+    return () => window.removeEventListener("pflx-players-list", onList as EventListener);
+  }, [user.id]);
+
+  useEffect(() => {
+    setTrades(loadTrades().filter(t => t.fromPlayerId === user.id || t.toPlayerId === user.id));
+  }, [user.id]);
+
+  const submit = useCallback(() => {
+    setMsg(null);
+    if (!toPlayerId) { setMsg({ kind: "error", text: "Pick a player to trade with." }); return; }
+    const offerN = parseInt(offerXc, 10) || 0;
+    const reqN   = parseInt(requestXc, 10) || 0;
+    if (offerN === 0 && !offerService.trim()) {
+      setMsg({ kind: "error", text: "Offer at least some XC or a service." });
+      return;
+    }
+    if (reqN === 0 && !requestService.trim()) {
+      setMsg({ kind: "error", text: "Request at least some XC or a service in return." });
+      return;
+    }
+    const recipient = roster.find(p => p.id === toPlayerId);
+    if (!recipient) { setMsg({ kind: "error", text: "Recipient not found." }); return; }
+
+    const offer: TradeOffer = {
+      id: shortId("trade"),
+      fromPlayerId: user.id,
+      fromBrand: (user.brandName as string) || (user.name as string) || "Player",
+      toPlayerId: recipient.id,
+      toBrand: recipient.brand || recipient.brandName || recipient.name || "Player",
+      offerXc: offerN,
+      offerService: offerService.trim(),
+      requestXc: reqN,
+      requestService: requestService.trim(),
+      notes: notes.trim(),
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    };
+    const next = [offer, ...loadTrades()];
+    saveTrades(next);
+    setTrades(next.filter(t => t.fromPlayerId === user.id || t.toPlayerId === user.id));
+    postToParent({ type: "pflx_trade_proposed", trade: offer });
+    // Reset
+    setOfferXc("0"); setOfferService(""); setRequestXc("0"); setRequestService(""); setNotes("");
+    setMsg({ kind: "success", text: `Trade offer sent to @${offer.toBrand}. They'll see it on their X-Tracker.` });
+  }, [user, toPlayerId, offerXc, offerService, requestXc, requestService, notes, roster]);
+
+  return (
+    <div>
+      <div style={cardStyle}>
+        <div style={cardTitleStyle}>Propose a trade</div>
+
+        <div style={{ marginBottom: "16px" }}>
+          <label style={labelStyle}>Trade with</label>
+          <select value={toPlayerId} onChange={e => setToPlayerId(e.target.value)} style={inputStyle}>
+            <option value="">— Choose a player —</option>
+            {roster.map(p => (
+              <option key={p.id} value={p.id}>{p.brand || p.brandName || p.name || p.id}</option>
+            ))}
+          </select>
+          {roster.length === 0 && (
+            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "4px" }}>
+              Waiting for roster from the Platform…
+            </div>
+          )}
+        </div>
+
+        {/* Two columns: I OFFER / I REQUEST */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px", marginBottom: "16px" }}>
+          <div style={{ background: "rgba(74,222,128,0.05)", border: "1px solid rgba(74,222,128,0.18)", borderRadius: "10px", padding: "14px" }}>
+            <div style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.14em", color: "#22c55e", marginBottom: "10px" }}>I OFFER ⬆</div>
+            <label style={labelStyle}>X-Coin amount</label>
+            <input type="number" min={0} value={offerXc} onChange={e => setOfferXc(e.target.value)} style={inputStyle} />
+            <label style={{ ...labelStyle, marginTop: "10px" }}>Service / work</label>
+            <textarea value={offerService} onChange={e => setOfferService(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }}
+              placeholder="e.g. I'll design 3 social media graphics" />
+          </div>
+          <div style={{ background: "rgba(167,139,250,0.05)", border: "1px solid rgba(167,139,250,0.18)", borderRadius: "10px", padding: "14px" }}>
+            <div style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.14em", color: "#a78bfa", marginBottom: "10px" }}>I REQUEST ⬇</div>
+            <label style={labelStyle}>X-Coin amount</label>
+            <input type="number" min={0} value={requestXc} onChange={e => setRequestXc(e.target.value)} style={inputStyle} />
+            <label style={{ ...labelStyle, marginTop: "10px" }}>Service / work</label>
+            <textarea value={requestService} onChange={e => setRequestService(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }}
+              placeholder="e.g. You write the script + voiceover" />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: "16px" }}>
+          <label style={labelStyle}>Notes (optional)</label>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} style={{ ...inputStyle, resize: "vertical" }}
+            placeholder="Timeline, conditions, anything else they should know." />
+        </div>
+
+        {msg && (
+          <div style={{
+            padding: "10px 14px", borderRadius: "8px", marginBottom: "14px", fontSize: "12px",
+            background: msg.kind === "success" ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+            border: msg.kind === "success" ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(239,68,68,0.3)",
+            color: msg.kind === "success" ? "#22c55e" : "#ef4444",
+          }}>{msg.text}</div>
+        )}
+
+        <button onClick={submit}
+          style={{
+            width: "100%", padding: "12px", borderRadius: "10px",
+            background: "linear-gradient(135deg,#22c55e,#a78bfa)",
+            color: "#fff", border: "none", cursor: "pointer",
+            fontFamily: "'Share Tech Mono', monospace", fontSize: "13px", fontWeight: 800, letterSpacing: "0.08em",
+          }}>SEND TRADE OFFER</button>
+      </div>
+
+      {/* My trades */}
+      <div style={{ marginTop: "28px" }}>
+        <div style={cardTitleStyle}>My trades</div>
+        {trades.length === 0 ? (
+          <div style={{ padding: "20px", textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>
+            No trades yet. Send an offer to a peer above to get started.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {trades.slice(0, 12).map(t => {
+              const isMine = t.fromPlayerId === user.id;
+              return (
+                <div key={t.id} style={{
+                  padding: "14px 16px", borderRadius: "12px",
+                  background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <div style={{ fontSize: "12px", color: "#e0e0ff" }}>
+                      {isMine ? `→ @${t.toBrand}` : `← @${t.fromBrand}`}
+                    </div>
+                    <div style={{
+                      padding: "3px 10px", borderRadius: "999px",
+                      background: t.status === "accepted" ? "rgba(34,197,94,0.15)" : t.status === "declined" ? "rgba(239,68,68,0.15)" : "rgba(245,200,66,0.15)",
+                      color: t.status === "accepted" ? "#22c55e" : t.status === "declined" ? "#ef4444" : "#f5c842",
+                      fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase",
+                      fontFamily: "'Share Tech Mono', monospace",
+                    }}>{t.status}</div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "12px" }}>
+                    <div style={{ color: "#22c55e" }}>
+                      <div style={{ fontSize: "9px", letterSpacing: "0.12em", opacity: 0.7 }}>{isMine ? "YOU OFFER" : "THEY OFFER"}</div>
+                      <div>⚡ {t.offerXc} XC{t.offerService ? ` + ${t.offerService}` : ""}</div>
+                    </div>
+                    <div style={{ color: "#a78bfa" }}>
+                      <div style={{ fontSize: "9px", letterSpacing: "0.12em", opacity: 0.7 }}>{isMine ? "YOU REQUEST" : "THEY REQUEST"}</div>
+                      <div>⚡ {t.requestXc} XC{t.requestService ? ` + ${t.requestService}` : ""}</div>
+                    </div>
+                  </div>
+                  {t.notes && <div style={{ marginTop: "8px", fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>📝 {t.notes}</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div style={{ marginTop: "12px", fontSize: "10px", color: "rgba(255,255,255,0.25)", textAlign: "center" }}>
+          Accept/decline UI for incoming offers ships in the next pass — for now both parties see the proposal here.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Shared styles ─────────────────────────────────────────────────
+const cardStyle: React.CSSProperties = {
+  padding: "20px 22px", borderRadius: "16px",
+  background: "rgba(22,22,31,0.6)", border: "1px solid rgba(0,212,255,0.12)",
+};
+const cardTitleStyle: React.CSSProperties = {
+  fontFamily: "'Orbitron', sans-serif", fontSize: "13px", fontWeight: 800,
+  letterSpacing: "0.08em", color: "#00d4ff", textTransform: "uppercase",
+  marginBottom: "16px",
+};
+const labelStyle: React.CSSProperties = {
+  display: "block", fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em",
+  textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: "6px",
+};
+const inputStyle: React.CSSProperties = {
+  width: "100%", padding: "10px 12px", borderRadius: "8px",
+  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)",
+  color: "#fff", fontSize: "13px", fontFamily: "'Jura', sans-serif", outline: "none",
+};
