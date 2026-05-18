@@ -197,6 +197,33 @@ function RequestRewardTab({ user }: { user: User }) {
 
   useEffect(() => { setRequests(loadRequests().filter(r => r.playerId === user.id)); }, [user.id]);
 
+  // Listen for host approve/deny broadcasts from the Console parent.
+  // When the host clicks Approve or Deny in their Approvals card, the
+  // Console posts pflx_reward_request_resolved with the updated record;
+  // we merge it into local state so the 'My recent requests' list
+  // flips from PENDING → APPROVED/DENIED in real time.
+  useEffect(() => {
+    function onMsg(ev: MessageEvent) {
+      let m: { type?: string; request?: RewardRequest } | null = null;
+      try { m = typeof ev.data === "string" ? JSON.parse(ev.data) : ev.data; } catch { return; }
+      if (!m || m.type !== "pflx_reward_request_resolved" || !m.request) return;
+      const updated = m.request;
+      const all = loadRequests();
+      const i = all.findIndex(r => r.id === updated.id);
+      if (i >= 0) all[i] = updated;
+      else all.unshift(updated);
+      saveRequests(all);
+      setRequests(all.filter(r => r.playerId === user.id));
+      if (updated.status === "approved") {
+        setMsg({ kind: "success", text: "✓ Host approved your request — rewards are on your account." });
+      } else if (updated.status === "denied") {
+        setMsg({ kind: "error", text: "Host denied this request" + (updated.reviewerNote ? ": " + updated.reviewerNote : ".") });
+      }
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, [user.id]);
+
   const onFile = useCallback((f: File | null) => {
     if (!f) { setProofFileName(""); setProofData(""); return; }
     if (f.size > 2 * 1024 * 1024) {
