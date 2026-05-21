@@ -357,31 +357,11 @@ export default function SideNav({ user }: NavProps) {
           {soundOn ? "Sound FX On" : "Sound FX Off"}
         </button>
 
-        {/* ── Sign Out ─────────────────────────────────────────────── */}
-        <button
-          id="logout-btn"
-          onClick={handleLogout}
-          style={{
-            display: "flex", alignItems: "center", gap: "10px",
-            padding: "9px 12px", borderRadius: "8px", border: "none",
-            background: "transparent",
-            color: "rgba(0,212,255,0.3)",
-            fontSize: "11px", fontWeight: 700,
-            cursor: "pointer", textAlign: "left", transition: "all 0.15s",
-            letterSpacing: "0.08em", textTransform: "uppercase",
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,80,80,0.06)";
-            (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,100,100,0.7)";
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-            (e.currentTarget as HTMLButtonElement).style.color = "rgba(0,212,255,0.3)";
-          }}
-        >
-          <span style={{ fontSize: "13px" }}>↩</span>
-          Sign Out
-        </button>
+        {/* Sign Out removed — sign-out is owned by the PFLX Platform now.
+            Logging out of X-Coin in isolation only clears its iframe state
+            and leaves the player half-logged-in everywhere else, which was
+            confusing. The Platform's profile menu is the only sign-out
+            surface in the suite. */}
 
         {/* ── Version footer ───────────────────────────────────────── */}
         <p style={{
