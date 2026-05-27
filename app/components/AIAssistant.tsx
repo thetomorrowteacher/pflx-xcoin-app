@@ -159,7 +159,7 @@ function buildTextResponse(input: string, router: ReturnType<typeof useRouter>):
     [["dashboard","home"], "/admin", "Dashboard"],
     [["approvals","approval"], "/admin/approvals", "Approvals"],
     [["players","player"], "/admin/players", "Players"],
-    [["task management","tasks"], "/admin/task-management", "Task Management"],
+    // X-Coin no longer surfaces task management — handled by Mission Control.
     [["leaderboard"], "/admin/leaderboard", "Leaderboard"],
     [["coins","coin management"], "/admin/coins", "Coin Management"],
     [["game management","modifiers"], "/admin/modifiers", "Game Management"],
