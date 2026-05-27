@@ -288,8 +288,7 @@ export async function saveAll() {
   await Promise.all([
     saveUsers(),
     saveCheckpoints(),
-    saveTasks(),
-    saveJobs(),
+    // tasks/jobs intentionally OMITTED — MC owns them, X-Coin must not push.
     saveTransactions(),
     saveModifiers(),
     savePlayerModifiers(),
@@ -299,7 +298,7 @@ export async function saveAll() {
     savePlayerDeals(),
     saveStartupStudios(),
     saveStudioInvestments(),
-    saveProjects(),
+    // projects intentionally OMITTED — MC owns them.
     saveCoinCategories(),
     saveTrades(),
     saveInvestments(),
