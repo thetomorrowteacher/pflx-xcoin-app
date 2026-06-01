@@ -1055,61 +1055,16 @@ export let mockTasks: Task[] = [
   },
 ];
 
-// Mock Jobs
-export let mockJobs: Job[] = [
-  {
-    id: "job-1",
-    title: "Class Social Media Manager",
-    description: "Manage the class Instagram and TikTok accounts for 2 weeks. Post 3x per week with approved content.",
-    rewardCoins: [
-      { coinName: "Content Creator", amount: 2 },
-      { coinName: "Social Media Manager", amount: 1 } 
-    ],
-    xcReward: 1200,
-    slots: 2,
-    filledSlots: 1,
-    status: "open",
-    createdBy: "admin-1",
-    createdAt: "2026-03-01",
-    applicants: ["player-1", "player-3"],
-    approved: ["player-1"],
-    assignedTo: "all",
-  },
-  {
-    id: "job-2",
-    title: "Equipment Room Assistant",
-    description: "Help manage and organize the equipment room. Check in/out cameras and audio gear for classmates.",
-    rewardCoins: [
-      { coinName: "Resource Manager", amount: 1 }
-    ],
-    xcReward: 800,
-    slots: 1,
-    filledSlots: 1,
-    status: "closed",
-    createdBy: "admin-1",
-    createdAt: "2026-02-15",
-    applicants: ["player-2", "player-5"],
-    approved: ["player-2"],
-    assignedTo: "all",
-  },
-  {
-    id: "job-3",
-    title: "Peer Tutor — Adobe Creative Suite",
-    description: "Help fellow players with Photoshop, Illustrator, and Premiere Pro. Must have Level 10+.",
-    rewardCoins: [
-      { coinName: "Creative Mentor", amount: 1 }
-    ],
-    xcReward: 1500,
-    slots: 3,
-    filledSlots: 0,
-    status: "open",
-    createdBy: "admin-1",
-    createdAt: "2026-03-10",
-    applicants: ["player-4"],
-    approved: [],
-    assignedTo: "all",
-  },
-];
+// Job Board seed — empty by design. The earlier seed shipped three demo
+// jobs (Class Social Media Manager, Equipment Room Assistant, Peer Tutor
+// — Adobe Creative Suite) and on every X-Coin iframe boot they were
+// pushed back into the shared mcJobs collection via the cloud sync.
+// That's why the Home Base Job Board kept repopulating after the host
+// thought they had cleared it — the wipe lived only in MC localStorage
+// and the Supabase row, but X-Coin's own boot re-seeded both. With the
+// seed now empty, the Job Board only ever holds jobs the host actually
+// posts through the MC UI.
+export let mockJobs: Job[] = [];
 
 // Mock Transactions
 export let mockTransactions: Transaction[] = [
