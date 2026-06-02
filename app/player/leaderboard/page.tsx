@@ -29,7 +29,7 @@ const RANK_TIERS = [
 
 const rankEmojis = ["🥇", "🥈", "🥉"];
 
-type SortKey     = "status" | "xcoin" | "totalXcoin" | "digitalBadge" | "name";
+type SortKey     = "evoRank" | "status" | "xcoin" | "totalXcoin" | "digitalBadge" | "name";
 type BadgeFilter = "all" | BadgeKey;
 type TierFilter  = "all" | "foundation" | "production" | "leadership" | "executive_tier";
 
@@ -105,7 +105,11 @@ export default function PlayerLeaderboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<"players" | "studios">("players");
-  const [sortBy,       setSortBy]       = useState<SortKey>("status");
+  // Default sort is Evo Rank — players are ranked first by Evo Rank tier
+  // (Master Admin → Player), then by lifetime XC (totalXcoin) as the
+  // tiebreaker within the same rank. This matches the platform's
+  // progression model where rank is the primary status signal.
+  const [sortBy,       setSortBy]       = useState<SortKey>("evoRank");
   const [sortDir,      setSortDir]      = useState<"desc" | "asc">("desc");
   const [badgeFilter,  setBadgeFilter]  = useState<BadgeFilter>("all");
   const [tierFilter,   setTierFilter]   = useState<TierFilter>("all");
@@ -142,7 +146,16 @@ export default function PlayerLeaderboard() {
 
   const sorted = [...filtered].sort((a, b) => {
     let diff = 0;
-    if (sortBy === "status")       diff = getStatusScore(b) - getStatusScore(a);
+    if (sortBy === "evoRank") {
+      // Primary: rank level (high → low). Tiebreaker: lifetime XC.
+      // Both signals are derived from getCurrentRank which already
+      // honors any pre-resolved fields the platform shell sets on
+      // the user record (rank, rankIcon, level, etc.).
+      const ra = getCurrentRank(a.totalXcoin, a);
+      const rb = getCurrentRank(b.totalXcoin, b);
+      diff = (rb.level - ra.level) || (b.totalXcoin - a.totalXcoin);
+    }
+    else if (sortBy === "status")       diff = getStatusScore(b) - getStatusScore(a);
     else if (sortBy === "xcoin")        diff = b.xcoin - a.xcoin;
     else if (sortBy === "totalXcoin")   diff = b.totalXcoin - a.totalXcoin;
     else if (sortBy === "digitalBadge") diff = b.digitalBadges - a.digitalBadges;
@@ -442,6 +455,7 @@ export default function PlayerLeaderboard() {
               value={sortBy}
               onChange={setSortBy}
               options={[
+                { key: "evoRank",      label: "🏆 Evo Rank" },
                 { key: "status",       label: "⭐ Status Score" },
                 { key: "xcoin",        label: "🪙 XC Balance" },
                 { key: "totalXcoin",   label: "📈 Total XC" },

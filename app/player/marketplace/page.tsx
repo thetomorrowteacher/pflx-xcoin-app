@@ -517,7 +517,13 @@ export default function PlayerMarketplace() {
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px" }}>
           {upgrades.map(mod => {
-            const hasEnough = user.xcoin >= mod.costXcoin && user.digitalBadges >= mod.costXcoin;
+            // hasEnough — upgrades are paid in XC only. The previous check
+            // also required user.digitalBadges >= mod.costXcoin which made
+            // every upgrade unbuyable for a player with no badges, even
+            // when they had plenty of XC. costBadge is a separate field
+            // on the modifier that's used for badge-priced items; for the
+            // XC-priced grid here only XC matters.
+            const hasEnough = user.xcoin >= mod.costXcoin;
 
             return (
               <div key={mod.id} style={{
@@ -597,22 +603,11 @@ export default function PlayerMarketplace() {
                 </p>
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 1 }}>
+                  {/* Cost chip — XC only. The second yellow chip that
+                      previously rendered the same costXcoin value was a
+                      copy-paste leftover and looked like the upgrade
+                      required two separate currencies. */}
                   <div style={{ display: "flex", gap: "8px" }}>
-                    {mod.costXcoin > 0 && (
-                      <span style={{
-                        padding: "6px 10px",
-                        borderRadius: "8px",
-                        background: "rgba(167,139,250,0.1)",
-                        border: "1px solid rgba(167,139,250,0.3)",
-                        color: "#a78bfa",
-                        fontSize: "14px",
-                        fontWeight: 800,
-                        textShadow: "0 0 8px rgba(167,139,250,0.4)",
-                        boxShadow: "0 0 10px rgba(167,139,250,0.15)"
-                      }}>
-                        ⚡ {mod.costXcoin} XC
-                      </span>
-                    )}
                     {mod.costXcoin > 0 && (
                       <span style={{
                         padding: "6px 10px",
@@ -625,7 +620,22 @@ export default function PlayerMarketplace() {
                         textShadow: "0 0 8px rgba(245,200,66,0.4)",
                         boxShadow: "0 0 10px rgba(245,200,66,0.15)"
                       }}>
-                        🪙 {mod.costXcoin} XC
+                        🪙 {mod.costXcoin.toLocaleString()} XC
+                      </span>
+                    )}
+                    {mod.costBadge > 0 && (
+                      <span style={{
+                        padding: "6px 10px",
+                        borderRadius: "8px",
+                        background: "rgba(167,139,250,0.1)",
+                        border: "1px solid rgba(167,139,250,0.3)",
+                        color: "#a78bfa",
+                        fontSize: "14px",
+                        fontWeight: 800,
+                        textShadow: "0 0 8px rgba(167,139,250,0.4)",
+                        boxShadow: "0 0 10px rgba(167,139,250,0.15)"
+                      }}>
+                        🏅 {mod.costBadge} Badge{mod.costBadge === 1 ? "" : "s"}
                       </span>
                     )}
                   </div>

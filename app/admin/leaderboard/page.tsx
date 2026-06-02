@@ -12,7 +12,7 @@ import {
 } from "../../lib/data";
 import { applyPlayerImages } from "../../lib/playerImages";
 
-type SortKey     = "status" | "xcoin" | "totalXcoin" | "digitalBadge";
+type SortKey     = "evoRank" | "status" | "xcoin" | "totalXcoin" | "digitalBadge";
 type BadgeFilter = "all" | "signature" | "executive" | "premium" | "primary";
 type TierFilter  = "all" | "foundation" | "production" | "leadership" | "executive_tier";
 
@@ -127,7 +127,9 @@ export default function AdminLeaderboard() {
   const router = useRouter();
   const [user, setUser]               = useState<User | null>(null);
   const [view, setView]               = useState<"players" | "studios">("players");
-  const [sortBy, setSortBy]           = useState<SortKey>("status");
+  // Default sort is Evo Rank — rank tier first (Master Admin → Player),
+  // then lifetime XC as tiebreaker.
+  const [sortBy, setSortBy]           = useState<SortKey>("evoRank");
   const [badgeFilter, setBadgeFilter] = useState<BadgeFilter>("all");
   const [tierFilter, setTierFilter]   = useState<TierFilter>("all");
   const [cohortFilter, setCohortFilter] = useState<string[]>([]);
@@ -150,6 +152,12 @@ export default function AdminLeaderboard() {
 
   // Sort
   const allPlayers = [...applyPlayerImages(mockUsers).filter(u => u.role === "player")].sort((a, b) => {
+    if (sortBy === "evoRank") {
+      // Primary: rank level high → low. Tiebreaker: lifetime XC.
+      const ra = getCurrentRank(a.totalXcoin, a);
+      const rb = getCurrentRank(b.totalXcoin, b);
+      return (rb.level - ra.level) || (b.totalXcoin - a.totalXcoin);
+    }
     if (sortBy === "status")       return getStatusScore(b) - getStatusScore(a);
     if (sortBy === "xcoin")        return b.xcoin - a.xcoin;
     if (sortBy === "totalXcoin")   return b.totalXcoin - a.totalXcoin;
@@ -401,6 +409,7 @@ export default function AdminLeaderboard() {
               onChange={setSortBy}
               activeColor={CYAN}
               options={[
+                { key: "evoRank",      label: "🏆 Evo Rank" },
                 { key: "status",       label: "⭐ Status Score" },
                 { key: "xcoin",        label: "💎 XC Balance" },
                 { key: "totalXcoin",   label: "⚡ Total XC" },
