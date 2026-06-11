@@ -1993,7 +1993,11 @@ export interface PlayerShipState {
   equippedEngine: string;      // Engine option ID
   equippedTrail: string;       // Trail option ID
   ownedTiers: string[];        // IDs of purchased ship tiers
-  modules?: string[];          // Purchased ship module add-on IDs (SHIP_MODULES)
+  // Purchased SHIP SYSTEM ids (SHIP_SYSTEMS). NOTE: the wire/storage key
+  // stays "modules" for cross-app compat with pathway.html, but these are
+  // ship hardware add-ons — NOT cartridge Modules (courses/projects that
+  // plug into Nodes per MODULE_STRUCTURE.md).
+  modules?: string[];
 }
 
 export function getDefaultShipState(): PlayerShipState {
@@ -2007,13 +2011,14 @@ export function getDefaultShipState(): PlayerShipState {
   };
 }
 
-// ==================== SHIP MODULES (add-ons) ====================
-// Cross-app contract with Core Pathways open space (pathway.html
-// honors these ids via pflx_ship_state.modules[]). Each module
-// changes how the ship interacts with the endless space: mining,
-// collection radius, event scanning, black-hole resistance, and
-// asteroid-blasting weaponry.
-export interface ShipModule {
+// ==================== SHIP SYSTEMS (hardware add-ons) ====================
+// Cross-app contract with Core Pathways open space (pathway.html honors
+// these ids via pflx_ship_state.modules[] — wire key kept for compat).
+// Each SYSTEM changes how the ship interacts with the endless space:
+// mining, collection radius, event scanning, black-hole resistance, and
+// asteroid-blasting weaponry. Terminology: "Module" is reserved for the
+// cartridge (course/project) that plugs into a Node — these are not that.
+export interface ShipSystem {
   id: string;
   name: string;
   icon: string;
@@ -2023,7 +2028,7 @@ export interface ShipModule {
   minRank: number;
 }
 
-export const SHIP_MODULES: ShipModule[] = [
+export const SHIP_SYSTEMS: ShipSystem[] = [
   {
     id: "blaster-mk2",
     name: "Blaster MK-II",

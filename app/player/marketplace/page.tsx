@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
-import { User, PFLXModifier, mockModifiers, mockPlayerModifiers, PlayerModifier, mockTransactions, getCurrentRank, SHIP_TIERS, ShipTier, PlayerShipState, getDefaultShipState, SHIP_MODULES, ShipModule } from "../../lib/data";
+import { User, PFLXModifier, mockModifiers, mockPlayerModifiers, PlayerModifier, mockTransactions, getCurrentRank, SHIP_TIERS, ShipTier, PlayerShipState, getDefaultShipState, SHIP_SYSTEMS, ShipSystem } from "../../lib/data";
 import { playSuccess, playError, playCashRegister } from "../../lib/sounds";
 
 export default function PlayerMarketplace() {
@@ -154,7 +154,7 @@ export default function PlayerMarketplace() {
     showToast(`${ship.name} acquired and equipped! 🚀`, "success");
   };
 
-  const purchaseModule = (mod: ShipModule) => {
+  const purchaseSystem = (mod: ShipSystem) => {
     if (!user) return;
     const owned = (shipState.modules || []).includes(mod.id);
     if (owned) return;
@@ -180,11 +180,11 @@ export default function PlayerMarketplace() {
       type: "spent",
       amount: mod.costXC,
       currency: "xcoin",
-      description: `Purchased Ship Module: ${mod.name}`,
+      description: `Purchased Ship System: ${mod.name}`,
       createdAt: new Date().toISOString().split("T")[0]
     });
-    // Add module — saveShipState broadcasts pflx_ship_state_update so
-    // Core Pathways picks up the new modules[] immediately.
+    // Add system — saveShipState broadcasts pflx_ship_state_update so
+    // Core Pathways picks it up immediately (wire key "modules" for compat).
     const ns = { ...shipState, modules: [...(shipState.modules || []), mod.id] };
     saveShipState(ns);
     playCashRegister();
@@ -480,17 +480,17 @@ export default function PlayerMarketplace() {
               })}
             </div>
 
-            {/* ── SHIP MODULES — open-space add-ons (Core Pathways contract) ── */}
+            {/* ── SHIP SYSTEMS — open-space hardware add-ons (Core Pathways contract) ── */}
             <div style={{ marginTop: "40px" }}>
               <h2 style={{
                 margin: "0 0 4px", fontSize: "18px", fontWeight: 900, letterSpacing: "0.08em",
                 color: "#a78bfa", textShadow: "0 0 12px rgba(167,139,250,0.4)"
-              }}>🔧 SHIP MODULES</h2>
+              }}>🔧 SHIP SYSTEMS</h2>
               <p style={{ margin: "0 0 20px", fontSize: "12px", color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>
-                Add-ons that change how your ship interacts with open space in Core Pathways — blast asteroids, mine faster, collect farther, resist black holes.
+                Hardware that changes how your ship interacts with open space in Core Pathways — blast asteroids, mine faster, collect farther, resist black holes.
               </p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
-                {SHIP_MODULES.map(mod => {
+                {SHIP_SYSTEMS.map(mod => {
                   const owned = (shipState.modules || []).includes(mod.id);
                   const canAfford = user.xcoin >= mod.costXC;
                   const rankOk = playerRank >= mod.minRank;
@@ -527,7 +527,7 @@ export default function PlayerMarketplace() {
                           )}
                         </div>
                         <button
-                          onClick={() => purchaseModule(mod)}
+                          onClick={() => purchaseSystem(mod)}
                           disabled={!canBuy}
                           style={{
                             padding: "8px 16px", borderRadius: "10px", fontWeight: 700, fontSize: "12px",
