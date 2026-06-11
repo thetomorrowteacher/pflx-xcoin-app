@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
-import { User, PFLXModifier, mockModifiers, mockPlayerModifiers, PlayerModifier, mockTransactions, getCurrentRank, SHIP_TIERS, ShipTier, PlayerShipState, getDefaultShipState } from "../../lib/data";
+import { User, PFLXModifier, mockModifiers, mockPlayerModifiers, PlayerModifier, mockTransactions, getCurrentRank, SHIP_TIERS, ShipTier, PlayerShipState, getDefaultShipState, SHIP_MODULES, ShipModule } from "../../lib/data";
 import { playSuccess, playError, playCashRegister } from "../../lib/sounds";
 
 export default function PlayerMarketplace() {
@@ -152,6 +152,43 @@ export default function PlayerMarketplace() {
     saveShipState(ns);
     playCashRegister();
     showToast(`${ship.name} acquired and equipped! 🚀`, "success");
+  };
+
+  const purchaseModule = (mod: ShipModule) => {
+    if (!user) return;
+    const owned = (shipState.modules || []).includes(mod.id);
+    if (owned) return;
+    if (user.xcoin < mod.costXC) {
+      playError();
+      showToast("Not enough XC for this module.", "error");
+      return;
+    }
+    const rank = getCurrentRank(user.totalXcoin, user).level;
+    if (rank < mod.minRank) {
+      playError();
+      showToast(`Requires Rank ${mod.minRank}+ to purchase.`, "error");
+      return;
+    }
+    // Deduct XC
+    const updatedUser = { ...user, xcoin: user.xcoin - mod.costXC };
+    setUser(updatedUser);
+    localStorage.setItem("pflx_user", JSON.stringify(updatedUser));
+    // Record transaction
+    mockTransactions.push({
+      id: `tx-${Date.now()}`,
+      userId: user.id,
+      type: "spent",
+      amount: mod.costXC,
+      currency: "xcoin",
+      description: `Purchased Ship Module: ${mod.name}`,
+      createdAt: new Date().toISOString().split("T")[0]
+    });
+    // Add module — saveShipState broadcasts pflx_ship_state_update so
+    // Core Pathways picks up the new modules[] immediately.
+    const ns = { ...shipState, modules: [...(shipState.modules || []), mod.id] };
+    saveShipState(ns);
+    playCashRegister();
+    showToast(`${mod.name} installed! ${mod.icon}`, "success");
   };
 
   const equipCustomization = (type: "hull" | "engine" | "trail", optionId: string) => {
@@ -441,6 +478,73 @@ export default function PlayerMarketplace() {
                   </div>
                 );
               })}
+            </div>
+
+            {/* ── SHIP MODULES — open-space add-ons (Core Pathways contract) ── */}
+            <div style={{ marginTop: "40px" }}>
+              <h2 style={{
+                margin: "0 0 4px", fontSize: "18px", fontWeight: 900, letterSpacing: "0.08em",
+                color: "#a78bfa", textShadow: "0 0 12px rgba(167,139,250,0.4)"
+              }}>🔧 SHIP MODULES</h2>
+              <p style={{ margin: "0 0 20px", fontSize: "12px", color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>
+                Add-ons that change how your ship interacts with open space in Core Pathways — blast asteroids, mine faster, collect farther, resist black holes.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
+                {SHIP_MODULES.map(mod => {
+                  const owned = (shipState.modules || []).includes(mod.id);
+                  const canAfford = user.xcoin >= mod.costXC;
+                  const rankOk = playerRank >= mod.minRank;
+                  const canBuy = !owned && canAfford && rankOk;
+                  return (
+                    <div key={mod.id} style={{
+                      background: owned ? "rgba(34,197,94,0.05)" : "rgba(167,139,250,0.04)",
+                      border: owned ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(167,139,250,0.18)",
+                      borderRadius: "16px", padding: "20px",
+                      boxShadow: owned ? "0 0 18px rgba(34,197,94,0.08)" : "none",
+                      transition: "all 0.3s",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "10px" }}>
+                        <div style={{
+                          width: "48px", height: "48px", borderRadius: "12px",
+                          background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.25)",
+                          display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px",
+                        }}>{mod.icon}</div>
+                        <div>
+                          <div style={{ fontSize: "16px", fontWeight: 800, color: "#a78bfa", letterSpacing: "0.04em" }}>{mod.name}</div>
+                          <div style={{ fontSize: "10px", color: "rgba(0,212,255,0.7)", letterSpacing: "0.04em" }}>{mod.effect}</div>
+                        </div>
+                      </div>
+                      <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)", lineHeight: 1.5, margin: "0 0 14px" }}>{mod.description}</p>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <span style={{
+                            padding: "5px 10px", borderRadius: "8px",
+                            background: "rgba(245,200,66,0.1)", border: "1px solid rgba(245,200,66,0.3)",
+                            color: "#f5c842", fontSize: "13px", fontWeight: 800,
+                          }}>🪙 {mod.costXC.toLocaleString()} XC</span>
+                          {mod.minRank > 1 && (
+                            <span style={{ marginLeft: "8px", fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>Rank {mod.minRank}+</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => purchaseModule(mod)}
+                          disabled={!canBuy}
+                          style={{
+                            padding: "8px 16px", borderRadius: "10px", fontWeight: 700, fontSize: "12px",
+                            cursor: canBuy ? "pointer" : owned ? "default" : "not-allowed",
+                            background: owned ? "rgba(34,197,94,0.12)" : canBuy ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.03)",
+                            color: owned ? "#22c55e" : canBuy ? "#a78bfa" : "rgba(255,255,255,0.2)",
+                            border: owned ? "1px solid rgba(34,197,94,0.3)" : canBuy ? "1px solid rgba(167,139,250,0.4)" : "1px solid rgba(255,255,255,0.08)",
+                            letterSpacing: "0.08em", transition: "all 0.3s",
+                          }}
+                        >
+                          {owned ? "INSTALLED" : canBuy ? "INSTALL" : !rankOk ? `RANK ${mod.minRank}+` : "NOT ENOUGH XC"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Neon glow keyframe for FX-824 */}

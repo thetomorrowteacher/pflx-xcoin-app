@@ -1993,6 +1993,7 @@ export interface PlayerShipState {
   equippedEngine: string;      // Engine option ID
   equippedTrail: string;       // Trail option ID
   ownedTiers: string[];        // IDs of purchased ship tiers
+  modules?: string[];          // Purchased ship module add-on IDs (SHIP_MODULES)
 }
 
 export function getDefaultShipState(): PlayerShipState {
@@ -2002,5 +2003,70 @@ export function getDefaultShipState(): PlayerShipState {
     equippedEngine: "e1-standard",
     equippedTrail: "t1-basic",
     ownedTiers: ["ship-t1-scout"],
+    modules: [],
   };
 }
+
+// ==================== SHIP MODULES (add-ons) ====================
+// Cross-app contract with Core Pathways open space (pathway.html
+// honors these ids via pflx_ship_state.modules[]). Each module
+// changes how the ship interacts with the endless space: mining,
+// collection radius, event scanning, black-hole resistance, and
+// asteroid-blasting weaponry.
+export interface ShipModule {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  effect: string;       // short effect line shown on the card
+  costXC: number;
+  minRank: number;
+}
+
+export const SHIP_MODULES: ShipModule[] = [
+  {
+    id: "blaster-mk2",
+    name: "Blaster MK-II",
+    icon: "🔫",
+    description: "Twin-linked pulse cannons replace the stock blaster. Tear through asteroid clusters for XC bounties and double ore drops.",
+    effect: "2x damage · 2.3x fire rate vs asteroids (SPACE to fire)",
+    costXC: 400,
+    minRank: 1,
+  },
+  {
+    id: "mining-laser",
+    name: "Mining Laser",
+    icon: "⛏️",
+    description: "Precision beam array for resource extraction. Mines asteroid clusters in a fraction of the time and doubles the ore yield.",
+    effect: "~3x faster mining · 2x ore yield",
+    costXC: 600,
+    minRank: 1,
+  },
+  {
+    id: "tractor-beam",
+    name: "Tractor Beam",
+    icon: "🧲",
+    description: "Graviton projector that pulls salvage and comet dust in from much farther away. Less flying, more collecting.",
+    effect: "Collection radius 150 → 240",
+    costXC: 500,
+    minRank: 2,
+  },
+  {
+    id: "deep-scanner",
+    name: "Deep Scanner",
+    icon: "📡",
+    description: "Long-range sensor suite. Announces comets and space events the moment they enter your sector — before you can see them.",
+    effect: "Early event alerts across the sector",
+    costXC: 450,
+    minRank: 2,
+  },
+  {
+    id: "shield-booster",
+    name: "Shield Booster",
+    icon: "🛡️",
+    description: "Auxiliary deflector generator. Grants black-hole pull resistance on any hull — no Tier 3+ ship required.",
+    effect: "65% gravity-pull mitigation on any ship",
+    costXC: 800,
+    minRank: 2,
+  },
+];
