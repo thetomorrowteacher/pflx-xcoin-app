@@ -7,6 +7,7 @@
 // and Core Pathways tours.
 // ═══════════════════════════════════════════════════════════════════
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 interface TourStep { sel?: string; title: string; body: string; }
 
@@ -19,22 +20,22 @@ const STEPS: TourStep[] = [
     body: "This is your economy hub. Every XC you earn across PFLX — modules, asteroid mining, arena wins, jobs — lands here, along with your badges and Evolution Rank.",
   },
   {
-    sel: 'a[href="/player/marketplace"], [data-nav="/player/marketplace"]',
+    sel: "#nav-marketplace",
     title: "MARKETPLACE & SHIP BAY",
     body: "Spend your XC: upgrades and modifiers, plus the Ship Bay — six ship tiers and Ship Systems (mining laser, tractor beam, blaster MK-II, shields) that change how you fly Core Pathways' open space.",
   },
   {
-    sel: 'a[href="/player/wallet"], [data-nav="/player/wallet"]',
+    sel: "#nav-wallet",
     title: "WALLET",
     body: "Your balance, every transaction, taxes and fines. If you're in a Startup Studio, your studio cut shows here too.",
   },
   {
-    sel: 'a[href="/player/leaderboard"], [data-nav="/player/leaderboard"]',
+    sel: "#nav-leaderboard",
     title: "LEADERBOARD",
     body: "Ranked by Evolution Rank. Higher ranks unlock better ships, bypass cohort locks, and can even let you found galaxy clusters.",
   },
   {
-    sel: 'a[href="/player/submit"], [data-nav="/player/submit"]',
+    sel: "#nav-x-tracker",
     title: "X-TRACKER",
     body: "Submit work for XC approval and trade with peers. Submissions go to your host's Approvals Queue — XC pays when they sign off.",
   },
@@ -43,6 +44,10 @@ const STEPS: TourStep[] = [
 export default function PflxTour() {
   const [idx, setIdx] = useState(-1);
   const [rect, setRect] = useState<{ t: number; l: number; w: number; h: number } | null>(null);
+  const pathname = usePathname();
+  // the tour only makes sense on player pages (the sidebar it spotlights
+  // doesn't exist on the login screen or host views)
+  const onPlayerPages = !!pathname && pathname.startsWith("/player");
 
   const position = useCallback((i: number) => {
     const st = STEPS[i];
@@ -58,6 +63,7 @@ export default function PflxTour() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!onPlayerPages) return;                      // never on login / host views
     try {
       const params = new URLSearchParams(window.location.search);
       if (params.get("embed")) return;               // hidden chrome inside Mission Control
@@ -65,7 +71,7 @@ export default function PflxTour() {
     } catch { return; }
     const t = setTimeout(() => setIdx(0), 1800);
     return () => clearTimeout(t);
-  }, []);
+  }, [onPlayerPages]);
 
   useEffect(() => {
     if (idx >= 0) position(idx);
@@ -93,6 +99,8 @@ export default function PflxTour() {
   } else {
     tipStyle = { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: tipW };
   }
+
+  if (!onPlayerPages) return null;
 
   return (
     <>
