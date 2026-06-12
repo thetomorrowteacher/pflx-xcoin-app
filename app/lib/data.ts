@@ -514,7 +514,6 @@ export interface PlayerModifier {
 }
 
 export let mockPlayerModifiers: PlayerModifier[] = [
-  { id: "pm-1", playerId: "player-1", modifierId: "upg-1", status: "active", acquiredAt: new Date().toISOString() }
 ];
 
 export interface PFLXRank {
@@ -732,9 +731,9 @@ export const COIN_CATEGORIES: CoinCategory[] = [
   {
     name: "Signature Badges (Skill Mastery)",
     coins: [
-      { name: "Cert: Photoshop", description: "Industry certification achievement.", xc: 5000, sponsorType: "player" as const, sponsorId: "player-1", sponsorName: "PixelQueen", residualPercent: 10 },
-      { name: "Cert: Premiere", description: "Industry certification achievement.", xc: 5000, sponsorType: "player" as const, sponsorId: "player-2", sponsorName: "MotionMaster", residualPercent: 12 },
-      { name: "Master Builder", description: "Exceptional mastery of pathway tools.", xc: 5000, sponsorType: "player" as const, sponsorId: "player-1", sponsorName: "PixelQueen", residualPercent: 8 },
+      { name: "Cert: Photoshop", description: "Industry certification achievement.", xc: 5000 },
+      { name: "Cert: Premiere", description: "Industry certification achievement.", xc: 5000 },
+      { name: "Master Builder", description: "Exceptional mastery of pathway tools.", xc: 5000 },
     ]
   }
 ];
@@ -779,108 +778,6 @@ export let mockUsers: User[] = [
     pin: "1111",
     claimed: true,
   },
-  {
-    id: "player-1",
-    name: "Alex Rivera",
-    brandName: "PixelProphet",
-    role: "player",
-    avatar: "AR",
-    digitalBadges: 28,
-    xcoin: 1850,
-    totalXcoin: 8500,
-    level: 9,
-    rank: 3,
-    cohort: "Cohort 2",
-    pathway: "Digital Design",
-    joinedAt: "2024-08-15",
-    email: "alex.rivera@school.edu",
-    pin: "3847",
-    claimed: true,
-    diagnosticComplete: true,
-    studioId: "studio-emagination",
-    badgeCounts: { signature: 1, executive: 4, premium: 3, primary: 20 },
-    diagnosticResult: {
-      brandType: "creative-director",
-      topPathways: ["Digital Design", "Content Creator", "Web Dev"],
-      style: "futuristic",
-      scores: { maker: 72, visionary: 85, storyteller: 78, technologist: 65 },
-      visionStatement: {
-        create: "I create visually stunning digital experiences that push the boundaries of design.",
-        impact: "My work empowers communities to see the world differently through bold creative expression.",
-        perspective: "I believe the future belongs to those who dare to imagine it first.",
-        future: "I will build a brand that bridges art, technology, and culture.",
-      },
-      completedAt: "2024-09-10",
-    },
-  },
-  {
-    id: "player-2",
-    name: "Jordan Lee",
-    brandName: "MotionMaster",
-    role: "player",
-    avatar: "JL",
-    digitalBadges: 42,
-    xcoin: 2900,
-    totalXcoin: 12500,
-    level: 13,
-    rank: 4,
-    cohort: "Cohort 3",
-    pathway: "Content Creator",
-    joinedAt: "2024-08-15",
-    email: "jordan.lee@school.edu",
-    pin: "5291",
-    claimed: false,
-    diagnosticComplete: true,
-    studioId: "studio-gentech",
-    badgeCounts: { signature: 2, executive: 6, premium: 4, primary: 30 },
-    diagnosticResult: {
-      brandType: "digital-innovator",
-      topPathways: ["Content Creator", "Game Designer", "Digital Design"],
-      style: "dynamic",
-      scores: { maker: 68, visionary: 90, storyteller: 88, technologist: 74 },
-      visionStatement: {
-        create: "I create motion-driven content that captures attention and tells powerful stories.",
-        impact: "My work inspires the next generation to express themselves through digital media.",
-        perspective: "I believe authentic storytelling is the most powerful tool in the digital age.",
-        future: "I will become a leading voice in youth media and digital entertainment.",
-      },
-      completedAt: "2024-09-12",
-    },
-  },
-  {
-    id: "player-3",
-    name: "Sam Chen",
-    brandName: "CodeCrafter",
-    role: "player",
-    avatar: "SC",
-    digitalBadges: 15,
-    xcoin: 450,
-    totalXcoin: 2100,
-    level: 4,
-    rank: 2,
-    cohort: "Cohort 2",
-    pathway: "Web Dev",
-    joinedAt: "2024-09-01",
-    email: "sam.chen@school.edu",
-    pin: "7063",
-    claimed: false,
-    diagnosticComplete: true,
-    studioId: "studio-innov8",
-    badgeCounts: { signature: 0, executive: 2, premium: 2, primary: 11 },
-    diagnosticResult: {
-      brandType: "technical-builder",
-      topPathways: ["Web Dev", "Game Designer", "Content Creator"],
-      style: "minimal",
-      scores: { maker: 91, visionary: 70, storyteller: 55, technologist: 95 },
-      visionStatement: {
-        create: "I create clean, functional digital products that solve real problems for real people.",
-        impact: "My work makes technology accessible and intuitive for every kind of learner.",
-        perspective: "I believe the best designs are invisible — they just work.",
-        future: "I will build the tools and platforms that power the next generation of creators.",
-      },
-      completedAt: "2024-09-15",
-    },
-  },
 ];
 
 
@@ -912,29 +809,10 @@ export function generatePin(): string {
 
 // Mock Trades
 export const mockTrades: XPTrade[] = [
-  {
-    id: "trade-1",
-    fromId: "player-1",
-    toId: "player-2",
-    amount: 150,
-    note: "Help with Premiere transitions",
-    status: "pending",
-    createdAt: "2026-03-15",
-  }
 ];
 
 // Mock Investments
 export const mockInvestments: Investment[] = [
-  {
-    id: "inv-1",
-    playerId: "player-2",
-    targetType: "task",
-    targetId: "task-1",
-    amount: 300,
-    expectedReturn: 360,
-    status: "active",
-    createdAt: "2026-03-14",
-  }
 ];
 
 // Mock Task Rounds
@@ -991,39 +869,6 @@ export let mockTasks: Task[] = [
     roundId: "round-1",
   },
   {
-    id: "task-2",
-    title: "Create a 60-Second Reel",
-    description: "Produce a 60-second social media reel showcasing your pathway project. Must include music, transitions, and captions.",
-    rewardCoins: [{ coinName: "Content Creator", amount: 2 }],
-    xcReward: 500,
-    dueDate: "2026-03-18",
-    status: "submitted",
-    submittedBy: "player-1",
-    submittedAt: "2026-03-12",
-    createdBy: "admin-1",
-    createdAt: "2026-03-05",
-    category: "Content",
-    assignedTo: "all",
-    roundId: "round-1",
-  },
-  {
-    id: "task-3",
-    title: "Complete Adobe Illustrator Quiz",
-    description: "Take the Adobe Illustrator fundamentals quiz on Canvas and score 80% or higher.",
-    rewardCoins: [{ coinName: "Tech Savvy", amount: 1 }],
-    xcReward: 100,
-    dueDate: "2026-03-15",
-    status: "approved",
-    submittedBy: "player-2",
-    submittedAt: "2026-03-10",
-    submissionProof: { linkUrl: "https://canvas.example.com/quiz/123", note: "Scored 92%" },
-    createdBy: "admin-1",
-    createdAt: "2026-03-01",
-    category: "Quiz",
-    assignedTo: "all",
-    roundId: "round-past-1",
-  },
-  {
     id: "task-4",
     title: "Build a Figma Prototype",
     description: "Design and prototype a mobile app concept using Figma. Minimum 5 screens with working interactions.",
@@ -1069,24 +914,6 @@ export let mockJobs: Job[] = [];
 // Mock Transactions
 export let mockTransactions: Transaction[] = [
   {
-    id: "tx-1",
-    userId: "player-1",
-    type: "earned",
-    amount: 75,
-    currency: "xcoin",
-    description: "Task approved: Create a 60-Second Reel",
-    createdAt: "2026-03-12",
-  },
-  {
-    id: "tx-2",
-    userId: "player-2",
-    type: "earned",
-    amount: 30,
-    currency: "xcoin",
-    description: "Task approved: Adobe Illustrator Quiz",
-    createdAt: "2026-03-10",
-  },
-  {
     id: "tx-3",
     userId: "player-4",
     type: "earned",
@@ -1095,37 +922,9 @@ export let mockTransactions: Transaction[] = [
     description: "Job completed: Equipment Room Assistant",
     createdAt: "2026-03-01",
   },
-  {
-    id: "tx-4",
-    userId: "player-1",
-    type: "admin_grant",
-    amount: 50,
-    currency: "xcoin",
-    description: "Bonus: Outstanding class participation",
-    createdAt: "2026-03-05",
-  },
 ];
 
 export let mockSubmissions: CoinSubmission[] = [
-  {
-    id: "sub-1",
-    playerId: "player-1",
-    coinType: "Collaborator",
-    amount: 1,
-    reason: "Helped Jordan with their project setup",
-    status: "approved",
-    submittedAt: "2024-09-10",
-    reviewedAt: "2024-09-11",
-  },
-  {
-    id: "sub-2",
-    playerId: "player-2",
-    coinType: "Problem Solver",
-    amount: 2,
-    reason: "Fixed a critical bug in the class repo",
-    status: "pending",
-    submittedAt: "2024-09-15",
-  },
 ];
 
 export function getLevelFromXC(xcoin: number): number {
@@ -1300,18 +1099,6 @@ export function getInvestmentBoostMultiplier(stakes: InvestorStake[] = []): numb
 
 // Player-to-player investment deals
 export let mockPlayerDeals: PlayerDeal[] = [
-  {
-    id: "deal-1",
-    investorId: "player-2",       // Jordan Lee (Rank 4: Manager)
-    targetPlayerId: "player-3",   // Sam Chen (Rank 2: Advanced Player)
-    xpStake: 500,
-    stakePercent: 5,
-    terms: "Investing 500 XC in Sam's development. In return, 5% of all future task and job earnings for this season.",
-    status: "pending",
-    createdAt: "2026-03-16",
-    totalEarningsTracked: 0,
-    totalReturned: 0,
-  }
 ];
 
 // ─────────────────────────────────────────────────────────────────
@@ -1502,26 +1289,6 @@ export let mockStartupStudios: StartupStudio[] = [
 
 // ─── Mock Studio Investments ────────────────────────────────────
 export let mockStudioInvestments: StudioInvestment[] = [
-  {
-    id: "sinv-1",
-    playerId: "player-1",
-    studioId: "studio-emagination",
-    stakeXC: 500,
-    stakePercent: 2.2,
-    status: "active",
-    createdAt: "2026-03-10",
-    earnedReturn: 45,
-  },
-  {
-    id: "sinv-2",
-    playerId: "player-2",
-    studioId: "studio-emagination",
-    stakeXC: 1200,
-    stakePercent: 5.3,
-    status: "active",
-    createdAt: "2026-03-08",
-    earnedReturn: 112,
-  },
 ];
 
 // ─── Mock Projects ───────────────────────────────────────────────
