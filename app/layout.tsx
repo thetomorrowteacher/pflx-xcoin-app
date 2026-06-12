@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
-import Ticker from "./components/Ticker";
+// Ticker removed (Ennis, June 2026) — the bottom notification bar was
+// stale and in the way. Re-import + re-mount <Ticker /> to restore.
 import StoreProvider from "./components/StoreProvider";
 import FullscreenToggle from "./components/FullscreenToggle";
 import PflxBridge from "./components/PflxBridge";
@@ -37,7 +38,6 @@ export default function RootLayout({
       <body>
         <StoreProvider>
           {children}
-          <Ticker />
           <FullscreenToggle />
           <PflxBridge />
           <PflxIframeGuard />
