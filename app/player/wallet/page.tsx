@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
+import LinkedInConnect from "../../components/LinkedInConnect";
 import { User, mockTransactions, Transaction, mockSubmissions, COIN_CATEGORIES, Coin, getCurrentRank, getStudioTaxRate, getEvoSharePercent, mockStartupStudios, mockProjectPitches, calculateNFTValue, calculateRarity } from "../../lib/data";
 
 export default function PlayerWallet() {
@@ -207,7 +208,27 @@ export default function PlayerWallet() {
               textShadow: "0 0 15px rgba(0,212,255,0.5)",
               textTransform: "uppercase", letterSpacing: "0.1em"
             }}>🛡️ DIGITAL BADGE COLLECTION</h2>
-            <span style={{ fontSize: "11px", color: "rgba(0,212,255,0.5)", fontWeight: 600 }}>UNIQUE BADGES: {Object.keys(badgeCounts).length}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+              <LinkedInConnect
+                playerId={user.id}
+                latestBadge={approvedSubmissions.length ? [...approvedSubmissions].sort((a, b) => ((b.reviewedAt || b.submittedAt) > (a.reviewedAt || a.submittedAt) ? 1 : -1))[0].coinType : undefined}
+                brandName={user.brandName}
+              />
+              <a
+                href={`/badge/${user.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px",
+                  padding: "6px 14px", borderRadius: "8px", textDecoration: "none",
+                  border: "1px solid rgba(10,102,194,0.45)", background: "rgba(10,102,194,0.14)",
+                  color: "#6cb2ff",
+                }}
+              >
+                in SHARE TO LINKEDIN
+              </a>
+              <span style={{ fontSize: "11px", color: "rgba(0,212,255,0.5)", fontWeight: 600 }}>UNIQUE BADGES: {Object.keys(badgeCounts).length}</span>
+            </div>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
