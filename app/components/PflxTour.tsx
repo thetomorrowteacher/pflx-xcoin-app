@@ -87,17 +87,36 @@ export default function PflxTour() {
   const next = () => (idx >= STEPS.length - 1 ? end() : setIdx(idx + 1));
   const back = () => setIdx(Math.max(0, idx - 1));
 
-  // tooltip placement
-  const tipW = Math.min(340, typeof window !== "undefined" ? window.innerWidth * 0.9 : 340);
+  // Tooltip placement.
+  // The previous `width: tipW` was a single computed pixel value which
+  // got squashed to a narrow vertical strip when ANY ancestor in the
+  // X-Coin layout had a CSS transform applied (transforms scope
+  // position:fixed to that ancestor). Symptom: every word of the
+  // tooltip wrapped onto its own line. Fix is two parts —
+  //   1. Use min/max-width + minWidth so the box can't be squashed
+  //      below 280px even if the layout tries.
+  //   2. wordBreak: normal, whiteSpace: normal force sane wrapping
+  //      regardless of inherited typography rules.
+  const tipW = 340;
   let tipStyle: React.CSSProperties;
   if (rect) {
     let top = rect.t + rect.h + 18;
     if (typeof window !== "undefined" && top + 230 > window.innerHeight) top = Math.max(12, rect.t - 240);
     let left = rect.l + rect.w / 2 - tipW / 2;
     if (typeof window !== "undefined") left = Math.max(12, Math.min(window.innerWidth - tipW - 12, left));
-    tipStyle = { position: "fixed", top, left, width: tipW };
+    tipStyle = {
+      position: "fixed", top, left,
+      width: tipW, minWidth: 280, maxWidth: "min(340px, calc(100vw - 24px))",
+      boxSizing: "border-box",
+      whiteSpace: "normal", wordBreak: "normal", overflowWrap: "break-word",
+    };
   } else {
-    tipStyle = { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: tipW };
+    tipStyle = {
+      position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+      width: tipW, minWidth: 280, maxWidth: "min(340px, calc(100vw - 24px))",
+      boxSizing: "border-box",
+      whiteSpace: "normal", wordBreak: "normal", overflowWrap: "break-word",
+    };
   }
 
   if (!onPlayerPages) return null;
