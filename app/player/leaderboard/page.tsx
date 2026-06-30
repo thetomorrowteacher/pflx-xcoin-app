@@ -128,6 +128,22 @@ export default function PlayerLeaderboard() {
     setUser(u);
   }, [router]);
 
+  // ── Live re-render when PflxBridge merges fresh profile images
+  // from the platform's pflx_players_list response. Without this
+  // hook, the merge updates localStorage and mockUsers but React
+  // keeps showing the cached frame — so NEUROFLUX's avatar would
+  // pop in only after a manual reload.
+  const [, _bumpRender] = useState(0);
+  useEffect(() => {
+    const onMerged = () => _bumpRender((n) => n + 1);
+    window.addEventListener("pflx-roster-images-merged", onMerged);
+    window.addEventListener("pflx-player-changed", onMerged);
+    return () => {
+      window.removeEventListener("pflx-roster-images-merged", onMerged);
+      window.removeEventListener("pflx-player-changed", onMerged);
+    };
+  }, []);
+
   if (!user) return null;
 
   const allPlayers = applyPlayerImages(mockUsers).filter((u) => u.role === "player");

@@ -42,6 +42,34 @@ export default function PflxBridge() {
       try {
         window.parent.postMessage(JSON.stringify({ type: "pflx_identity_request" }), "*");
       } catch {}
+      // ── Pull the full player roster from Console ──
+      // X-Coin's leaderboard reads from mockUsers + applyPlayerImages
+      // (which checks localStorage pflx_player_images). The PROFILE
+      // PHOTOS players upload through the Platform's Player Management
+      // form land in the Console's PLAYERS array (and the cloud row
+      // pflx_player_<id>), NOT in X-Coin's pflx_player_images map.
+      // Without this hop, the leaderboard avatars show as empty rings /
+      // initials for everyone except players who happened to upload
+      // their image directly inside an X-Coin flow.
+      //
+      // Asking the Console for the full roster gets us back every
+      // player record including `image` (data URI or URL). We mirror
+      // each into BOTH the mockUsers array (so the leaderboard's
+      // current render picks it up) AND the pflx_player_images
+      // localStorage map (so applyPlayerImages finds it on every
+      // future render too).
+      try {
+        // Tiny delay so the platform shell has time to wire up its
+        // PflxDataBus before our request arrives.
+        setTimeout(() => {
+          try {
+            window.parent.postMessage(JSON.stringify({
+              type: "pflx_players_list_request",
+              source: "xcoin-leaderboard-images",
+            }), "*");
+          } catch {}
+        }, 250);
+      } catch {}
     }
 
     // ── Send readiness signal to parent once store is initialized ──
@@ -194,8 +222,50 @@ export default function PflxBridge() {
         }
 
         // ── PflxDataBus: roster from Console ──
+        // Two-purpose handler. (1) Dispatch the event for any consumer
+        // that wants the raw list. (2) Mirror each player's profile
+        // image into the local pflx_player_images map AND into the
+        // mockUsers array, so the leaderboard avatars resolve to the
+        // image the host uploaded through Player Management.
         if (msg.type === "pflx_players_list" && Array.isArray(msg.players)) {
           window.dispatchEvent(new CustomEvent("pflx-players-list", { detail: { players: msg.players, ackId: msg.ackId || null } }));
+          try {
+            // Image map merge
+            let imgMap: Record<string, string> = {};
+            try {
+              const raw = localStorage.getItem("pflx_player_images");
+              if (raw) imgMap = JSON.parse(raw) || {};
+            } catch {}
+            let imgChanged = false;
+            let usersChanged = false;
+            msg.players.forEach((p: { id?: string; image?: string; brand?: string; brandName?: string; name?: string; xc?: number; xcoin?: number; totalXcoin?: number; digitalBadges?: number; level?: number; rank?: number; cohort?: string; pathway?: string; pin?: string; role?: string; claimed?: boolean }) => {
+              if (!p || !p.id) return;
+              if (p.image && imgMap[p.id] !== p.image) {
+                imgMap[p.id] = p.image;
+                imgChanged = true;
+              }
+              // Also push the latest image and identity fields into
+              // mockUsers so the leaderboard's current render picks
+              // them up without waiting for the next applyPlayerImages
+              // pass to merge from localStorage.
+              const idx = D.mockUsers.findIndex(u => u.id === p.id);
+              if (idx >= 0) {
+                const cur = D.mockUsers[idx];
+                if (p.image && cur.image !== p.image) { cur.image = p.image; usersChanged = true; }
+                if (p.brand && cur.brandName !== p.brand) { cur.brandName = p.brand; usersChanged = true; }
+              }
+            });
+            if (imgChanged) {
+              try { localStorage.setItem("pflx_player_images", JSON.stringify(imgMap)); } catch {}
+            }
+            if (imgChanged || usersChanged) {
+              // Nudge any open leaderboard / roster view to re-render
+              // against the freshly-mirrored data.
+              window.dispatchEvent(new CustomEvent("pflx-roster-images-merged"));
+            }
+          } catch (e) {
+            console.warn("[X-Coin Bridge] roster image merge failed", e);
+          }
         }
 
         // ── PflxDataBus.mc: MC data response (tasks/checkpoints/projects/seasons/jobs/submissions) ──
