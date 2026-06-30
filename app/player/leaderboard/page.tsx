@@ -255,15 +255,23 @@ export default function PlayerLeaderboard() {
         {/* ── Title + Toggle ───────────────────────────────────────── */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "24px", flexWrap: "wrap", gap: "12px" }}>
           <div>
+            {/*
+              Title used the WebkitBackgroundClip:text + transparent-text
+              gradient trick, which was rendering as just a solid gradient
+              bar with no visible text inside the X-Coin iframe (the
+              background-clip:text fell through somewhere in the inherited
+              cascade, leaving the gradient filling the span box while
+              -webkit-text-fill-color:transparent kept the text invisible).
+              Switched to a plain colored title + drop-shadow glow — visually
+              equivalent, and CANNOT silently render as an empty bar.
+            */}
             <h1 style={{ fontSize: "28px", fontWeight: 900, margin: "0 0 4px", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "8px" }}>
               <span>{view === "players" ? "🏆" : "🏢"}</span>
               <span style={{
-                background: view === "players"
-                  ? "linear-gradient(90deg, #00d4ff, #a78bfa, #00d4ff)"
-                  : "linear-gradient(90deg, #a78bfa, #00d4ff, #a78bfa)",
-                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-                filter: "drop-shadow(0 0 10px rgba(0,212,255,0.4))",
+                color: view === "players" ? "#00d4ff" : "#a78bfa",
+                textShadow: view === "players"
+                  ? "0 0 18px rgba(0,212,255,0.55), 0 0 36px rgba(167,139,250,0.25)"
+                  : "0 0 18px rgba(167,139,250,0.55), 0 0 36px rgba(0,212,255,0.25)",
               }}>
                 {view === "players" ? "LEADERBOARD" : "STARTUP STUDIOS"}
               </span>
@@ -369,7 +377,15 @@ export default function PlayerLeaderboard() {
                       {isMe ? "✨ YOU" : `STATUS #${idx + 1}`}
                     </div>
 
-                    {/* ── Hero photo ── */}
+                    {/* ── Hero photo ──
+                        Fallback chain: image → player.avatar (legacy
+                        initials field) → computed initials from
+                        brandName/name → "?" . Without this, players
+                        whose mockUsers record has no image AND no
+                        avatar field render as empty rings (the bug
+                        shown in the user's screenshot). The computed
+                        initials path guarantees every circle shows
+                        SOMETHING identifiable. */}
                     <div style={{ position: "relative", flexShrink: 0 }}>
                       <div style={{
                         width: photoSize, height: photoSize, borderRadius: "50%",
@@ -381,10 +397,28 @@ export default function PlayerLeaderboard() {
                         background: `radial-gradient(circle, rgba(${medalRgb},0.25) 0%, rgba(0,0,0,0.7) 100%)`,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: is1st ? "4rem" : is2nd ? "3rem" : "2.6rem",
+                        fontWeight: 900,
+                        color: `rgb(${medalRgb})`,
+                        textShadow: `0 0 16px rgba(${medalRgb},0.55)`,
+                        fontFamily: "Orbitron, monospace",
+                        letterSpacing: "0.02em",
                       }}>
-                        {player.image
-                          ? <img src={player.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          : player.avatar}
+                        {(() => {
+                          if (player.image) {
+                            return <img src={player.image} alt={player.brandName || player.name || "Player"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />;
+                          }
+                          if (player.avatar) return player.avatar;
+                          const source = (player.brandName || player.name || "?").toString().trim();
+                          // Take first 1–2 letters of first significant word
+                          const initials = source
+                            .split(/\s+/)
+                            .filter(Boolean)
+                            .slice(0, 2)
+                            .map((w: string) => w[0])
+                            .join("")
+                            .toUpperCase() || "?";
+                          return initials;
+                        })()}
                       </div>
                       {/* Medal badge */}
                       <div style={{
@@ -625,7 +659,9 @@ export default function PlayerLeaderboard() {
                     {posLabel(pos)}
                   </div>
 
-                  {/* Avatar */}
+                  {/* Avatar — same fallback chain as the top-3 cards so
+                      players without an uploaded image still get a
+                      readable initials chip instead of an empty box. */}
                   <div style={{
                     width: "32px", height: "32px", overflow: "hidden",
                     borderRadius: p.image ? "50%" : "8px",
@@ -635,7 +671,12 @@ export default function PlayerLeaderboard() {
                     fontSize: "12px", fontWeight: 700, color: "white",
                     flexShrink: 0,
                   }}>
-                    {p.image ? <img src={p.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : p.avatar}
+                    {(() => {
+                      if (p.image) return <img src={p.image} alt={p.brandName || p.name || "Player"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />;
+                      if (p.avatar) return p.avatar;
+                      const src = (p.brandName || p.name || "?").toString().trim();
+                      return src.split(/\s+/).filter(Boolean).slice(0, 2).map((w: string) => w[0]).join("").toUpperCase() || "?";
+                    })()}
                   </div>
 
                   {/* Name + pathway */}
