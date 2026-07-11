@@ -9,6 +9,7 @@ import {
   getStudioMaxStakePercent,
 } from "../../lib/data";
 import { saveStartupStudios } from "../../lib/store";
+import { supabase } from "../../lib/supabaseClient";
 import { saveAndToast } from "../../lib/saveToast";
 import { playSuccess, playClick, playNav } from "../../lib/sounds";
 
@@ -70,6 +71,34 @@ export default function StudiosPage() {
   // Hover states
   const [hoveredStudio, setHoveredStudio] = useState<string | null>(null);
   const [hoveredBtn, setHoveredBtn] = useState<string | null>(null);
+
+  // ── Studio Market (written by the PFLX console's pflxStudioMarket engine) ──
+  // Each house has a stock-style index moved by member activity + fresh stakes.
+  type MarketRow = {
+    history: { t: number; v: Record<string, number> }[];
+    funds?: Record<string, number>;
+    lastDividend?: { studioId: string; members: number; at: number };
+  };
+  const [market, setMarket] = useState<MarketRow | null>(null);
+  useEffect(() => {
+    supabase.from("app_data").select("data").eq("key", "pflx_studio_market").single()
+      .then(({ data }) => { if (data?.data?.history) setMarket(data.data as MarketRow); });
+  }, []);
+  const marketQuote = (sid: string) => {
+    if (!market || market.history.length === 0) return null;
+    const h = market.history;
+    const now = h[h.length - 1].v[sid];
+    if (now === undefined) return null;
+    const prev = h.length > 1 ? h[h.length - 2].v[sid] : now;
+    return { value: now, delta: prev ? (now - prev) / prev : 0 };
+  };
+  const sparkPath = (sid: string, w = 110, hgt = 26) => {
+    if (!market) return "";
+    const pts = market.history.slice(-30).map(x => x.v[sid] ?? 100);
+    if (pts.length < 2) return "";
+    const min = Math.min(...pts), max = Math.max(...pts), rng = (max - min) || 1;
+    return pts.map((v, i) => `${i ? "L" : "M"}${(i / (pts.length - 1) * w).toFixed(1)},${(hgt - ((v - min) / rng) * hgt).toFixed(1)}`).join(" ");
+  };
 
 
   useEffect(() => {
@@ -213,6 +242,40 @@ export default function StudiosPage() {
           </div>
 
           {/* ── Studio Cards Grid ────────────────────────────────────────── */}
+          {market && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", marginBottom: "32px" }}>
+              {studios.map(studio => {
+                const q = marketQuote(studio.id);
+                if (!q) return null;
+                const up = q.delta > 0.001, dn = q.delta < -0.001;
+                const champ = market.lastDividend?.studioId === studio.id;
+                return (
+                  <div key={`mkt-${studio.id}`} style={{
+                    background: `rgba(${studio.colorRgb},0.07)`, border: `1px solid rgba(${studio.colorRgb},0.3)`,
+                    borderRadius: "12px", padding: "14px", textAlign: "center",
+                  }}>
+                    <div style={{ fontSize: "11px", fontWeight: 800, color: studio.color, letterSpacing: "0.1em", marginBottom: "6px" }}>
+                      {studio.name.replace(" Studios", "").toUpperCase()} {champ ? "👑" : ""}
+                    </div>
+                    <div style={{ fontSize: "22px", fontWeight: 900, color: "#fff" }}>
+                      {q.value.toFixed(1)}{" "}
+                      <span style={{ fontSize: "12px", color: up ? "#4ade80" : dn ? "#ef4444" : "#8a92b0" }}>
+                        {up ? "▲" : dn ? "▼" : "▪"} {(Math.abs(q.delta) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <svg width="110" height="26" style={{ margin: "6px auto 0", display: "block" }}>
+                      <path d={sparkPath(studio.id)} fill="none" stroke={studio.color} strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                    <div style={{ fontSize: "10px", color: "#f5c842", marginTop: "4px" }}>
+                      💰 fund {(market.funds?.[studio.id] ?? 0).toLocaleString()} XC
+                    </div>
+                    <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.4)", letterSpacing: "0.12em", marginTop: "2px" }}>MARKET INDEX</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "20px", marginBottom: "32px" }}>
             {studios.map(studio => {
               const members = getStudioMembers(studio.id);

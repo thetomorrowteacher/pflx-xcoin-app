@@ -18,7 +18,8 @@ import { useRouter, usePathname } from "next/navigation";
 
 const ADMIN_TO_PLAYER: Record<string, string> = {
   "/admin": "/player",
-  // /admin/task-management removed — X-Coin no longer owns tasks (MC is sole source of truth).
+  "/admin/task-management": "/player/tasks",
+  "/admin/tasks": "/player/tasks",
   "/admin/projects": "/player/projects",
   "/admin/jobs": "/player/jobs",
   "/admin/leaderboard": "/player/leaderboard",
@@ -29,7 +30,7 @@ const ADMIN_TO_PLAYER: Record<string, string> = {
 
 const PLAYER_TO_ADMIN: Record<string, string> = {
   "/player": "/admin",
-  "/player/tasks": "/admin",  // task-management page removed; host lands on admin home.
+  "/player/tasks": "/admin/task-management",
   "/player/projects": "/admin/projects",
   "/player/jobs": "/admin/jobs",
   "/player/leaderboard": "/admin/leaderboard",

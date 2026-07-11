@@ -158,9 +158,18 @@ export async function initStore(): Promise<void> {
               ];
               for (const [, fn] of seedSplice) fn();
               console.log("[store] ✓ Loaded seed-data.json fallback with", Object.keys(seedAll).length, "collections");
-              // Push seed data to Supabase so next load is fast
-              _needsSeed = true;
-              setProgress(85, "Restoring data to cloud...");
+              // ONLY push seed data to Supabase if this is a truly fresh install
+              // (no `pflx_ever_initialized` localStorage flag yet). For returning
+              // users where the cloud only LOOKS empty (network blip, race),
+              // we use the seed for in-memory display but never write it back —
+              // otherwise a transient read failure would overwrite real user
+              // data with stale mocks (which is what bit MC tasks/jobs).
+              _needsSeed = !everInitialized;
+              if (_needsSeed) {
+                setProgress(85, "Restoring data to cloud...");
+              } else {
+                console.warn("[store] Seed loaded for display only — NOT pushing to cloud because this user has been initialized before (preserves real data through transient empty reads)");
+              }
             } else {
               console.warn("[store] seed-data.json fetch failed:", seedRes.status);
               _needsSeed = !everInitialized;
@@ -288,7 +297,8 @@ export async function saveAll() {
   await Promise.all([
     saveUsers(),
     saveCheckpoints(),
-    // tasks/jobs intentionally OMITTED — MC owns them, X-Coin must not push.
+    saveTasks(),
+    saveJobs(),
     saveTransactions(),
     saveModifiers(),
     savePlayerModifiers(),
@@ -298,7 +308,7 @@ export async function saveAll() {
     savePlayerDeals(),
     saveStartupStudios(),
     saveStudioInvestments(),
-    // projects intentionally OMITTED — MC owns them.
+    saveProjects(),
     saveCoinCategories(),
     saveTrades(),
     saveInvestments(),

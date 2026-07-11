@@ -13,8 +13,8 @@ type CollectionKey = string;
 const COLLECTIONS: { key: CollectionKey; getData: () => any; save: () => Promise<any> }[] = [
   { key: "u",  getData: () => D.mockUsers,            save: () => import("../lib/store").then(m => m.saveUsers()) },
   { key: "c",  getData: () => D.mockCheckpoints,      save: () => import("../lib/store").then(m => m.saveCheckpoints()) },
-  // tasks (t) and jobs (j) intentionally OMITTED — MC is the sole source of truth for tasks/jobs.
-  // X-Coin only reads them (via PflxBridge when MC broadcasts) for display & node-tagging; it never auto-saves them back.
+  { key: "t",  getData: () => D.mockTasks,             save: () => import("../lib/store").then(m => m.saveTasks()) },
+  { key: "j",  getData: () => D.mockJobs,              save: () => import("../lib/store").then(m => m.saveJobs()) },
   { key: "tx", getData: () => D.mockTransactions,      save: () => import("../lib/store").then(m => m.saveTransactions()) },
   { key: "m",  getData: () => D.mockModifiers,         save: () => import("../lib/store").then(m => m.saveModifiers()) },
   { key: "pm", getData: () => D.mockPlayerModifiers,   save: () => import("../lib/store").then(m => m.savePlayerModifiers()) },
@@ -24,7 +24,7 @@ const COLLECTIONS: { key: CollectionKey; getData: () => any; save: () => Promise
   { key: "pd", getData: () => D.mockPlayerDeals,       save: () => import("../lib/store").then(m => m.savePlayerDeals()) },
   { key: "ss", getData: () => D.mockStartupStudios,    save: () => import("../lib/store").then(m => m.saveStartupStudios()) },
   { key: "si", getData: () => D.mockStudioInvestments, save: () => import("../lib/store").then(m => m.saveStudioInvestments()) },
-  // projects (p) intentionally OMITTED — same reason as tasks/jobs above. MC owns projects.
+  { key: "p",  getData: () => D.mockProjects,          save: () => import("../lib/store").then(m => m.saveProjects()) },
   { key: "cc", getData: () => D.COIN_CATEGORIES,       save: () => import("../lib/store").then(m => m.saveCoinCategories()) },
   { key: "tr", getData: () => D.mockTrades,            save: () => import("../lib/store").then(m => m.saveTrades()) },
   { key: "iv", getData: () => D.mockInvestments,       save: () => import("../lib/store").then(m => m.saveInvestments()) },
