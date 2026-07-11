@@ -209,11 +209,16 @@ export default function StudiosPage() {
 
           {/* ── Header ──────────────────────────────────────────────────── */}
           <div style={{ marginBottom: "32px" }}>
-            <h1 style={{ fontSize: "28px", fontWeight: 900, margin: "0 0 4px", letterSpacing: "0.08em",
-              background: "linear-gradient(90deg, #00d4ff, #a78bfa, #00d4ff)",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-              filter: "drop-shadow(0 0 10px rgba(0,212,255,0.4))"
-            }}>🏢 STARTUP STUDIOS</h1>
+            {/* Plain color + glow — the background-clip:text gradient trick
+                renders as a solid bar with invisible text inside the console
+                iframe (same incident as the player leaderboard title). */}
+            <h1 style={{ fontSize: "28px", fontWeight: 900, margin: "0 0 4px", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>🏢</span>
+              <span style={{
+                color: "#a78bfa",
+                textShadow: "0 0 18px rgba(167,139,250,0.55), 0 0 36px rgba(0,212,255,0.25)",
+              }}>STARTUP STUDIOS</span>
+            </h1>
             <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.1em" }}>[ MANAGE STUDIO MEMBERSHIP, XC POOLS & PLAYER ASSIGNMENTS ]</p>
           </div>
 

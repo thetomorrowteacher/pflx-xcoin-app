@@ -230,6 +230,18 @@ export function didLoadFail() {
 // ─── Save helpers (call after any mutation) ──────────────────────
 
 export function saveUsers() {
+  // ROSTER STOMP GUARD (July 10 incident): the hardcoded default roster is
+  // 2 admins / 0 players. If the initial Supabase load silently failed, saving
+  // that default overwrites the real roster (95 players lost). Once this
+  // browser has ever loaded real data, refuse to save a player-less roster.
+  try {
+    if (!D.mockUsers.some((u) => u && u.role === "player") &&
+        typeof window !== "undefined" &&
+        localStorage.getItem("pflx_ever_initialized") === "1") {
+      console.warn("[store] ✋ saveUsers blocked — roster has no players (looks like default/mock state)");
+      return Promise.resolve(false);
+    }
+  } catch { /* fall through to save */ }
   return saveData("users", D.mockUsers);
 }
 export function saveCheckpoints() {

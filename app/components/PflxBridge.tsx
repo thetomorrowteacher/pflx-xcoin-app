@@ -121,6 +121,18 @@ export default function PflxBridge() {
         case "sessions":          data = _sessions; break;
       }
 
+      // ── ROSTER STOMP GUARD (July 10 incident) ──
+      // X-Coin's hardcoded default roster is 2 admins and zero players. If the
+      // Supabase load failed, sending that default up the bridge caused MC to
+      // adopt it and overwrite the real 97-user roster everywhere. Never send
+      // a player-less users list once this browser has ever seen real data.
+      if (key === "users" && Array.isArray(data) &&
+          !data.some((u: any) => u && u.role === "player") &&
+          typeof window !== "undefined" &&
+          localStorage.getItem("pflx_ever_initialized") === "1") {
+        console.warn("[X-Coin Bridge] ✋ blocked users send — roster has no players (looks like default/mock state)");
+        data = null;
+      }
       if (data && window.parent !== window) {
         window.parent.postMessage(JSON.stringify({
           type: "pflx_cloud_data",

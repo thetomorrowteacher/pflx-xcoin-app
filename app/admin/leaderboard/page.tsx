@@ -215,13 +215,14 @@ export default function AdminLeaderboard() {
           <div>
             <h1 style={{ fontSize: "28px", fontWeight: 900, margin: "0 0 4px", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "8px" }}>
               <span>{view === "players" ? "🏆" : "🏢"}</span>
+              {/* Plain color + glow — the background-clip:text gradient trick
+                  renders as a solid bar with invisible text inside the console
+                  iframe (same fix as the player leaderboard title). */}
               <span style={{
-                background: view === "players"
-                  ? "linear-gradient(90deg, #00d4ff, #a78bfa, #00d4ff)"
-                  : "linear-gradient(90deg, #a78bfa, #00d4ff, #a78bfa)",
-                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-                filter: "drop-shadow(0 0 10px rgba(0,212,255,0.4))",
+                color: view === "players" ? "#00d4ff" : "#a78bfa",
+                textShadow: view === "players"
+                  ? "0 0 18px rgba(0,212,255,0.55), 0 0 36px rgba(167,139,250,0.25)"
+                  : "0 0 18px rgba(167,139,250,0.55), 0 0 36px rgba(0,212,255,0.25)",
               }}>{view === "players" ? "LEADERBOARD" : "STARTUP STUDIOS"}</span>
             </h1>
             <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.1em" }}>
