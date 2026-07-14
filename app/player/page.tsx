@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../components/SideNav";
+import SeasonBanner from "../components/SeasonBanner";
 import { mergePlayerStats } from "../lib/playerStats";
 import {
   User, mockUsers, mockTransactions, Transaction,
@@ -307,6 +308,9 @@ Return ONLY valid JSON with this exact format (no markdown, no code blocks):
     <div style={{ display: "flex", minHeight: "100vh", background: "#0a0a0f" }}>
       <SideNav user={user} />
       <main style={{ flex: 1, padding: "32px", overflow: "auto", paddingBottom: "60px" }}>
+
+        {/* Active Season indicator — same card as the Console's Home Base */}
+        <SeasonBanner />
 
         {/* Header */}
         <div style={{ marginBottom: "28px" }}>

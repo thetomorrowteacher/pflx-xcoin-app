@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../components/SideNav";
+import SeasonBanner from "../components/SeasonBanner";
 import { User, mockTasks, mockUsers, mockModifiers, mockTransactions, COIN_CATEGORIES, isHostUser, earnXCWithTax } from "../lib/data";
 import { applyPlayerImages } from "../lib/playerImages";
 import { saveUsers, saveTransactions, saveStartupStudios } from "../lib/store";
@@ -571,6 +572,9 @@ export default function AdminDashboard() {
             <span>{dateStr}</span><span>{timeStr}</span><span>v1.0.0</span>
           </div>
         </div>
+
+        {/* Active Season indicator — same card as the Console's Mission Control bar */}
+        <SeasonBanner />
 
         {/* Header */}
         <div style={{ marginBottom:"28px" }}>
