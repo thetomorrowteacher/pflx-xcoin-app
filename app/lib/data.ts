@@ -1842,3 +1842,11 @@ export const SHIP_SYSTEMS: ShipSystem[] = [
     minRank: 2,
   },
 ];
+
+// ── Community Contributions ──────────────────────────────────────────────────
+// Referenced by store.ts / StoreProvider / admin task-management but was never
+// defined here — every build logged "Attempted import error". Empty seed; real
+// entries hydrate from the Supabase 'communityContributions' collection.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type CommunityContribution = any;
+export let mockCommunityContributions: CommunityContribution[] = [];

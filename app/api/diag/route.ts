@@ -4,6 +4,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+// Never prerender this route at build time. It queries Supabase live — during
+// the July 15 DB slowdown, build-time prerendering hung >60s × 3 attempts and
+// failed the whole Vercel deployment. Diagnostics must always run on request.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

@@ -328,6 +328,13 @@ export async function POST(req: Request) {
 }
 
 // ─── GET handler for status ──────────────────────────────────────
+
+// Never prerender at build time — this route does live work (Supabase / external
+// services). Build-time prerendering hung the July 15 Vercel deploy on /api/diag;
+// same failure mode applies to any zero-arg GET route.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   const scanHistory = await loadData("scanHistory") as any[];
   const lastScan = scanHistory[scanHistory.length - 1] || null;
