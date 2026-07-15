@@ -8,7 +8,7 @@ import {
   mockStudioInvestments, getCurrentRank,
   getStudioMaxStakePercent,
 } from "../../lib/data";
-import { saveStartupStudios } from "../../lib/store";
+import { saveStartupStudios, subscribe, initStore } from "../../lib/store";
 import { supabase } from "../../lib/supabaseClient";
 import { saveAndToast } from "../../lib/saveToast";
 import { playSuccess, playClick, playNav } from "../../lib/sounds";
@@ -16,6 +16,25 @@ import { playSuccess, playClick, playNav } from "../../lib/sounds";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function avatarInitials(name: string) {
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+}
+
+// Studio ids appear as "studio-mindforge" (console) and occasionally bare
+// "mindforge" in older records — compare on the normalized slug so members
+// are never miscounted by a prefix mismatch.
+function studioSlug(x: string | undefined | null) {
+  return String(x || "").trim().toLowerCase().replace(/^studio-/, "");
+}
+function sameStudio(a: string | undefined | null, b: string | undefined | null) {
+  const sa = studioSlug(a), sb = studioSlug(b);
+  return !!sa && sa === sb;
+}
+
+// A "player" for roster purposes: not flagged host, role reads player-ish.
+// (Restored rosters have role "player"; be tolerant of stray casing/spaces.)
+function isRosterPlayer(u: User) {
+  if (!u || u.isHost) return false;
+  const r = String(u.role || "").trim().toLowerCase();
+  return r === "player" || r === "";
 }
 
 function StudioLogo({ studioId, icon, color, colorRgb, size = 52 }: {
@@ -109,14 +128,26 @@ export default function StudiosPage() {
     const activeRole = localStorage.getItem("pflx_active_role");
     if (!isHostUser(user) && activeRole !== "host") { router.push("/player"); return; }
     setCurrentUser(user);
-    setPlayers(mockUsers.filter(u => u.role === "player" && !u.isHost));
+    setPlayers(mockUsers.filter(isRosterPlayer));
+    // The roster hydrates from Supabase asynchronously (and may retry on a
+    // slow connection). Re-snapshot whenever the store changes so the player
+    // list and member counts never freeze on the pre-hydration default.
+    initStore().then(() => {
+      setPlayers(mockUsers.filter(isRosterPlayer));
+      setStudios([...mockStartupStudios]);
+    }).catch(() => {});
+    const unsub = subscribe(() => {
+      setPlayers(mockUsers.filter(isRosterPlayer));
+      setStudios([...mockStartupStudios]);
+    });
+    return () => { unsub(); };
   }, [router]);
 
   if (!currentUser) return null;
 
   // ── Derived helpers ──────────────────────────────────────────────────────
   const getStudioMembers = (studioId: string) =>
-    players.filter(p => p.studioId === studioId);
+    players.filter(p => sameStudio(p.studioId, studioId));
 
   const getActiveStudio = () =>
     modal ? studios.find(s => s.id === modal.studioId) ?? null : null;
@@ -134,7 +165,7 @@ export default function StudiosPage() {
 
     // Remove from old studio members
     if (oldStudioId) {
-      const oldStudio = mockStartupStudios.find(s => s.id === oldStudioId);
+      const oldStudio = mockStartupStudios.find(s => sameStudio(s.id, oldStudioId));
       if (oldStudio) oldStudio.members = oldStudio.members.filter(id => id !== reassignPlayerId);
     }
     // Add to new studio members
@@ -156,7 +187,7 @@ export default function StudiosPage() {
     }
 
     setStudios([...mockStartupStudios]);
-    setPlayers(mockUsers.filter(u => u.role === "player" && !u.isHost));
+    setPlayers(mockUsers.filter(isRosterPlayer));
     setModal(null);
     setReassignPlayerId("");
     setReassignTargetStudioId("");
@@ -607,7 +638,7 @@ export default function StudiosPage() {
                     >
                       <option value="">— Choose a player —</option>
                       {players.map(p => {
-                        const currentStudio = studios.find(s => s.id === p.studioId);
+                        const currentStudio = studios.find(s => sameStudio(s.id, p.studioId));
                         return (
                           <option key={p.id} value={p.id}>
                             {p.brandName || p.name} {currentStudio ? `(→ ${currentStudio.name})` : "(unassigned)"}
