@@ -28,7 +28,7 @@ interface TickerEvent {
   date: string;
 }
 
-function buildTickerEvents(): TickerEvent[] {
+export function buildTickerEvents(): TickerEvent[] {
   // Only include events from the current calendar day (resets at midnight)
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);

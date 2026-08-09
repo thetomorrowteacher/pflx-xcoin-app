@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { saveData } from "../lib/persistence";
 import { isStoreReady, initStore } from "../lib/store";
 import * as D from "../lib/data";
+import { buildTickerEvents } from "./Ticker";
 
 // ── Pass-through caches for MC-owned collections without in-memory arrays ──
 // These collections originate from Mission Control and are just persisted through X-Coin
@@ -330,6 +331,31 @@ export default function PflxBridge() {
             document.body.classList.toggle("pflx-as-player", msg.role === "player");
             window.dispatchEvent(new CustomEvent("pflx-role-changed", { detail: { role: msg.role } }));
           } catch {}
+        }
+
+        // ── Ticker request from Platform (Aug 9 fix) ──
+        // The Platform shell's bottom ticker asks every sub-app for its
+        // recent events, but X-Coin never had a handler for this message —
+        // it fell through silently, so live XC awards / badge earns /
+        // approvals never reached the shell's ticker no matter how often it
+        // asked. Reuse the same event builder that drives X-Coin's own
+        // in-app ticker so both stay in sync with one source of truth.
+        if (msg.type === "pflx_ticker_request") {
+          try {
+            const events = buildTickerEvents().map(function (e) {
+              return { text: e.text, color: e.color, icon: e.icon, date: e.date };
+            });
+            if (window.parent !== window) {
+              window.parent.postMessage(JSON.stringify({
+                type: "pflx_ticker_events",
+                source: "xcoin",
+                events: events,
+              }), "*");
+              console.log("[X-Coin Bridge] → Sent", events.length, "ticker events to Platform");
+            }
+          } catch (e) {
+            console.warn("[X-Coin Bridge] ticker request failed", e);
+          }
         }
 
         // ── Cloud Save: MC pushes data to X-Coin for Supabase persistence ──
