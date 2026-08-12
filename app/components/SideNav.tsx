@@ -116,8 +116,53 @@ export default function SideNav({ user }: NavProps) {
     setSoundOn(s.enabled);
   }, []);
 
+  // ── Collapsible sidebar (Aug 12, Ennis) — reclaim viewport width on
+  // desktop and especially on phones in portrait, where a fixed 230px rail
+  // eats a big share of the screen. Default false during SSR/first paint,
+  // synced from localStorage in an effect (same pattern as isEmbed/soundOn
+  // above) so there's no hydration mismatch. When collapsed we return just
+  // a small fixed toggle button instead of the 230px <nav> — removing the
+  // node from the DOM (rather than hiding it with CSS) is what lets every
+  // page's flex layout reclaim the width without per-page changes, same
+  // reason `isEmbed` returning null already works across every route.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setSidebarCollapsed(localStorage.getItem("pflx_xcoin_sidebar_collapsed") === "1");
+    } catch { /* ignore */ }
+  }, []);
+  const toggleSidebar = (next?: boolean) => {
+    setSidebarCollapsed(prev => {
+      const value = typeof next === "boolean" ? next : !prev;
+      try { localStorage.setItem("pflx_xcoin_sidebar_collapsed", value ? "1" : "0"); } catch { /* ignore */ }
+      return value;
+    });
+  };
+
   // ─── ALL HOOKS DECLARED — SAFE TO RETURN EARLY NOW ─────────────────────────
   if (isEmbed) return null;
+
+  if (sidebarCollapsed) {
+    return (
+      <>
+        <PflxBadge />
+        <button
+          onClick={() => toggleSidebar(false)}
+          title="Show sidebar"
+          aria-label="Show X-Coin sidebar"
+          style={{
+            position: "fixed", top: "14px", left: "14px", zIndex: 9998,
+            width: "38px", height: "38px", borderRadius: "10px",
+            border: "1px solid rgba(0,212,255,0.25)", background: "rgba(6,9,13,0.92)",
+            color: CYAN, fontSize: "16px", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          ☰
+        </button>
+      </>
+    );
+  }
 
   // Executive Evo Rank players (Chief level 9+, Partner level 10) get access to Approvals
   const rankLevel = getCurrentRank(user.totalXcoin ?? 0, user)?.level ?? 1;
@@ -161,6 +206,21 @@ export default function SideNav({ user }: NavProps) {
       overflowY: "auto",
       overflowX: "hidden",
     }}>
+
+      <button
+        onClick={() => toggleSidebar(true)}
+        title="Collapse sidebar"
+        aria-label="Collapse X-Coin sidebar"
+        style={{
+          position: "absolute", top: "14px", right: "-14px", zIndex: 10,
+          width: "28px", height: "28px", borderRadius: "50%",
+          border: "1px solid rgba(0,212,255,0.35)", background: "#06090d",
+          color: CYAN, fontSize: "14px", lineHeight: 1, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        ‹
+      </button>
 
       {/* Background grid */}
       <div style={{
