@@ -493,29 +493,58 @@ export default function ManageCoinsPage() {
               <h2 style={{ margin: "0 0 8px", color: "#f0f0ff" }}>Grant {grantTarget.coin.name}</h2>
               <p style={{ margin: "0 0 24px", fontSize: "14px", color: "rgba(255,255,255,0.4)" }}>Select a player to award this coin</p>
               
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "24px", maxHeight: "200px", overflowY: "auto" }}>
-                {applyPlayerImages(mockUsers).filter(u => u.role === "player").map(s => (
-                  <button
-                    key={s.id}
-                    onClick={() => setGrantTarget({...grantTarget, playerId: s.id})}
-                    style={{
-                      padding: "12px", borderRadius: "12px", border: grantTarget.playerId === s.id ? "1px solid #4f8ef7" : "1px solid rgba(255,255,255,0.05)",
-                      background: grantTarget.playerId === s.id ? "rgba(79,142,247,0.1)" : "rgba(255,255,255,0.02)",
-                      display: "flex", alignItems: "center", gap: "12px", color: "#f0f0ff", cursor: "pointer", textAlign: "left"
-                    }}
-                  >
-                    <div style={{ width: "24px", height: "24px", overflow: "hidden",
-                      borderRadius: s.image ? "50%" : "6px",
-                      background: s.image ? "transparent" : "linear-gradient(135deg, #4f8ef7, #8b5cf6)",
-                      fontSize: "10px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0,
-                    }}>
-                      {s.image ? <img src={s.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : s.avatar}
-                    </div>
-                    <span style={{ fontSize: "14px", flex: 1 }}>{s.name}</span>
-                    <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>Lv.{s.level}</span>
-                  </button>
-                ))}
+              {/* Player select — a single-column scrollable list. This used
+                  to be a 2-column CSS grid (gridTemplateColumns: "1fr 1fr"),
+                  which blew out horizontally: a grid track's default
+                  min-width is its content's intrinsic width, so a long name
+                  (e.g. "Nila Vyshnavi Subhashchandra Nair") forced its
+                  column wider than the 1fr share, pushing the second column
+                  — and the list's own scrollbar — off the right edge of the
+                  400px modal. A single column with each row's text properly
+                  truncated removes the failure mode entirely and leaves
+                  room to show the brand name under the real name. */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "24px", maxHeight: "260px", overflowY: "auto", overflowX: "hidden" }}>
+                {applyPlayerImages(mockUsers).filter(u => u.role === "player").map(s => {
+                  const initials = (s.brandName || s.name || "?")
+                    .trim()
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map(w => w.charAt(0).toUpperCase())
+                    .join("") || "?";
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => setGrantTarget({...grantTarget, playerId: s.id})}
+                      style={{
+                        padding: "10px 12px", borderRadius: "12px", border: grantTarget.playerId === s.id ? "1px solid #4f8ef7" : "1px solid rgba(255,255,255,0.05)",
+                        background: grantTarget.playerId === s.id ? "rgba(79,142,247,0.1)" : "rgba(255,255,255,0.02)",
+                        display: "flex", alignItems: "center", gap: "12px", color: "#f0f0ff", cursor: "pointer", textAlign: "left",
+                        width: "100%", boxSizing: "border-box", minWidth: 0
+                      }}
+                    >
+                      {/* Uploaded avatar image when present; otherwise initials
+                          computed from the player's brand/real name — not the
+                          raw `avatar` field, which is frequently blank for
+                          players synced in from Mission Control and would
+                          otherwise render as an empty color swatch. */}
+                      <div style={{ width: "32px", height: "32px", overflow: "hidden",
+                        borderRadius: "50%",
+                        background: s.image ? "transparent" : "linear-gradient(135deg, #4f8ef7, #8b5cf6)",
+                        fontSize: "11px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0, color: "#fff",
+                      }}>
+                        {s.image ? <img src={s.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "14px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
+                        {s.brandName && s.brandName !== s.name && (
+                          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.brandName}</div>
+                        )}
+                      </div>
+                      <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>Lv.{s.level}</span>
+                    </button>
+                  );
+                })}
               </div>
 
               <div style={{ marginBottom: "24px" }}>
