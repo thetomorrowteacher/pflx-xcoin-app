@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = "gemini-2.0-flash";
+// v1.2 (Aug 14) — gemini-2.0-flash was retired by Google ("this model is no
+// longer available"), which made every single X-Bot/Pathway Guide chat
+// request fail with a 404 and fall back to "Sorry, I'm having trouble
+// connecting right now" — the exact symptom reported by Hannah (Daily
+// Briefing / Pathway Guide, 9 reports over 3 weeks) and others describing
+// irrelevant canned answers (the client-side keyword fallback masked the
+// real cause). gemini-3.6-flash is the current recommended stable Flash
+// model as of this patch.
+const GEMINI_MODEL = "gemini-3.6-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 // ─── PFLX System Knowledge ──────────────────────────────────────────────────
