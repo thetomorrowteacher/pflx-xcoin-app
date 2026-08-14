@@ -122,7 +122,11 @@ export default function ManageCoinsPage() {
 
   const handleGrantCoin = () => {
     if (!grantTarget) return;
-    const { playerId, coin, amount } = grantTarget;
+    const { playerId, coin } = grantTarget;
+    // Defense-in-depth clamp (Aug 14) — the modal's onChange already clamps
+    // to [1,100], but this is the actual money path, so it re-clamps here
+    // too rather than trusting a single guard upstream of it.
+    const amount = Math.max(1, Math.min(100, Number.isFinite(grantTarget.amount) ? grantTarget.amount : 1));
     const targetPlayer = mockUsers.find(u => u.id === playerId);
     if (targetPlayer) {
       const totalXcReward = coin.xc * amount;
@@ -550,12 +554,31 @@ export default function ManageCoinsPage() {
               <div style={{ marginBottom: "24px" }}>
                 <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Amount to Grant</label>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <input 
-                    type="number" 
-                    min="1" 
-                    max="100" 
-                    value={grantTarget.amount} 
-                    onChange={e => setGrantTarget({...grantTarget, amount: parseInt(e.target.value) || 1})}
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={grantTarget.amount}
+                    onChange={e => {
+                      // Aug 14 — the min/max attrs above are cosmetic only;
+                      // a native number input never enforces them on typed
+                      // (or pasted, or scroll-wheel-incremented) input, and
+                      // this modal's Grant button calls handleGrantCoin()
+                      // directly rather than going through native form
+                      // validation, so an out-of-range amount sailed straight
+                      // through to `coin.xc * amount` uncapped. Surfaced from
+                      // the FeedForward XC_CREDIT/COURSE_REWARD investigation
+                      // (a ~10x overcredit report) as a plausible mechanism —
+                      // a stray keystroke/paste/scroll on this field is
+                      // otherwise invisible until the preview total below
+                      // updates, and nothing stopped the grant from going
+                      // through anyway. Now clamps to the same [1,100] range
+                      // the input already advertises.
+                      var n = parseInt(e.target.value, 10);
+                      if (!Number.isFinite(n)) n = 1;
+                      n = Math.max(1, Math.min(100, n));
+                      setGrantTarget({...grantTarget, amount: n});
+                    }}
                     style={{ flex: 1, padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white" }}
                   />
                   <div style={{ textAlign: "right", minWidth: "100px" }}>
