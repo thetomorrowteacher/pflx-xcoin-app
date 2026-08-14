@@ -71,7 +71,12 @@ export default function LinkedInConnect({ playerId, latestBadge, brandName }: Pr
           {busy ? "⟳ POSTING…" : "⚡ POST LATEST BADGE"}
         </button>
       ) : (
-        <a href={`/api/linkedin/auth?playerId=${encodeURIComponent(playerId)}`} style={btn}>
+        <a
+          href={`/api/linkedin/auth?playerId=${encodeURIComponent(playerId)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={btn}
+        >
           in CONNECT LINKEDIN
         </a>
       )}
