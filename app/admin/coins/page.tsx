@@ -146,14 +146,69 @@ export default function ManageCoinsPage() {
         reviewedAt: new Date().toISOString()
       });
 
-      // Persist updated stats so player dashboard reflects this immediately
+      // Persist updated stats so player dashboard reflects this immediately.
+      // v1.81 (Ennis: "I added Video Editor badge to Neuroflux and changed
+      // the grant number to 5. The Video Editor badge should show 5
+      // endorsements") — ROOT CAUSE of the corruption Ennis saw (Video
+      // Editor x5 landing as 5 fake "Professional Endorsement Badge #N"
+      // placeholders): this call used to also send `digitalBadges:
+      // targetPlayer.digitalBadges` (already bumped by `amount` above), a
+      // bare inflated count with no badge identity. It raced against the
+      // pflx_player_award message below — whichever the Console processed
+      // second would see `digitalBadges` claiming more badges than
+      // badges[] actually held, and its placeholder-synthesis safety net
+      // (PflxDataBus.applyUpdate, guards exactly this drift) topped up the
+      // shortfall with generic placeholders. digitalBadges is dropped from
+      // this call entirely now — the Console derives it itself from the
+      // real badges[] array once the identity-aware award below is
+      // applied, so there's nothing left to race.
       updatePlayerStats(playerId, {
         xcoin: targetPlayer.xcoin,
         totalXcoin: targetPlayer.totalXcoin,
-        digitalBadges: targetPlayer.digitalBadges,
         level: targetPlayer.level,
         rank: targetPlayer.rank,
       });
+
+      // v1.78 (Ennis: "This seems to be showing dummy badges... you seem
+      // to not be receiving all of the right information") — ROOT CAUSE:
+      // updatePlayerStats() above only ever bridges the PlayerStats shape
+      // (xcoin/totalXcoin/digitalBadges/level/rank) to the Console — it
+      // has no field for WHICH badge was granted. The Console received a
+      // bare "+1 to your badge count" and had no way to know this grant
+      // was "AI App Developer"/"Beta Tester"/etc., so its portfolio viewer
+      // could only backfill a generic "Primary Badge #N" placeholder
+      // (v1.77) — technically consistent, but not the real badge Ennis
+      // actually granted. Send the real identity as its own message so
+      // the Console can route it through its canonical award() path
+      // (PflxDataBus.award, the same funnel task/checkpoint/project
+      // completions already use) and store the real name/artwork instead
+      // of a placeholder. xcValue is 0 here — the XC for this grant was
+      // already credited above via earnXCWithTax + updatePlayerStats;
+      // sending it again here would double-credit it on the Console side.
+      // v1.81 — `count: amount` carries the Grant modal's "Amount" field
+      // through as an endorsement count (award() now understands it: a
+      // NEW badge is tagged `endorsements: amount`, an already-earned one
+      // has `amount` added to its running endorsement count) instead of
+      // being silently dropped — the field the "digitalBadges += amount"
+      // bump above used to be the only place this intent lived.
+      try {
+        if (typeof window !== "undefined" && window.parent !== window) {
+          const ownerCategory = categories.find(c => c.coins.some(cc => cc.name === coin.name));
+          window.parent.postMessage(JSON.stringify({
+            type: "pflx_player_award",
+            playerId,
+            badge: {
+              name: coin.name,
+              image: coin.image || "",
+              category: ownerCategory ? ownerCategory.name : "",
+              xcValue: 0,
+              count: amount,
+            },
+            source: "xcoin",
+            reason: `xcoin badge grant: ${coin.name}`,
+          }), "*");
+        }
+      } catch {}
 
       // Save to Supabase
       playReward();
