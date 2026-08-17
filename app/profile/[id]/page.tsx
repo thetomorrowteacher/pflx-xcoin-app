@@ -1,12 +1,41 @@
 "use client";
 import { useEffect, useState } from "react";
-import { mockUsers } from "../../lib/data";
+import { useRouter } from "next/navigation";
 
 // ═══════════════════════════════════════════════════════════════════
-// X-Coin profile page — REMOVED in favor of the Console portfolio.
-// The Console (prototypeflx.com) now owns the unified portfolio surface
-// at prototypeflx.com/<brand>. Visiting this old X-Coin route now
-// redirects to the equivalent Console portfolio URL.
+// X-Coin profile page — REMOVED in favor of the Console's in-app
+// Universal Portfolio Viewer (v1.71+, pflxOpenPlayerPortfolio).
+//
+// v1.73.1 (Ennis: "It should open directly with no middle ground.") —
+// this used to postMessage a `pflx_navigate` request that sent the WHOLE
+// Console shell to its legacy `/<brand>` public-portfolio page. That page
+// is gated behind Publish ("Publish is for viewing outside of PFLX" —
+// Ennis's original v1.71 spec), so it dead-ended in "Portfolio not
+// found" for the very common case of a player who's never published.
+// That's backwards: viewing a portfolio FROM INSIDE PFLX was always
+// supposed to need no publish step at all.
+//
+// v1.75 (Ennis: "the screen was blank when I clicked out") — the
+// original v1.73.1 fix assumed this iframe "stays wherever it was" once
+// the parent opens its modal. It doesn't: every "view portfolio" click
+// (Leaderboard, Player Management, side nav) is a real router.push() to
+// THIS route, so the iframe's own location genuinely becomes
+// /profile/[id] — which renders null. The Console's modal covers that
+// up while it's open, but closing the modal exposed the blank page
+// underneath. Fix: after telling the parent to open the modal, pop this
+// route off the iframe's own history so it lands back on whatever page
+// the click came from — the modal then sits on top of the correct
+// background, and closing it reveals that page, not a blank one.
+//
+// Now, when this route is reached inside the Console iframe (the normal
+// case — every "view portfolio" click across X-Coin's Leaderboard,
+// Player Management, and side nav still routes here), it asks the
+// PARENT shell to open the player directly in the no-publish-required
+// modal instead — one hop, no interstitial screens. Standalone visits
+// (this route hit directly, outside the Console iframe — rare, but the
+// player record isn't guaranteed to exist on this device to resolve a
+// brand for) get a plain, honest pointer back to the Platform instead
+// of a dead-end.
 //
 // The legacy implementation (project add/edit, publish, etc. — ~1000
 // lines) lived here before. See git history if you ever need it. Don't
@@ -16,51 +45,37 @@ import { mockUsers } from "../../lib/data";
 
 const CONSOLE_ORIGIN = "https://www.prototypeflx.com";
 
-function slugifyBrand(b: string): string {
-  return String(b || "").trim().replace(/[^a-zA-Z0-9_]+/g, "_").replace(/^_+|_+$/g, "") || "player";
-}
-
 export default function PlayerProfileRedirect({ params }: { params: { id: string } }) {
-  const [target, setTarget] = useState<string | null>(null);
-  const [reason, setReason] = useState<string>("");
+  const [standalone, setStandalone] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    let brand = "";
     try {
-      const u = mockUsers.find(m => m.id === params.id);
-      if (u && (u.brandName || u.name)) {
-        brand = String(u.brandName || u.name);
+      if (window.parent !== window) {
+        // Iframed inside the Console — ask the parent shell to open this
+        // player's portfolio directly. The Console resolves the id itself
+        // (it has the full player roster); no brand lookup needed here.
+        window.parent.postMessage(JSON.stringify({
+          type: "pflx_open_portfolio",
+          playerId: params.id,
+        }), "*");
+        // Then return the iframe to whatever page the click came from —
+        // see the v1.75 note above. Guarded so a direct/first load into
+        // this route (no prior history entry) doesn't try to pop past it.
+        if (window.history.length > 1) router.back();
       } else {
-        const cached = localStorage.getItem("pflx_user");
-        if (cached) {
-          const cu = JSON.parse(cached);
-          if (cu && cu.id === params.id) brand = String(cu.brandName || cu.name || "");
-        }
+        setStandalone(true);
       }
-    } catch {}
-
-    if (brand) {
-      const url = CONSOLE_ORIGIN + "/" + encodeURIComponent(slugifyBrand(brand));
-      setTarget(url);
-      // If we're iframed inside the Console, post a navigation request to the
-      // parent so the WHOLE shell navigates rather than just this iframe.
-      try {
-        if (window.parent !== window) {
-          window.parent.postMessage(JSON.stringify({
-            type: "pflx_navigate",
-            url: url,
-            target: "self",
-          }), "*");
-        } else {
-          // Standalone — hard-redirect.
-          window.location.replace(url);
-        }
-      } catch {}
-    } else {
-      setReason("This portfolio view has moved to the PFLX Platform. The player record couldn't be resolved on this device.");
+    } catch {
+      setStandalone(true);
     }
-  }, [params.id]);
+  }, [params.id, router]);
+
+  // Iframed: the parent opens its modal and this route immediately
+  // navigates back to the referring page underneath it — nothing needs
+  // to render here.
+  if (!standalone) return null;
 
   return (
     <div style={{
@@ -75,25 +90,15 @@ export default function PlayerProfileRedirect({ params }: { params: { id: string
           Portfolio moved
         </div>
         <div style={{ color: "#8a92b0", fontSize: 13, lineHeight: 1.6, fontFamily: "Rajdhani, sans-serif" }}>
-          {reason || "The unified portfolio now lives on the PFLX Platform. Redirecting…"}
+          Portfolio viewing now lives inside the PFLX Platform. Open the Platform and click the player's name to view it there.
         </div>
-        {target && (
-          <a href={target} style={{
-            marginTop: 8, padding: "12px 28px",
-            background: "linear-gradient(135deg,#00d4ff,#7c3aed)",
-            color: "#fff", textDecoration: "none", borderRadius: 10,
-            fontFamily: "Orbitron, sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 700,
-            boxShadow: "0 4px 24px rgba(0,212,255,0.35)",
-          }}>OPEN PORTFOLIO →</a>
-        )}
-        {!target && (
-          <a href={CONSOLE_ORIGIN} style={{
-            marginTop: 8, padding: "12px 28px",
-            background: "linear-gradient(135deg,#00d4ff,#7c3aed)",
-            color: "#fff", textDecoration: "none", borderRadius: 10,
-            fontFamily: "Orbitron, sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 700,
-          }}>OPEN PFLX PLATFORM →</a>
-        )}
+        <a href={CONSOLE_ORIGIN} style={{
+          marginTop: 8, padding: "12px 28px",
+          background: "linear-gradient(135deg,#00d4ff,#7c3aed)",
+          color: "#fff", textDecoration: "none", borderRadius: 10,
+          fontFamily: "Orbitron, sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 700,
+          boxShadow: "0 4px 24px rgba(0,212,255,0.35)",
+        }}>OPEN PFLX PLATFORM →</a>
       </div>
     </div>
   );
