@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 // ═══════════════════════════════════════════════════════════════════
 // X-Coin profile page — REMOVED in favor of the Console's in-app
@@ -13,6 +14,18 @@ import { useEffect, useState } from "react";
 // found" for the very common case of a player who's never published.
 // That's backwards: viewing a portfolio FROM INSIDE PFLX was always
 // supposed to need no publish step at all.
+//
+// v1.75 (Ennis: "the screen was blank when I clicked out") — the
+// original v1.73.1 fix assumed this iframe "stays wherever it was" once
+// the parent opens its modal. It doesn't: every "view portfolio" click
+// (Leaderboard, Player Management, side nav) is a real router.push() to
+// THIS route, so the iframe's own location genuinely becomes
+// /profile/[id] — which renders null. The Console's modal covers that
+// up while it's open, but closing the modal exposed the blank page
+// underneath. Fix: after telling the parent to open the modal, pop this
+// route off the iframe's own history so it lands back on whatever page
+// the click came from — the modal then sits on top of the correct
+// background, and closing it reveals that page, not a blank one.
 //
 // Now, when this route is reached inside the Console iframe (the normal
 // case — every "view portfolio" click across X-Coin's Leaderboard,
@@ -34,6 +47,7 @@ const CONSOLE_ORIGIN = "https://www.prototypeflx.com";
 
 export default function PlayerProfileRedirect({ params }: { params: { id: string } }) {
   const [standalone, setStandalone] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -46,16 +60,21 @@ export default function PlayerProfileRedirect({ params }: { params: { id: string
           type: "pflx_open_portfolio",
           playerId: params.id,
         }), "*");
+        // Then return the iframe to whatever page the click came from —
+        // see the v1.75 note above. Guarded so a direct/first load into
+        // this route (no prior history entry) doesn't try to pop past it.
+        if (window.history.length > 1) router.back();
       } else {
         setStandalone(true);
       }
     } catch {
       setStandalone(true);
     }
-  }, [params.id]);
+  }, [params.id, router]);
 
-  // Iframed: the parent takes over instantly (opens its modal, this iframe
-  // stays wherever it was) — nothing needs to render here.
+  // Iframed: the parent opens its modal and this route immediately
+  // navigates back to the referring page underneath it — nothing needs
+  // to render here.
   if (!standalone) return null;
 
   return (
