@@ -155,6 +155,40 @@ export default function ManageCoinsPage() {
         rank: targetPlayer.rank,
       });
 
+      // v1.78 (Ennis: "This seems to be showing dummy badges... you seem
+      // to not be receiving all of the right information") — ROOT CAUSE:
+      // updatePlayerStats() above only ever bridges the PlayerStats shape
+      // (xcoin/totalXcoin/digitalBadges/level/rank) to the Console — it
+      // has no field for WHICH badge was granted. The Console received a
+      // bare "+1 to your badge count" and had no way to know this grant
+      // was "AI App Developer"/"Beta Tester"/etc., so its portfolio viewer
+      // could only backfill a generic "Primary Badge #N" placeholder
+      // (v1.77) — technically consistent, but not the real badge Ennis
+      // actually granted. Send the real identity as its own message so
+      // the Console can route it through its canonical award() path
+      // (PflxDataBus.award, the same funnel task/checkpoint/project
+      // completions already use) and store the real name/artwork instead
+      // of a placeholder. xcValue is 0 here — the XC for this grant was
+      // already credited above via earnXCWithTax + updatePlayerStats;
+      // sending it again here would double-credit it on the Console side.
+      try {
+        if (typeof window !== "undefined" && window.parent !== window) {
+          const ownerCategory = categories.find(c => c.coins.some(cc => cc.name === coin.name));
+          window.parent.postMessage(JSON.stringify({
+            type: "pflx_player_award",
+            playerId,
+            badge: {
+              name: coin.name,
+              image: coin.image || "",
+              category: ownerCategory ? ownerCategory.name : "",
+              xcValue: 0,
+            },
+            source: "xcoin",
+            reason: `xcoin badge grant: ${coin.name}`,
+          }), "*");
+        }
+      } catch {}
+
       // Save to Supabase
       playReward();
       saveAndToast([saveUsers, saveSubmissions, saveStartupStudios], `${amount}x ${coin.name} granted — saved to cloud ✓`);
