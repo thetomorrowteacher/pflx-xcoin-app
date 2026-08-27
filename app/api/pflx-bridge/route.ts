@@ -8,24 +8,118 @@
 // GET  ?action=submissions     → Recent submissions
 // POST { action: "event", ... }→ Publish a cross-app event
 // POST { action: "xc_update", playerId, delta, reason } → Award/deduct XC
+//
+// ── SECURITY (Aug 26, PATCH v1.98 quick-harden) ─────────────────────────────
+// This endpoint has NO per-player authentication: `playerId` is whatever the
+// caller says it is, not tied to a verified session. That's a real gap and
+// is NOT closed by anything below — closing it means Battle Arena (and any
+// other satellite) reporting raw match state to a new authenticated endpoint
+// that independently computes the payout server-side, which is real work
+// that hasn't been scoped/built yet. What IS shipped here narrows the blast
+// radius of the easiest version of the exploit (a single call requesting an
+// enormous or unbounded delta) without touching how legitimate wagers/awards
+// flow today:
+//   1. CORS is restricted to known PFLX app origins instead of "*". This only
+//      stops a THIRD-PARTY WEBSITE from silently firing a cross-site request
+//      using a visitor's browser — it does nothing against a direct curl/
+//      fetch/devtools call (CORS is a browser-enforced, response-reading
+//      policy, not a server-side authorization check).
+//   2. A hard per-call cap on |delta| (MAX_XC_DELTA_PER_CALL) — calibrated
+//      above the largest real balance seen in production (~202k as of Aug
+//      2026, so up to ~404k for a doubled all-in wager) so it won't break a
+//      legitimate high-roller, but stops a single call from minting/erasing
+//      an arbitrary amount.
+//   3. Best-effort in-memory rate limiting per playerId. This is PER WARM
+//      SERVERLESS INSTANCE ONLY — Vercel can spin up multiple instances or
+//      cold-start, which resets this map — so treat it as a speed bump
+//      against a single rapid-fire script, not a real distributed limiter.
+//   4. Anomaly logging: any call at/above a lower "suspicious" threshold is
+//      recorded to Supabase (`app_data` key `xc_anomaly_log`, capped at the
+//      last 500) even if it's allowed through, so Ennis can review after the
+//      fact rather than the activity being invisible.
+// ─────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "../../lib/supabaseClient";
 import { publishEvent, loadEvents, PflxAppId, PflxEventType } from "../../lib/pflx-events";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
+// ── CORS allowlist ───────────────────────────────────────────────────────
+const ALLOWED_ORIGINS = [
+  "https://pflx-battle-arena.vercel.app",
+  "https://pflx-darkcampus.vercel.app",
+  "https://pflx-overlay.vercel.app",
+  "https://pflx-pathway-portal.vercel.app",
+  "https://pflx-xcoin-app.vercel.app",
+  "https://www.prototypeflx.com",
+  "https://prototypeflx.com",
+];
 
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: CORS });
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  // local dev only
+  if (/^http:\/\/localhost:\d+$/.test(origin) || /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) return true;
+  return false;
+}
+
+function corsHeaders(req: NextRequest): Record<string, string> {
+  const origin = req.headers.get("origin");
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Vary": "Origin",
+  };
+  // Only echo the Origin back (enabling the browser to read the response)
+  // when it's on the allowlist. A disallowed/missing Origin gets no ACAO
+  // header at all — the request still runs (this is not an auth check, see
+  // header comment), but a disallowed browser origin can't read the result.
+  if (isAllowedOrigin(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin as string;
+  }
+  return headers;
+}
+
+// ── xc_update hardening constants ─────────────────────────────────────────
+const MAX_XC_DELTA_PER_CALL = 500_000;      // hard reject above this magnitude
+const SUSPICIOUS_XC_DELTA = 10_000;         // log (but still allow) at/above this
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const RATE_LIMIT_MAX_CALLS = 30;            // per playerId, per warm instance
+
+// Module-scope = persists only for the lifetime of a warm serverless
+// instance. See header comment — this is a speed bump, not a real limiter.
+const _xcUpdateCallLog: Map<string, number[]> = new Map();
+
+function isRateLimited(playerId: string): boolean {
+  const now = Date.now();
+  const calls = (_xcUpdateCallLog.get(playerId) || []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+  calls.push(now);
+  _xcUpdateCallLog.set(playerId, calls);
+  return calls.length > RATE_LIMIT_MAX_CALLS;
+}
+
+async function logXcAnomaly(entry: Record<string, unknown>): Promise<void> {
+  try {
+    const { data: row } = await supabase.from("app_data").select("data").eq("key", "xc_anomaly_log").single();
+    const log = Array.isArray(row?.data) ? (row!.data as Record<string, unknown>[]) : [];
+    log.push({ ...entry, loggedAt: new Date().toISOString() });
+    const trimmed = log.slice(-500);
+    await supabase.from("app_data").upsert(
+      { key: "xc_anomaly_log", data: trimmed, updated_at: new Date().toISOString() },
+      { onConflict: "key" }
+    );
+  } catch (err) {
+    console.error("[pflx-bridge] logXcAnomaly failed:", err);
+  }
+}
+
+export async function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { headers: corsHeaders(req) });
 }
 
 // ── GET: Read shared data ─────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const action = req.nextUrl.searchParams.get("action");
+  const CORS = corsHeaders(req);
 
   try {
     // ── List all players ──────────────────────────────────────────────
@@ -90,6 +184,7 @@ export async function GET(req: NextRequest) {
 
 // ── POST: Write operations ────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
+  const CORS = corsHeaders(req);
   try {
     const body = await req.json();
     const action = body.action;
@@ -109,6 +204,20 @@ export async function POST(req: NextRequest) {
       const { playerId, delta, reason, app: sourceApp } = body;
       if (!playerId || delta === undefined) {
         return NextResponse.json({ error: "Missing playerId or delta" }, { status: 400, headers: CORS });
+      }
+
+      // ── Hard cap: reject an unbounded/absurd single-call delta ──────
+      if (Math.abs(delta) > MAX_XC_DELTA_PER_CALL) {
+        console.warn(`[pflx-bridge] REJECTED xc_update: |delta|=${Math.abs(delta)} exceeds cap for player ${playerId} (source: ${sourceApp || "unknown"})`);
+        await logXcAnomaly({ playerId, delta, reason, sourceApp, outcome: "rejected_over_cap" });
+        return NextResponse.json({ error: "Delta exceeds allowed per-call maximum" }, { status: 400, headers: CORS });
+      }
+
+      // ── Best-effort rate limit per playerId (see header comment) ────
+      if (isRateLimited(playerId)) {
+        console.warn(`[pflx-bridge] REJECTED xc_update: rate limit exceeded for player ${playerId} (source: ${sourceApp || "unknown"})`);
+        await logXcAnomaly({ playerId, delta, reason, sourceApp, outcome: "rejected_rate_limited" });
+        return NextResponse.json({ error: "Too many XC updates for this player — try again shortly" }, { status: 429, headers: CORS });
       }
 
       const { data } = await supabase.from("app_data").select("data").eq("key", "users").single();
@@ -148,6 +257,12 @@ export async function POST(req: NextRequest) {
         { key: "transactions", data: transactions, updated_at: new Date().toISOString() },
         { onConflict: "key" }
       );
+
+      // Flag (but still allow) anomalously large legitimate-looking calls
+      if (Math.abs(delta) >= SUSPICIOUS_XC_DELTA) {
+        console.warn(`[pflx-bridge] SUSPICIOUS xc_update: delta=${delta} player=${playerId} source=${sourceApp || "unknown"} reason="${reason || ""}"`);
+        await logXcAnomaly({ playerId, delta, reason, sourceApp, oldXC, newXC, outcome: "allowed_flagged" });
+      }
 
       // Publish event
       await publishEvent(
