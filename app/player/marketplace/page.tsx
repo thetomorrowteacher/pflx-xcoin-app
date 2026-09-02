@@ -62,8 +62,16 @@ export default function PlayerMarketplace() {
       return;
     }
 
-    // Deduct cost
-    const updatedUser = { ...user, xp: user.xcoin - mod.costXcoin, xc: user.digitalBadges - mod.costXcoin };
+    // Deduct cost (Sept 2, Ennis — FeedForward, Hannah Rodrigues 8/12: "Booster
+    // XC not deducted"). This used to write the post-deduction numbers onto
+    // `xp` and `xc` — neither of which exists on the User type (the balance
+    // field checked two lines up, and used everywhere else in this app, is
+    // `xcoin`) — so the spread below silently tacked two bogus extra
+    // properties onto updatedUser while `xcoin` itself passed through
+    // untouched. The visible balance never moved because the real field was
+    // never written. Now deducts from the actual `xcoin`/`digitalBadges`
+    // fields the eligibility check above already uses.
+    const updatedUser = { ...user, xcoin: user.xcoin - mod.costXcoin, digitalBadges: user.digitalBadges - mod.costBadge };
     setUser(updatedUser);
     localStorage.setItem("pflx_user", JSON.stringify(updatedUser));
 

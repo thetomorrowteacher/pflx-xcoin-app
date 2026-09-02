@@ -122,21 +122,34 @@ export default function ManageCoinsPage() {
 
   const handleGrantCoin = () => {
     if (!grantTarget) return;
-    const { playerId, coin } = grantTarget;
+    const { playerIds, coin } = grantTarget;
+    if (!playerIds.length) return;
     // Defense-in-depth clamp (Aug 14) — the modal's onChange already clamps
     // to [1,100], but this is the actual money path, so it re-clamps here
     // too rather than trusting a single guard upstream of it.
     const amount = Math.max(1, Math.min(100, Number.isFinite(grantTarget.amount) ? grantTarget.amount : 1));
-    const targetPlayer = mockUsers.find(u => u.id === playerId);
-    if (targetPlayer) {
+
+    // Sept 2 (Ennis: better badge-grant selection — search/cohort filter +
+    // multi-select) — grantTarget.playerIds is now an array (a single grant
+    // used to only ever carry one playerId). Apply the exact same per-player
+    // award logic — digitalBadges bump, earnXCWithTax, submission history,
+    // the Console-identity award message, Slack/Discord notify — to every
+    // selected player, then ONE cloud save + toast for the whole batch
+    // (not one per player) so granting an entire cohort doesn't fire N
+    // redundant Supabase writes or a wall of N toasts.
+    let grantedCount = 0;
+    playerIds.forEach(playerId => {
+      const targetPlayer = mockUsers.find(u => u.id === playerId);
+      if (!targetPlayer) return;
+      grantedCount++;
       const totalXcReward = coin.xc * amount;
       targetPlayer.digitalBadges += amount; // +X badges
       // Use earnXCWithTax — auto-deducts studio income tax
-      const { netXC, taxDeducted } = earnXCWithTax(targetPlayer, totalXcReward, `Badge Grant: ${coin.name}`);
+      earnXCWithTax(targetPlayer, totalXcReward, `Badge Grant: ${coin.name}`);
 
       // Add to submissions history as pre-approved
       mockSubmissions.push({
-        id: `grant-${Date.now()}`,
+        id: `grant-${Date.now()}-${playerId}`,
         playerId,
         coinType: coin.name,
         amount: amount,
@@ -210,13 +223,23 @@ export default function ManageCoinsPage() {
         }
       } catch {}
 
-      // Save to Supabase
-      playReward();
-      saveAndToast([saveUsers, saveSubmissions, saveStartupStudios], `${amount}x ${coin.name} granted — saved to cloud ✓`);
-      // Notify Slack/Discord
+      // Notify Slack/Discord — one message per player, same as granting
+      // one at a time used to produce.
       notifyBadgeAwarded(targetPlayer.brandName || targetPlayer.name, coin.name, coin.xc).catch(() => {});
+    });
+
+    if (grantedCount > 0) {
+      playReward();
+      saveAndToast(
+        [saveUsers, saveSubmissions, saveStartupStudios],
+        grantedCount === 1
+          ? `${amount}x ${coin.name} granted — saved to cloud ✓`
+          : `${amount}x ${coin.name} granted to ${grantedCount} players — saved to cloud ✓`
+      );
     }
     setGrantTarget(null);
+    setGrantSearch("");
+    setGrantCohortFilter("all");
   };
 
   return (
@@ -268,7 +291,7 @@ export default function ManageCoinsPage() {
                           style={{ flex: 1, padding: "6px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "white", fontSize: "11px", cursor: "pointer" }}
                         >Edit</button>
                         <button 
-                          onClick={() => setGrantTarget({ playerId: "", coin, amount: 1 })}
+                          onClick={() => { setGrantTarget({ playerIds: [], coin, amount: 1 }); setGrantSearch(""); setGrantCohortFilter("all"); }}
                           style={{ flex: 1, padding: "6px", borderRadius: "8px", border: "none", background: "rgba(79,142,247,0.2)", color: "#4f8ef7", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
                         >Grant</button>
                         <button 
@@ -550,37 +573,96 @@ export default function ManageCoinsPage() {
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
             <div style={{ background: "#16161f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "24px", padding: "32px", width: "100%", maxWidth: "400px" }}>
               <h2 style={{ margin: "0 0 8px", color: "#f0f0ff" }}>Grant {grantTarget.coin.name}</h2>
-              <p style={{ margin: "0 0 24px", fontSize: "14px", color: "rgba(255,255,255,0.4)" }}>Select a player to award this coin</p>
-              
-              {/* Player select — a single-column scrollable list. This used
-                  to be a 2-column CSS grid (gridTemplateColumns: "1fr 1fr"),
-                  which blew out horizontally: a grid track's default
-                  min-width is its content's intrinsic width, so a long name
-                  (e.g. "Nila Vyshnavi Subhashchandra Nair") forced its
-                  column wider than the 1fr share, pushing the second column
-                  — and the list's own scrollbar — off the right edge of the
-                  400px modal. A single column with each row's text properly
-                  truncated removes the failure mode entirely and leaves
-                  room to show the brand name under the real name. */}
+              <p style={{ margin: "0 0 16px", fontSize: "14px", color: "rgba(255,255,255,0.4)" }}>Select players to award this coin</p>
+
+              {/* Search + cohort filter (Sept 2, Ennis) — the roster can run
+                  to 150+ players, and finding one by scrolling a single
+                  260px list was the actual friction being reported. Search
+                  matches name or brand name; the cohort dropdown is
+                  populated from the same getMockCohorts() the rest of the
+                  app already uses for cohort-scoped assignment. */}
+              <input
+                type="text"
+                value={grantSearch}
+                onChange={e => setGrantSearch(e.target.value)}
+                placeholder="Search players by name or brand…"
+                style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", marginBottom: "8px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", color: "white", fontSize: "13px" }}
+              />
+              <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
+                <select
+                  value={grantCohortFilter}
+                  onChange={e => setGrantCohortFilter(e.target.value)}
+                  style={{ flex: 1, padding: "8px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", color: "white", fontSize: "12px" }}
+                >
+                  <option value="all">All Cohorts</option>
+                  {grantCohorts.map(ch => <option key={ch} value={ch}>{ch}</option>)}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const visibleIds = filteredGrantPlayers.map(s => s.id);
+                    const merged = Array.from(new Set([...grantTarget.playerIds, ...visibleIds]));
+                    setGrantTarget({...grantTarget, playerIds: merged});
+                  }}
+                  style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid rgba(79,142,247,0.3)", background: "rgba(79,142,247,0.1)", color: "#4f8ef7", fontSize: "11px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+                >Select All</button>
+                <button
+                  type="button"
+                  onClick={() => setGrantTarget({...grantTarget, playerIds: []})}
+                  style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "rgba(255,255,255,0.5)", fontSize: "11px", cursor: "pointer", whiteSpace: "nowrap" }}
+                >Clear</button>
+              </div>
+              <p style={{ margin: "0 0 8px", fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>
+                {grantTarget.playerIds.length} selected · {filteredGrantPlayers.length} shown
+              </p>
+
+              {/* Player select — a single-column scrollable, multi-select
+                  list. Kept single-column (not a 2-column grid) since a
+                  long name (e.g. "Nila Vyshnavi Subhashchandra Nair") in a
+                  grid track forces its column wider than its 1fr share,
+                  pushing the second column — and the list's own scrollbar
+                  — off the right edge of the 400px modal. */}
               <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "24px", maxHeight: "260px", overflowY: "auto", overflowX: "hidden" }}>
-                {applyPlayerImages(mockUsers).filter(u => u.role === "player").map(s => {
+                {filteredGrantPlayers.length === 0 && (
+                  <p style={{ margin: "12px 0", fontSize: "12px", color: "rgba(255,255,255,0.3)", textAlign: "center" }}>No players match this search/cohort.</p>
+                )}
+                {filteredGrantPlayers.map(s => {
                   const initials = (s.brandName || s.name || "?")
                     .trim()
                     .split(/\s+/)
                     .slice(0, 2)
                     .map(w => w.charAt(0).toUpperCase())
                     .join("") || "?";
+                  const isSelected = grantTarget.playerIds.includes(s.id);
                   return (
                     <button
                       key={s.id}
-                      onClick={() => setGrantTarget({...grantTarget, playerId: s.id})}
+                      onClick={() => {
+                        const next = isSelected
+                          ? grantTarget.playerIds.filter(id => id !== s.id)
+                          : [...grantTarget.playerIds, s.id];
+                        setGrantTarget({...grantTarget, playerIds: next});
+                      }}
                       style={{
-                        padding: "10px 12px", borderRadius: "12px", border: grantTarget.playerId === s.id ? "1px solid #4f8ef7" : "1px solid rgba(255,255,255,0.05)",
-                        background: grantTarget.playerId === s.id ? "rgba(79,142,247,0.1)" : "rgba(255,255,255,0.02)",
+                        padding: "10px 12px", borderRadius: "12px", border: isSelected ? "1px solid #4f8ef7" : "1px solid rgba(255,255,255,0.05)",
+                        background: isSelected ? "rgba(79,142,247,0.1)" : "rgba(255,255,255,0.02)",
                         display: "flex", alignItems: "center", gap: "12px", color: "#f0f0ff", cursor: "pointer", textAlign: "left",
                         width: "100%", boxSizing: "border-box", minWidth: 0
                       }}
                     >
+                      {/* Checkbox indicator — purely visual, the whole row's
+                          onClick above already handles the toggle, so this
+                          has no separate handler (avoids a double-toggle
+                          from the click bubbling through both). */}
+                      <div style={{
+                        width: "16px", height: "16px", borderRadius: "4px", flexShrink: 0,
+                        border: isSelected ? "none" : "1px solid rgba(255,255,255,0.25)",
+                        background: isSelected ? "#4f8ef7" : "transparent",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "11px", color: "white", fontWeight: 700,
+                      }}>
+                        {isSelected ? "✓" : ""}
+                      </div>
                       {/* Uploaded avatar image when present; otherwise initials
                           computed from the player's brand/real name — not the
                           raw `avatar` field, which is frequently blank for
@@ -637,19 +719,19 @@ export default function ManageCoinsPage() {
                     style={{ flex: 1, padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white" }}
                   />
                   <div style={{ textAlign: "right", minWidth: "100px" }}>
-                    <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#4f8ef7" }}>+{grantTarget.coin.xc * grantTarget.amount} XP</p>
-                    <p style={{ margin: 0, fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>{grantTarget.amount} Badges</p>
+                    <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#4f8ef7" }}>+{grantTarget.coin.xc * grantTarget.amount} XP{grantTarget.playerIds.length > 1 ? " each" : ""}</p>
+                    <p style={{ margin: 0, fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>{grantTarget.amount} Badge{grantTarget.amount !== 1 ? "s" : ""}{grantTarget.playerIds.length > 1 ? ` → ${grantTarget.playerIds.length} players` : ""}</p>
                   </div>
                 </div>
               </div>
 
               <div style={{ display: "flex", gap: "12px" }}>
-                <button onClick={() => setGrantTarget(null)} style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", cursor: "pointer" }}>Cancel</button>
+                <button onClick={() => { setGrantTarget(null); setGrantSearch(""); setGrantCohortFilter("all"); }} style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", cursor: "pointer" }}>Cancel</button>
                 <button 
                   onClick={handleGrantCoin}
-                  disabled={!grantTarget.playerId}
-                  style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "#4f8ef7", border: "none", color: "white", fontWeight: 700, cursor: grantTarget.playerId ? "pointer" : "not-allowed", opacity: grantTarget.playerId ? 1 : 0.5 }}
-                >Confirm Grant</button>
+                  disabled={grantTarget.playerIds.length === 0}
+                  style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "#4f8ef7", border: "none", color: "white", fontWeight: 700, cursor: grantTarget.playerIds.length > 0 ? "pointer" : "not-allowed", opacity: grantTarget.playerIds.length > 0 ? 1 : 0.5 }}
+                >Confirm Grant{grantTarget.playerIds.length > 1 ? ` (${grantTarget.playerIds.length})` : ""}</button>
               </div>
             </div>
           </div>
