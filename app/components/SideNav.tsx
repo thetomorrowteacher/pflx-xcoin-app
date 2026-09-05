@@ -6,41 +6,6 @@ import { User, isHostUser, getCurrentRank } from "../lib/data";
 import { playNav, playClick, getSoundSettings, saveSoundSettings, SoundSettings, syncAmbient } from "../lib/sounds";
 import { applyPlayerImages } from "../lib/playerImages";
 
-// ─── PFLX branding badge (top-right, fixed) ─────────────────────────────────
-function PflxBadge() {
-  const [imgFailed, setImgFailed] = useState(false);
-  return (
-    <div style={{
-      position: "fixed", top: "14px", right: "20px",
-      zIndex: 9999, pointerEvents: "none",
-      display: "flex", alignItems: "center", gap: "8px",
-    }}>
-      {!imgFailed ? (
-        <img
-          src="/pflx-logo.png"
-          alt="PFLX"
-          onError={() => setImgFailed(true)}
-          style={{ height: "36px", width: "auto", objectFit: "contain" }}
-        />
-      ) : (
-        <div style={{
-          fontSize: "13px", fontWeight: 900, letterSpacing: "0.12em",
-          background: "linear-gradient(90deg, #00d4ff, #a78bfa)",
-          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-          filter: "drop-shadow(0 0 8px rgba(0,212,255,0.4))",
-        }}>PFLX</div>
-      )}
-      <span style={{
-        fontSize: "9px", fontWeight: 800, letterSpacing: "0.1em",
-        color: "#f5c842", background: "rgba(245,200,66,0.12)",
-        border: "1px solid rgba(245,200,66,0.3)",
-        borderRadius: "4px", padding: "2px 6px",
-        textTransform: "uppercase",
-      }}>BETA</span>
-    </div>
-  );
-}
-
 interface NavProps {
   user: User;
 }
@@ -145,7 +110,6 @@ export default function SideNav({ user }: NavProps) {
   if (sidebarCollapsed) {
     return (
       <>
-        <PflxBadge />
         <button
           onClick={() => toggleSidebar(false)}
           title="Show sidebar"
@@ -190,7 +154,6 @@ export default function SideNav({ user }: NavProps) {
 
   return (
     <>
-    <PflxBadge />
     <nav style={{
       width: "230px",
       minWidth: "230px",
