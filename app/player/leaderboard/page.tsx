@@ -9,6 +9,7 @@ import {
   CohortGroup, mockCohortGroups,
 } from "../../lib/data";
 import { applyPlayerImages } from "../../lib/playerImages";
+import { playerInitials } from "../../lib/avatarUtils";
 import Link from "next/link";
 
 // ─── Badge colour palette ──────────────────────────────────────────────────
@@ -939,7 +940,7 @@ export default function PlayerLeaderboard() {
                       }}>
                         {s.topMember.image
                           ? <img src={s.topMember.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          : s.topMember.avatar}
+                          : playerInitials(s.topMember)}
                       </div>
                       <span style={{ fontSize: "13px", fontWeight: 700, color: s.color }}>{s.topMember.brandName || s.topMember.name}</span>
                       <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}>{s.topMember.totalXcoin.toLocaleString()} XC</span>
@@ -954,7 +955,7 @@ export default function PlayerLeaderboard() {
                         }}>
                           {m.image
                             ? <img src={m.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            : m.avatar}
+                            : playerInitials(m)}
                         </div>
                       ))}
                       {s.members.length > 10 && (

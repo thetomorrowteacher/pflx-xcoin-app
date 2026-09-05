@@ -5,6 +5,7 @@ import SideNav from "../components/SideNav";
 import SeasonBanner from "../components/SeasonBanner";
 import { User, mockTasks, mockUsers, mockModifiers, mockTransactions, COIN_CATEGORIES, isHostUser, earnXCWithTax } from "../lib/data";
 import { applyPlayerImages } from "../lib/playerImages";
+import { playerInitials } from "../lib/avatarUtils";
 import { saveUsers, saveTransactions, saveStartupStudios } from "../lib/store";
 import { saveAndToast } from "../lib/saveToast";
 import { notifyXCAward, notifyBadgeAwarded } from "../lib/notifications";
@@ -632,7 +633,7 @@ export default function AdminDashboard() {
                     background: s.image ? "transparent" : "linear-gradient(135deg,#00d4ff22,#7c3aed33)",
                     border: `1px solid ${s.image ? "rgba(0,212,255,0.3)" : "rgba(0,212,255,0.2)"}`,
                     display:"flex", alignItems:"center", justifyContent:"center", fontSize:"11px", color:CYAN }}>
-                    {s.image ? <img src={s.image} style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : s.avatar}
+                    {s.image ? <img src={s.image} style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : playerInitials(s)}
                   </div>
                   <div style={{ flex:1 }}>
                     <p style={{ margin:0, fontSize:"12px", fontWeight:700, color:"#fff" }}>{s.brandName ?? s.name}</p>

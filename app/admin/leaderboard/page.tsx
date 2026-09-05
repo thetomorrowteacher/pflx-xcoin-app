@@ -11,6 +11,7 @@ import {
   CohortGroup, mockCohortGroups,
 } from "../../lib/data";
 import { applyPlayerImages } from "../../lib/playerImages";
+import { playerInitials } from "../../lib/avatarUtils";
 
 type SortKey     = "evoRank" | "status" | "xcoin" | "totalXcoin" | "digitalBadge";
 type BadgeFilter = "all" | "signature" | "executive" | "premium" | "primary";
@@ -340,7 +341,7 @@ export default function AdminLeaderboard() {
                       }}>
                         {player.image
                           ? <img src={player.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          : player.avatar}
+                          : playerInitials(player)}
                       </div>
                       {/* Medal badge pinned bottom-right of photo */}
                       <div style={{
@@ -569,7 +570,7 @@ export default function AdminLeaderboard() {
                     display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px",
                     boxShadow: p.image ? "0 0 10px rgba(0,212,255,0.2)" : "none",
                   }}>
-                    {p.image ? <img src={p.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : p.avatar}
+                    {p.image ? <img src={p.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : playerInitials(p)}
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <p
@@ -819,7 +820,7 @@ export default function AdminLeaderboard() {
                       }}>
                         {s.topMember.image
                           ? <img src={s.topMember.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          : s.topMember.avatar}
+                          : playerInitials(s.topMember)}
                       </div>
                       <span style={{ fontSize: "13px", fontWeight: 700, color: s.color }}>{s.topMember.brandName || s.topMember.name}</span>
                       <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}>{s.topMember.totalXcoin.toLocaleString()} XC</span>
@@ -834,7 +835,7 @@ export default function AdminLeaderboard() {
                         }}>
                           {m.image
                             ? <img src={m.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            : m.avatar}
+                            : playerInitials(m)}
                         </div>
                       ))}
                       {s.members.length > 10 && (
