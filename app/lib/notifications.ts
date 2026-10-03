@@ -291,7 +291,7 @@ export function notifyBadgeAwarded(playerName: string, badgeName: string, xc: nu
 export function notifyRankUp(playerName: string, newRank: string, level: number) {
   return sendNotification({
     event: "rank_up",
-    title: "Evo Rank Up!",
+    title: "Pro Rank Up!",
     message: `*${playerName}* has reached *${newRank}* (Level ${level})! 🎉`,
     fields: [
       { name: "New Rank", value: `📈 ${newRank}` },

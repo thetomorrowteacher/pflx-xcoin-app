@@ -185,7 +185,7 @@ export default async function PublicBadgePage(
             {data.brand}
           </div>
           <div style={{ fontSize: 12, color: "#8a92b0", marginTop: 6 }}>
-            Evolution Rank {data.rank} · {data.total} Digital Badge{data.total === 1 ? "" : "s"} earned
+            Pro Rank {data.rank} · {data.total} Digital Badge{data.total === 1 ? "" : "s"} earned
           </div>
           <div style={{ fontSize: 11, color: "#5a6280", marginTop: 10 }}>
             Issued by <span style={{ color: "#f5c842" }}>{ORG_NAME}</span> · Verified on the PFLX platform

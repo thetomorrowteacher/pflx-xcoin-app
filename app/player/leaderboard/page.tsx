@@ -70,7 +70,7 @@ function ChipSelect<T extends string>({
 }
 
 // ─── Grid template shared between header and rows ────────────────────────
-// STATUS | avatar | PLAYER | STUDIO | EVO RANK | SIG | EXEC | PREM | PRI | TOTAL | XC | SCORE
+// STATUS | avatar | PLAYER | STUDIO | PRO RANK | SIG | EXEC | PREM | PRI | TOTAL | XC | SCORE
 const GRID = "56px 36px minmax(130px,1fr) 100px 100px 68px 68px 68px 68px 62px 82px 76px";
 
 // ─── Studio logo helper — tries image, falls back to emoji ────────────────
@@ -106,7 +106,7 @@ export default function PlayerLeaderboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<"players" | "studios">("players");
-  // Default sort is Evo Rank — players are ranked first by Evo Rank tier
+  // Default sort is Pro Rank — players are ranked first by Pro Rank tier
   // (Master Admin → Player), then by lifetime XC (totalXcoin) as the
   // tiebreaker within the same rank. This matches the platform's
   // progression model where rank is the primary status signal.
@@ -295,7 +295,7 @@ export default function PlayerLeaderboard() {
             </h1>
             <p style={{ margin: 0, color: "rgba(0,212,255,0.5)", fontSize: "13px", letterSpacing: "0.1em" }}>
               {view === "players"
-                ? "[ STATUS STANDINGS · EVO RANK · XC BALANCE ]"
+                ? "[ STATUS STANDINGS · PRO RANK · XC BALANCE ]"
                 : "[ STUDIO COMPETITION · XC POOLS · CORPORATE RANKINGS ]"}
             </p>
           </div>
@@ -506,7 +506,7 @@ export default function PlayerLeaderboard() {
               value={sortBy}
               onChange={setSortBy}
               options={[
-                { key: "evoRank",      label: "🏆 Evo Rank" },
+                { key: "evoRank",      label: "🏆 Pro Rank" },
                 { key: "status",       label: "⭐ Status Score" },
                 { key: "xcoin",        label: "🪙 XC Balance" },
                 { key: "totalXcoin",   label: "📈 Total XC" },
@@ -607,7 +607,7 @@ export default function PlayerLeaderboard() {
                 { label: "All Studios", active: studioFilter === "all", onSelect: () => setStudioFilter("all") },
                 ...mockStartupStudios.map(s => ({ label: s.icon + " " + s.name, active: studioFilter === s.id, onSelect: () => setStudioFilter(s.id) })),
               ]} />
-              <ColDropdown id="evorank" label="EVO RANK" isActive={tierFilter !== "all"} options={[
+              <ColDropdown id="evorank" label="PRO RANK" isActive={tierFilter !== "all"} options={[
                 { label: "All Tiers", active: tierFilter === "all", onSelect: () => setTierFilter("all") },
                 ...RANK_TIERS.map(t => ({ label: t.label, active: tierFilter === t.key, onSelect: () => setTierFilter(t.key as TierFilter) })),
               ]} />
@@ -751,7 +751,7 @@ export default function PlayerLeaderboard() {
                     );
                   })()}
 
-                  {/* Evo Rank */}
+                  {/* Pro Rank */}
                   <div>
                     <p style={{ margin: "0 0 1px", fontSize: "12px", fontWeight: 700, color: "#e0e0ff", whiteSpace: "nowrap" }}>
                       {rank.icon} {rank.name}
@@ -814,7 +814,7 @@ export default function PlayerLeaderboard() {
             display: "flex", flexWrap: "wrap", gap: "6px 16px",
             fontSize: "10px", color: "rgba(255,255,255,0.3)",
           }}>
-            <span>🎖 Evo Rank ×100k</span>
+            <span>🎖 Pro Rank ×100k</span>
             <span style={{ color: "#ef4444" }}>🟥 Sig ×10k</span>
             <span style={{ color: "#f5c842" }}>🟨 Exec ×1k</span>
             <span style={{ color: "#a78bfa" }}>🟪 Prem ×100</span>

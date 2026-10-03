@@ -44,7 +44,7 @@ export default function PlayerWallet() {
     nft_value: "🔮",
   };
 
-  // Evo Ranking Portfolio data
+  // Pro Ranking Portfolio data
   const currentRank = getCurrentRank(user.totalXcoin, user);
   const taxRate = getStudioTaxRate(user.rank || 1);
   const sharePercent = getEvoSharePercent(user.rank || 1);
@@ -93,13 +93,13 @@ export default function PlayerWallet() {
           </div>
         </div>
 
-        {/* Evo Ranking & Stakes/Shares Portfolio */}
+        {/* Pro Ranking & Stakes/Shares Portfolio */}
         <section style={{ marginBottom: "32px" }}>
           <h2 style={{
             margin: "0 0 16px", fontSize: "18px", fontWeight: 700, color: "#a78bfa",
             textShadow: "0 0 15px rgba(167,139,250,0.5)",
             textTransform: "uppercase", letterSpacing: "0.1em"
-          }}>📊 EVO RANKING PORTFOLIO</h2>
+          }}>📊 PRO RANKING PORTFOLIO</h2>
 
           <div style={{
             background: "linear-gradient(135deg, rgba(167,139,250,0.08), rgba(0,212,255,0.04))",
@@ -191,11 +191,11 @@ export default function PlayerWallet() {
               </div>
             )}
 
-            {/* Evo Rank Progression hint */}
+            {/* Pro Rank Progression hint */}
             <div style={{
               marginTop: "12px", fontSize: "11px", color: "rgba(255,255,255,0.25)", lineHeight: 1.6,
             }}>
-              Higher Evo ranks unlock higher stake/share percentages but also pay higher studio tax. Build your portfolio value by earning XC, pitching projects, and earning residual income.
+              Higher Pro ranks unlock higher stake/share percentages but also pay higher studio tax. Build your portfolio value by earning XC, pitching projects, and earning residual income.
             </div>
           </div>
         </section>

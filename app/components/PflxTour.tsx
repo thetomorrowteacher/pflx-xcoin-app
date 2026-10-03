@@ -17,7 +17,7 @@ const ACCENT = "#f5c842";
 const STEPS: TourStep[] = [
   {
     title: "WELCOME TO X-COIN",
-    body: "This is your economy hub. Every XC you earn across PFLX — modules, asteroid mining, arena wins, jobs — lands here, along with your badges and Evolution Rank.",
+    body: "This is your economy hub. Every XC you earn across PFLX — modules, asteroid mining, arena wins, jobs — lands here, along with your badges and Pro Rank.",
   },
   {
     sel: "#nav-marketplace",
@@ -32,7 +32,7 @@ const STEPS: TourStep[] = [
   {
     sel: "#nav-leaderboard",
     title: "LEADERBOARD",
-    body: "Ranked by Evolution Rank. Higher ranks unlock better ships, bypass cohort locks, and can even let you found galaxy clusters.",
+    body: "Ranked by Pro Rank. Higher ranks unlock better ships, bypass cohort locks, and can even let you found galaxy clusters.",
   },
   {
     sel: "#nav-x-tracker",

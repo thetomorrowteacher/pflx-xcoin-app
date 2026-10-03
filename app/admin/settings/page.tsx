@@ -322,7 +322,7 @@ export default function AdminSettings() {
           })}
         </div>
 
-        {/* Seasons + Evolution Rankings tabs moved to Mission Control */}
+        {/* Seasons + Pro Rankings tabs moved to Mission Control */}
 
         {/* ── SOUND TAB ── */}
         {activeTab === "sound" && (
@@ -480,7 +480,7 @@ export default function AdminSettings() {
         {false && (
           <div>
             <p style={{ margin: "0 0 24px", color: "rgba(255,255,255,0.6)", fontSize: "14px" }}>
-              Edit the criteria for each Evolution Rank. Players are promoted when they meet the XC threshold, checkpoint count, and badge requirements.
+              Edit the criteria for each Pro Rank. Players are promoted when they meet the XC threshold, checkpoint count, and badge requirements.
             </p>
             {/* Tier group headers */}
             {[
@@ -544,7 +544,7 @@ export default function AdminSettings() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "22px" }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#f0f0ff" }}>Edit Tier {editingRank.level}: {editingRank.name}</h2>
-                <p style={{ margin: "3px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>Evolution Rankings · Level {editingRank.level} of 10</p>
+                <p style={{ margin: "3px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>Pro Rankings · Level {editingRank.level} of 10</p>
               </div>
               <button onClick={() => setEditingRank(null)} style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px", lineHeight: 1 }}>×</button>
             </div>

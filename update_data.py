@@ -129,7 +129,7 @@ old_rank_interface = '''export interface PFLXRank {
   requirementXcoin?: number; // Total X-Coins required
   specificCoinRequirement?: string; // Name of a specific coin required
   icon?: string;
-  image?: string; // Support for custom images for Evolution Rankings
+  image?: string; // Support for custom images for Pro Rankings
 }'''
 
 new_rank_interface = '''export interface PFLXRank {
@@ -141,7 +141,7 @@ new_rank_interface = '''export interface PFLXRank {
   badgeTypeRequirements: string[]; // Badge types needed: "Primary", "Premium", "Executive", "Signature"
   specificBadgeRequirements?: string[]; // Specific named badges required
   icon?: string;
-  image?: string; // Custom image for Evolution Rankings
+  image?: string; // Custom image for Pro Rankings
 }'''
 
 content = content.replace(old_rank_interface, new_rank_interface)

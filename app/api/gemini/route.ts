@@ -40,7 +40,7 @@ CURRENCY & PROGRESSION:
   • Executive Badges (Jobs) — awarded for completing jobs/roles
   • Signature Badges (Skill Mastery) — highest weight, awarded for completing courses/pathways
 - Level is based on current XC balance. Higher XC = higher level.
-- Rank (Evolution Rank 1-10) is based on LIFETIME XC earned (never decreases even if XC is spent).
+- Rank (Pro Rank 1-10) is based on LIFETIME XC earned (never decreases even if XC is spent).
 - The Leaderboard ranks players by current XC.
 
 TASKS, JOBS & SUBMISSIONS:

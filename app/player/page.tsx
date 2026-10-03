@@ -365,7 +365,7 @@ Return ONLY valid JSON with this exact format (no markdown, no code blocks):
             { label: "Digital Badges", value: (user.digitalBadges ?? 0).toLocaleString(), color: "#f5c842", icon: "🏅" },
             { label: "XC Balance", value: (user.xcoin ?? 0).toLocaleString(), color: "#4f8ef7", icon: "⚡" },
             { label: "Total XC Earned", value: (user.totalXcoin ?? 0).toLocaleString(), color: "#a78bfa", icon: "💎" },
-            { label: "Evo Rank", value: currentRank?.name ?? `LV.${user.level ?? 1}`, color: "#00d4ff", icon: currentRank?.icon ?? "🌱" },
+            { label: "Pro Rank", value: currentRank?.name ?? `LV.${user.level ?? 1}`, color: "#00d4ff", icon: currentRank?.icon ?? "🌱" },
           ].map(stat => (
             <div key={stat.label} style={{
               padding: "18px", borderRadius: "16px",
@@ -379,7 +379,7 @@ Return ONLY valid JSON with this exact format (no markdown, no code blocks):
           ))}
         </div>
 
-        {/* Evo Rank Progress */}
+        {/* Pro Rank Progress */}
         {currentRank && (
           <div style={{
             marginBottom: "28px", padding: "20px 24px", borderRadius: "16px",
@@ -387,7 +387,7 @@ Return ONLY valid JSON with this exact format (no markdown, no code blocks):
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
               <div>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "rgba(0,212,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "3px" }}>Evo Rank Progress</div>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "rgba(0,212,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "3px" }}>Pro Rank Progress</div>
                 <div style={{ fontSize: "16px", fontWeight: 800, color: "#f0f0ff" }}>{currentRank.icon} {currentRank.name}</div>
               </div>
               <div style={{ textAlign: "right" }}>

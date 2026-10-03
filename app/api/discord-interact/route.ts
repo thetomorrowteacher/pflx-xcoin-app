@@ -81,7 +81,7 @@ async function handleBalance(discordUserId: string, discordUsername: string) {
           { name: "XC Balance", value: `⚡ ${(player.xcoin || 0).toLocaleString()} XC`, inline: true },
           { name: "Lifetime XC", value: `📊 ${(player.totalXcoin || 0).toLocaleString()} XC`, inline: true },
           { name: "Digital Badges", value: `🏅 ${player.digitalBadges || 0}`, inline: true },
-          { name: "Evo Rank", value: `📈 Level ${player.rank || 1}`, inline: true },
+          { name: "Pro Rank", value: `📈 Level ${player.rank || 1}`, inline: true },
           { name: "Studio", value: player.studioId ? `🏛️ ${player.studioId}` : "None", inline: true },
         ],
         footer: { text: "PFLX X-Coin System" },

@@ -128,7 +128,7 @@ export default function AdminLeaderboard() {
   const router = useRouter();
   const [user, setUser]               = useState<User | null>(null);
   const [view, setView]               = useState<"players" | "studios">("players");
-  // Default sort is Evo Rank — rank tier first (Master Admin → Player),
+  // Default sort is Pro Rank — rank tier first (Master Admin → Player),
   // then lifetime XC as tiebreaker.
   const [sortBy, setSortBy]           = useState<SortKey>("evoRank");
   const [badgeFilter, setBadgeFilter] = useState<BadgeFilter>("all");
@@ -411,7 +411,7 @@ export default function AdminLeaderboard() {
               onChange={setSortBy}
               activeColor={CYAN}
               options={[
-                { key: "evoRank",      label: "🏆 Evo Rank" },
+                { key: "evoRank",      label: "🏆 Pro Rank" },
                 { key: "status",       label: "⭐ Status Score" },
                 { key: "xcoin",        label: "💎 XC Balance" },
                 { key: "totalXcoin",   label: "⚡ Total XC" },
@@ -515,7 +515,7 @@ export default function AdminLeaderboard() {
             {colHead("status", "STATUS")}
             <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", color: "rgba(0,212,255,0.35)" }}>PLAYER</span>
             <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", color: "rgba(0,212,255,0.35)" }}>STUDIO</span>
-            <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", color: "rgba(0,212,255,0.35)" }}>EVO RANK</span>
+            <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", color: "rgba(0,212,255,0.35)" }}>PRO RANK</span>
             <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em", color: "#ef4444", opacity: 0.8 }}>🟥 SIGNATURE</span>
             <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em", color: "#f5c842", opacity: 0.8 }}>🟨 EXECUTIVE</span>
             <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em", color: "#a78bfa", opacity: 0.8 }}>🟪 PREMIUM</span>
@@ -608,7 +608,7 @@ export default function AdminLeaderboard() {
                   );
                 })()}
 
-                {/* Evo Rank — actual rank name */}
+                {/* Pro Rank — actual rank name */}
                 <div>
                   <p style={{ margin: "0 0 1px", fontSize: "12px", fontWeight: 700, color: "#e0e0ff", whiteSpace: "nowrap" }}>
                     {evRank.icon} {evRank.name}
@@ -703,7 +703,7 @@ export default function AdminLeaderboard() {
             display: "flex", flexWrap: "wrap", gap: "6px 14px", alignItems: "center",
           }}>
             <span style={{ fontSize: "10px", fontWeight: 700, color: "rgba(0,212,255,0.3)", letterSpacing: "0.08em" }}>SCORE WEIGHTS:</span>
-            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>Evo Rank ×100k</span>
+            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>Pro Rank ×100k</span>
             <BadgePill count={1} type="signature" /><span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>×10k</span>
             <BadgePill count={1} type="executive" /><span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>×1k</span>
             <BadgePill count={1} type="premium"   /><span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>×100</span>

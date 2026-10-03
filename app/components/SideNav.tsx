@@ -128,7 +128,7 @@ export default function SideNav({ user }: NavProps) {
     );
   }
 
-  // Executive Evo Rank players (Chief level 9+, Partner level 10) get access to Approvals
+  // Executive Pro Rank players (Chief level 9+, Partner level 10) get access to Approvals
   const rankLevel = getCurrentRank(user.totalXcoin ?? 0, user)?.level ?? 1;
   const isExecutiveRank = rankLevel >= 9;
   const basePlayerLinks = isExecutiveRank

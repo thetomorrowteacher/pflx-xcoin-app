@@ -13,7 +13,7 @@ export interface User {
   xcoin: number;    // Current spendable X-Coin (XC)
   totalXcoin: number; // Total lifetime XC earned (used for Rank calculation only)
   level: number;
-  rank: number;  // Evolution Rank (1-10)
+  rank: number;  // Pro Rank (1-10)
   cohort: string;
   pathway: string;
   joinedAt: string;
@@ -343,7 +343,7 @@ export function calculateRarity(completionCount: number): "common" | "uncommon" 
   return "common";
 }
 
-// ─── Startup Studio Income Tax Rates by Evo Rank ────────────────
+// ─── Startup Studio Income Tax Rates by Pro Rank ────────────────
 // Higher rank = higher tax, but higher stake/share ceiling
 export function getStudioTaxRate(rankLevel: number): number {
   // Returns decimal (e.g. 0.05 = 5%)
@@ -362,7 +362,7 @@ export function getStudioTaxRate(rankLevel: number): number {
   return rates[rankLevel] || 0.05;
 }
 
-// Get Evo-rank share/stake percentage ceiling for portfolio display
+// Get Pro-rank share/stake percentage ceiling for portfolio display
 export function getEvoSharePercent(rankLevel: number): number {
   // How much of their studio they can "own" via stakes
   const shares: Record<number, number> = {
@@ -442,7 +442,7 @@ export interface PFLXModifier {
   scope?: "task" | "job" | "checkpoint" | "all"; // What entity it targets
   // ── Availability restrictions ───────────────────────────────────
   availableTo?: "all" | "restricted";  // "all" = everyone can see/buy, "restricted" = filtered
-  minRank?: number;                     // Minimum Evolution Rank required (1-10)
+  minRank?: number;                     // Minimum Pro Rank required (1-10)
   maxRank?: number;                     // Maximum rank allowed (for beginner-only items)
   minLevel?: number;                    // Minimum level required
   allowedCohorts?: string[];            // Specific cohort names, empty = all cohorts
@@ -525,7 +525,7 @@ export interface PFLXRank {
   badgeTypeRequirements: string[]; // Badge types needed: "Primary", "Premium", "Executive", "Signature"
   specificBadgeRequirements?: string[]; // Specific named badges required
   icon?: string;
-  image?: string; // Custom image for Evolution Rankings
+  image?: string; // Custom image for Pro Rankings
 }
 
 export let mockPflxRanks: PFLXRank[] = [
@@ -788,7 +788,7 @@ export function getBadgeBreakdown(user: User): BadgeBreakdown {
 }
 
 // Composite Status Score — determines leaderboard position
-// Weights: Evolution Rank > Signature > Executive > Premium > Primary > XC (tiebreaker)
+// Weights: Pro Rank > Signature > Executive > Premium > Primary > XC (tiebreaker)
 export function getStatusScore(user: User): number {
   const rankLevel = getCurrentRank(user.totalXcoin, user).level;
   const b = getBadgeBreakdown(user);
@@ -1425,7 +1425,7 @@ export function assignStudioFromVisionText(visionText: string): string {
   return Object.entries(studioScores).sort(([, a], [, b]) => b - a)[0][0];
 }
 
-// Max stake % a player can hold based on their Evo Rank level
+// Max stake % a player can hold based on their Pro Rank level
 export function getStudioMaxStakePercent(rankLevel: number): number {
   if (rankLevel <= 2) return 5;
   if (rankLevel <= 4) return 10;
