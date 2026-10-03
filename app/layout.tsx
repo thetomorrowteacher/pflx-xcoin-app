@@ -8,6 +8,7 @@ import PflxBridge from "./components/PflxBridge";
 import PflxIframeGuard from "./components/PflxIframeGuard";
 import CloudSaveIndicator from "./components/CloudSaveIndicator";
 import PflxTour from "./components/PflxTour";
+import UiSfx from "./components/UiSfx";
 
 export const metadata: Metadata = {
   title: "PFLX X-Coin",
@@ -43,6 +44,7 @@ export default function RootLayout({
           <PflxIframeGuard />
           <CloudSaveIndicator />
           <PflxTour />
+          <UiSfx />
         </StoreProvider>
       </body>
     </html>
