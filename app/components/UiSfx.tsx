@@ -4,7 +4,7 @@ import { useEffect } from "react";
 const SOUND_ROOT = "https://www.prototypeflx.com/public/sounds/";
 const SOUNDS: Record<string, string> = {
   hover: "pflx-library/02_UI_Blips/blip_039.mp3", // Ennis locked blip_039 as THE hover sound (matches Console v263 / X-Live v0.87 / DarkCampus). Was pflx-ui/ui_hover_soft.mp3.
-  // X-Coin: hover only for now (Ennis asked for the hover sound here); no click sound.
+  click: "pflx-library/01_UI_Clicks/click_041.mp3", // same smooth click as the Console (v243) and X-Live
 };
 const UI_SEL =
   'button, a[href], [onclick], [role="button"], .tab, select, input[type="checkbox"], input[type="radio"], label';
