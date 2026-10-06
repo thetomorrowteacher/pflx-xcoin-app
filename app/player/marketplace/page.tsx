@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
+import MarketHub from "../../components/MarketHub";
 import { User, PFLXModifier, mockModifiers, mockPlayerModifiers, PlayerModifier, mockTransactions, getCurrentRank, SHIP_TIERS, ShipTier, PlayerShipState, getDefaultShipState, SHIP_SYSTEMS, ShipSystem } from "../../lib/data";
 import { playSuccess, playError, playCashRegister } from "../../lib/sounds";
 
@@ -627,164 +628,15 @@ export default function PlayerMarketplace() {
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px" }}>
-          {upgrades.map(mod => {
-            // hasEnough — upgrades are paid in XC only. The previous check
-            // also required user.digitalBadges >= mod.costXcoin which made
-            // every upgrade unbuyable for a player with no badges, even
-            // when they had plenty of XC. costBadge is a separate field
-            // on the modifier that's used for badge-priced items; for the
-            // XC-priced grid here only XC matters.
-            const hasEnough = user.xcoin >= mod.costXcoin;
-
-            return (
-              <div key={mod.id} style={{
-                background: "rgba(0,212,255,0.05)",
-                border: "1px solid rgba(0,212,255,0.2)",
-                borderRadius: "20px",
-                padding: "24px",
-                display: "flex",
-                flexDirection: "column",
-                boxShadow: "0 0 20px rgba(0,212,255,0.1), inset 0 0 20px rgba(0,212,255,0.03)",
-                position: "relative",
-                overflow: "hidden",
-                transition: "all 0.3s ease",
-                cursor: "pointer"
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = "0 0 30px rgba(0,212,255,0.3), inset 0 0 30px rgba(0,212,255,0.08)";
-                e.currentTarget.style.borderColor = "rgba(0,212,255,0.4)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = "0 0 20px rgba(0,212,255,0.1), inset 0 0 20px rgba(0,212,255,0.03)";
-                e.currentTarget.style.borderColor = "rgba(0,212,255,0.2)";
-              }}>
-                {/* Corner brackets */}
-                <div style={{ position: "absolute", top: "8px", left: "8px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.4)", borderRight: "none", borderBottom: "none", borderRadius: "2px" }} />
-                <div style={{ position: "absolute", top: "8px", right: "8px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.4)", borderLeft: "none", borderBottom: "none", borderRadius: "2px" }} />
-                <div style={{ position: "absolute", bottom: "8px", left: "8px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.4)", borderRight: "none", borderTop: "none", borderRadius: "2px" }} />
-                <div style={{ position: "absolute", bottom: "8px", right: "8px", width: "16px", height: "16px", border: "2px solid rgba(0,212,255,0.4)", borderLeft: "none", borderTop: "none", borderRadius: "2px" }} />
-
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", marginBottom: "16px", position: "relative", zIndex: 1 }}>
-                  <div style={{
-                    width: "64px",
-                    height: "64px",
-                    borderRadius: "16px",
-                    background: "rgba(0,212,255,0.08)",
-                    border: "1px solid rgba(0,212,255,0.2)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "32px",
-                    overflow: "hidden",
-                    boxShadow: "0 0 15px rgba(0,212,255,0.2)"
-                  }}>
-                    {mod.image ? <img src={mod.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : mod.icon}
-                  </div>
-                  <div>
-                    <h3 style={{
-                      margin: "0 0 4px",
-                      fontSize: "18px",
-                      fontWeight: 700,
-                      color: "#00d4ff",
-                      textShadow: "0 0 12px rgba(0,212,255,0.4)"
-                    }}>{mod.name}</h3>
-                    <span style={{
-                      fontSize: "11px",
-                      color: "rgba(0,212,255,0.6)",
-                      padding: "2px 6px",
-                      background: "rgba(0,212,255,0.1)",
-                      border: "1px solid rgba(0,212,255,0.2)",
-                      borderRadius: "6px",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em"
-                    }}>
-                      ⏳ {mod.duration}
-                    </span>
-                  </div>
-                </div>
-
-                <p style={{
-                  margin: "0 0 20px",
-                  fontSize: "14px",
-                  color: "rgba(0,212,255,0.7)",
-                  lineHeight: 1.5,
-                  flex: 1
-                }}>
-                  {mod.description}
-                </p>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 1 }}>
-                  {/* Cost chip — XC only. The second yellow chip that
-                      previously rendered the same costXcoin value was a
-                      copy-paste leftover and looked like the upgrade
-                      required two separate currencies. */}
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    {mod.costXcoin > 0 && (
-                      <span style={{
-                        padding: "6px 10px",
-                        borderRadius: "8px",
-                        background: "rgba(245,200,66,0.1)",
-                        border: "1px solid rgba(245,200,66,0.3)",
-                        color: "#f5c842",
-                        fontSize: "14px",
-                        fontWeight: 800,
-                        textShadow: "0 0 8px rgba(245,200,66,0.4)",
-                        boxShadow: "0 0 10px rgba(245,200,66,0.15)"
-                      }}>
-                        🪙 {mod.costXcoin.toLocaleString()} XC
-                      </span>
-                    )}
-                    {mod.costBadge > 0 && (
-                      <span style={{
-                        padding: "6px 10px",
-                        borderRadius: "8px",
-                        background: "rgba(167,139,250,0.1)",
-                        border: "1px solid rgba(167,139,250,0.3)",
-                        color: "#a78bfa",
-                        fontSize: "14px",
-                        fontWeight: 800,
-                        textShadow: "0 0 8px rgba(167,139,250,0.4)",
-                        boxShadow: "0 0 10px rgba(167,139,250,0.15)"
-                      }}>
-                        🏅 {mod.costBadge} Badge{mod.costBadge === 1 ? "" : "s"}
-                      </span>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => purchaseUpgrade(mod)}
-                    disabled={!hasEnough}
-                    style={{
-                      padding: "8px 16px",
-                      borderRadius: "10px",
-                      fontWeight: 700,
-                      cursor: hasEnough ? "pointer" : "not-allowed",
-                      background: hasEnough ? "linear-gradient(135deg, rgba(0,212,255,0.1), rgba(167,139,250,0.1))" : "rgba(255,255,255,0.03)",
-                      color: hasEnough ? "#00d4ff" : "rgba(0,212,255,0.3)",
-                      border: hasEnough ? "1px solid rgba(0,212,255,0.3)" : "1px solid rgba(255,255,255,0.1)",
-                      textShadow: hasEnough ? "0 0 8px rgba(0,212,255,0.4)" : "none",
-                      boxShadow: hasEnough ? "0 0 12px rgba(0,212,255,0.2)" : "none",
-                      transition: "all 0.3s ease"
-                    }}
-                    onMouseEnter={(e) => {
-                      if (hasEnough) {
-                        e.currentTarget.style.boxShadow = "0 0 20px rgba(0,212,255,0.4), inset 0 0 12px rgba(0,212,255,0.1)";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (hasEnough) {
-                        e.currentTarget.style.boxShadow = "0 0 12px rgba(0,212,255,0.2)";
-                      }
-                    }}
-                  >
-                    {hasEnough ? "PURCHASE" : "NOT ENOUGH"}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {/* ONE connected marketplace (Sept 2026): platform upgrades are bought here; game upgrades (Battle Arena),
+            session upgrades (X-Live) and taxes & fines are browsed here and open where they live. */}
+        <MarketHub
+          user={user}
+          initialTab="platform"
+          visibleIds={upgrades.map(u => u.id)}
+          onBuy={purchaseUpgrade}
+          version={myModifiers.length}
+        />
         </>}
       </main>
     </div>

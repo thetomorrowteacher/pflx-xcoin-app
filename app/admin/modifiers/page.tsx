@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
+import MarketHub from "../../components/MarketHub";
 import {
   User, PFLXModifier, mockModifiers,
   ModifierTrigger, ModifierEffect, triggerLabel, effectLabel,
@@ -42,7 +43,7 @@ function effectValueLabel(e?: ModifierEffect): string {
 export default function AdminModifiers() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<"upgrades" | "taxes">("upgrades");
+  const [activeTab, setActiveTab] = useState<"market" | "upgrades" | "taxes">("market");
   const [modifiers, setModifiers] = useState<PFLXModifier[]>(mockModifiers);
   const [editingMod, setEditingMod] = useState<PFLXModifier | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -140,9 +141,11 @@ export default function AdminModifiers() {
               [ MANAGE SYSTEM MODIFIERS THAT AFFECT PLAYERS ]
             </p>
           </div>
+          {activeTab !== "market" && (
           <button onClick={openNewMod} className="btn-primary" style={{ padding: "12px 24px" }}>
             ➕ Create {activeTab === "upgrades" ? "Upgrade" : "Tax"}
           </button>
+          )}
         </div>
 
         {/* Stat Pills */}
@@ -194,6 +197,15 @@ export default function AdminModifiers() {
         {/* Tab Selection */}
         <div style={{ display: "flex", gap: "24px", borderBottom: "1px solid rgba(255,255,255,0.06)", marginBottom: "32px" }}>
           <button
+            onClick={() => setActiveTab("market")}
+            style={{
+              padding: "12px 8px", background: "none", border: "none",
+              color: activeTab === "market" ? "#7de9ff" : "rgba(255,255,255,0.3)",
+              fontSize: "15px", fontWeight: 700, cursor: "pointer",
+              borderBottom: activeTab === "market" ? "2px solid #7de9ff" : "2px solid transparent",
+            }}
+          >🛒 Combined Marketplace</button>
+          <button
             onClick={() => setActiveTab("upgrades")}
             style={{
               padding: "12px 8px", background: "none", border: "none",
@@ -213,7 +225,20 @@ export default function AdminModifiers() {
           >PFLX Taxes & Fines</button>
         </div>
 
+        {/* Combined marketplace: platform + taxes (edited here), game (Battle Arena) and session (X-Live) upgrades.
+            Edit on a platform upgrade or a tax opens the editor below; the others open the app that owns them. */}
+        {activeTab === "market" && (
+          <MarketHub
+            user={user}
+            host
+            initialTab="all"
+            version={modifiers.length}
+            onEdit={(mod) => { setActiveTab(mod.type === "tax" ? "taxes" : "upgrades"); setEditingMod({ ...mod }); }}
+          />
+        )}
+
         {/* Modifier Cards */}
+        {activeTab !== "market" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))", gap: "20px" }}>
           {currentList.map(mod => (
             <div key={mod.id} style={{
@@ -318,6 +343,7 @@ export default function AdminModifiers() {
             </div>
           ))}
         </div>
+        )}
 
         {/* ── Edit / Create Modal ────────────────────────────────────── */}
         {editingMod && (
