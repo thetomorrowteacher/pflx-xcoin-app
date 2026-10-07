@@ -28,6 +28,8 @@ export default function PlayerMarketplace() {
     const playerRank = getCurrentRank(u.totalXcoin, u).level;
     const allUpgrades = mockModifiers.filter(m => m.type === "upgrade");
     const visibleUpgrades = allUpgrades.filter(m => {
+      // v1.79: items flagged purchasable:false (e.g. Replicators) are never sold here.
+      if (m.purchasable === false) return false;
       if (!m.availableTo || m.availableTo === "all") return true;
       // Check rank restrictions
       if (m.minRank && playerRank < m.minRank) return false;

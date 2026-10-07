@@ -440,6 +440,8 @@ export interface PFLXModifier {
   effectType?: ModifierEffect;      // What effect is applied
   effectValue?: number;             // Flat amount OR multiplier (1.1 = +10%)
   scope?: "task" | "job" | "checkpoint" | "all"; // What entity it targets
+  purchasable?: boolean;            // false = never sold in the marketplace (granted by events/rewards only)
+  acquiredVia?: string;             // how a non-purchasable item is earned (informational)
   // ── Availability restrictions ───────────────────────────────────
   availableTo?: "all" | "restricted";  // "all" = everyone can see/buy, "restricted" = filtered
   minRank?: number;                     // Minimum Pro Rank required (1-10)

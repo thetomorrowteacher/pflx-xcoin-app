@@ -38,6 +38,8 @@
     if (!m || typeof m !== 'object' || !m.name) return null;
     var isTax = m.type === 'tax';
     if (m.type !== 'tax' && m.type !== 'upgrade') return null;
+    // v1.79: purchasable:false = granted by System Events / slot-machine awards / reward packs only, never listed for sale.
+    if (m.purchasable === false) return null;
     return {
       id: 'mod:' + (m.id || m.name), rawId: String(m.id || ''), kind: isTax ? 'tax' : 'platform', home: 'xcoin',
       name: String(m.name), desc: String(m.description || ''), icon: String(m.icon || (isTax ? '⚠️' : '⚡')), image: safeImg(m.image || m.img || m.imageUrl),
