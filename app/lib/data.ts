@@ -1,3 +1,4 @@
+import * as RankEngine from "./pflxRankEngine";
 // Mock data store for PFLX Digital Badge & X-Coin (XC) app
 // In production, this will be wired to Supabase
 
@@ -528,6 +529,13 @@ export interface PFLXRank {
   specificBadgeRequirements?: string[]; // Specific named badges required
   icon?: string;
   image?: string; // Custom image for Pro Rankings
+  id?: string;
+  color?: string;
+  group?: string;
+  enforceRequirements?: boolean;   // false = host bypass: this rank is decided by lifetime XC only
+  stackRequirements?: boolean;     // false = this rank does not inherit lower ranks' badge requirements
+  godTier?: boolean;               // Master rank — Master Host accounts only
+  masterOnly?: boolean;
 }
 
 export let mockPflxRanks: PFLXRank[] = [
@@ -535,7 +543,7 @@ export let mockPflxRanks: PFLXRank[] = [
     level: 1, name: "Player",
     xcoinUnlock: 1000, xcoinMaintain: 0, checkpointsRequired: 0,
     badgeTypeRequirements: ["Signature"],
-    specificBadgeRequirements: ["Personal Branding Level 1", "Portfolio Starter", "Design Thinker Level 1", "Digital Citizen Level 1", "PFLX User Certification"],
+    specificBadgeRequirements: ["Personal Branding Level 1", "Portfolio Starter", "Design Thinker Level 1|BrandBuilder", "Digital Citizen Level 1", "PFLX User Certification"],
     icon: "👤"
   },
   {
@@ -943,7 +951,10 @@ export function getXCProgress(xcoin: number): number {
   return (xcInCurrentLevel / 1000) * 100;
 }
 
-// ── Rank eligibility: checks XC + checkpoints + badge types + specific badges ──
+// ── Pro Rank resolution (shared engine — see pflxRankEngine.ts) ──
+// XC = LIFETIME XC; checkpoint + badge requirements are enforced and STACK up the ladder unless a host
+// bypasses them (per rank: enforceRequirements=false, per player: rankBypass). In the Platform the Console
+// is the source of truth (it knows every legacy badge) and pushes a report + roster index that we cache here.
 
 /** Count how many checkpoints a player has completed (tasks approved in completed rounds) */
 export function getPlayerCheckpointsCompleted(playerId: string): number {
@@ -970,58 +981,133 @@ export function getPlayerEarnedBadgeNames(playerId: string): string[] {
     .map(s => s.coinType);
 }
 
-/** Check if a player has at least one badge from a given type category */
-function playerHasBadgeType(badgeCounts: BadgeBreakdown | undefined, typeName: string): boolean {
-  if (!badgeCounts) return false;
-  const map: Record<string, keyof BadgeBreakdown> = {
-    "Primary": "primary",
-    "Premium": "premium",
-    "Executive": "executive",
-    "Signature": "signature",
-  };
-  const key = map[typeName];
-  return key ? (badgeCounts[key] ?? 0) > 0 : false;
+export interface PflxRankSlim {
+  id?: string; level: number; name: string; icon?: string; image?: string; color?: string; group?: string;
+  xcoinUnlock: number; enforceRequirements?: boolean;
+}
+export interface PflxRankReport {
+  playerId?: string;
+  at: number;
+  master: boolean;
+  bypassed: boolean;
+  overridden: boolean;
+  lifetimeXc: number;
+  checkpointsDone: number;
+  current: PflxRankSlim | null;
+  next: PflxRankSlim | null;
+  checks: RankEngine.RankCheck[];
+  progress: number; // 0..1 share of the NEXT rank's enforced requirements already met
+  ladder: (PflxRankSlim & { unlocked: boolean; current: boolean })[];
 }
 
-/** Full rank calculation — evaluates ALL requirements, not just XC */
+const RANK_REPORTS_KEY = "pflx_rank_reports_v1";
+const RANK_INDEX_KEY = "pflx_rank_index_v1";
+let _rankReports: Record<string, PflxRankReport> = {};
+let _rankIndex: Record<string, { id?: string; level: number }> = {};
+let _rankCacheLoaded = false;
+
+function loadRankCache() {
+  if (_rankCacheLoaded || typeof window === "undefined") return;
+  _rankCacheLoaded = true;
+  try { _rankReports = JSON.parse(localStorage.getItem(RANK_REPORTS_KEY) || "{}") || {}; } catch { _rankReports = {}; }
+  try { _rankIndex = JSON.parse(localStorage.getItem(RANK_INDEX_KEY) || "{}") || {}; } catch { _rankIndex = {}; }
+}
+function notifyRankUpdated() {
+  if (typeof window === "undefined") return;
+  try { window.dispatchEvent(new CustomEvent("pflx-rank-updated")); } catch { /* ignore */ }
+}
+/** Called by PflxBridge when the Console answers a pflx_rank_get request. */
+export function setPflxRankReport(playerId: string, report: PflxRankReport | null) {
+  loadRankCache();
+  if (!playerId || !report) return;
+  _rankReports[playerId] = report;
+  try { localStorage.setItem(RANK_REPORTS_KEY, JSON.stringify(_rankReports)); } catch { /* quota */ }
+  notifyRankUpdated();
+}
+export function setPflxRankIndex(index: Record<string, { id?: string; level: number }> | null) {
+  loadRankCache();
+  if (!index) return;
+  _rankIndex = index;
+  try { localStorage.setItem(RANK_INDEX_KEY, JSON.stringify(_rankIndex)); } catch { /* quota */ }
+  notifyRankUpdated();
+}
+
+type UserWithBadges = User & { badges?: unknown[]; rankOverride?: string | number | null; rankBypass?: boolean };
+
+function localRankFacts(user: User, totalXcoin?: number): RankEngine.EngineFacts {
+  const u = user as UserWithBadges;
+  const badges: { id?: string; name?: string; tier?: string; type?: string }[] = [];
+  if (Array.isArray(u.badges)) {
+    u.badges.forEach(b => {
+      if (typeof b === "string") badges.push({ id: b });
+      else if (b && typeof b === "object") badges.push(b as { id?: string; name?: string; tier?: string; type?: string });
+    });
+  }
+  getPlayerEarnedBadgeNames(user.id).forEach(n => badges.push({ name: n }));
+  const bc = user.badgeCounts;
+  return RankEngine.buildFacts({
+    xc: Math.max(totalXcoin || 0, user.totalXcoin || 0, user.xcoin || 0),
+    badges,
+    tierCounts: bc ? { primary: bc.primary, premium: bc.premium, executive: bc.executive, signature: bc.signature } : undefined,
+    checkpoints: () => getPlayerCheckpointsCompleted(user.id),
+  });
+}
+function localRankPlayer(user: User): RankEngine.EnginePlayer {
+  const u = user as UserWithBadges;
+  return { id: user.id, rankOverride: u.rankOverride ?? null, rankBypass: !!u.rankBypass };
+}
+function slimRank(r: RankEngine.EngineRank | null): PflxRankSlim | null {
+  return r ? {
+    id: r.id, level: r.level, name: r.name, icon: r.icon, image: r.image, color: r.color, group: r.group,
+    xcoinUnlock: r.xcoinUnlock, enforceRequirements: r.enforceRequirements !== false,
+  } : null;
+}
+
+/** Full local report (used standalone, or until the Console answers). */
+export function buildLocalRankReport(user: User, totalXcoin?: number): PflxRankReport {
+  const ranks = mockPflxRanks as RankEngine.EngineRank[];
+  const facts = localRankFacts(user, totalXcoin);
+  const res = RankEngine.resolve(localRankPlayer(user), facts, ranks);
+  const lad = RankEngine.ladder(ranks);
+  const cp = typeof facts.checkpoints === "function" ? facts.checkpoints() : facts.checkpoints;
+  facts.checkpoints = cp;
+  const curLevel = res.current ? res.current.level : 0;
+  return {
+    playerId: user.id, at: Date.now(), master: res.master, bypassed: res.bypassed, overridden: res.overridden,
+    lifetimeXc: facts.xc, checkpointsDone: cp as number,
+    current: slimRank(res.current), next: slimRank(res.next),
+    checks: res.nextEval ? res.nextEval.checks : [],
+    progress: res.next ? RankEngine.progress(res.nextEval) : 1,
+    ladder: lad.map(r => ({ ...(slimRank(r) as PflxRankSlim), unlocked: res.master || r.level <= curLevel, current: !!(res.current && r.id === res.current.id && !res.master) })),
+  };
+}
+/** Report for the Pro Rank panel: the Console's (authoritative) when we have it, else local. */
+export function getPlayerRankReport(user: User): PflxRankReport {
+  loadRankCache();
+  const cached = _rankReports[user.id];
+  if (cached) return cached;
+  return buildLocalRankReport(user);
+}
+
+/** Current rank. With a user → full requirement check; without → XC-only (legacy callers). */
 export function getCurrentRank(totalXcoin: number, user?: User): PFLXRank {
-  // If no user context provided, fall back to XC-only check (backward compat)
   if (!user) {
-    return [...mockPflxRanks].reverse().find(r => totalXcoin >= r.xcoinUnlock) || mockPflxRanks[0];
+    const lad = RankEngine.ladder(mockPflxRanks as RankEngine.EngineRank[]) as PFLXRank[];
+    return [...lad].reverse().find(r => totalXcoin >= r.xcoinUnlock) || lad[0] || mockPflxRanks[0];
   }
-
-  const checkpointsCompleted = getPlayerCheckpointsCompleted(user.id);
-  const earnedBadgeNames = getPlayerEarnedBadgeNames(user.id);
-
-  // Walk ranks from highest to lowest, return the first one where ALL requirements are met
-  for (let i = mockPflxRanks.length - 1; i >= 0; i--) {
-    const rank = mockPflxRanks[i];
-
-    // 1. XC requirement
-    if (totalXcoin < rank.xcoinUnlock) continue;
-
-    // 2. Checkpoints requirement
-    if (checkpointsCompleted < rank.checkpointsRequired) continue;
-
-    // 3. Badge type requirements — must have at least 1 badge in each required type
-    const badgeTypeMet = rank.badgeTypeRequirements.every(
-      type => playerHasBadgeType(user.badgeCounts, type)
-    );
-    if (!badgeTypeMet) continue;
-
-    // 4. Specific badge requirements — must have each named badge
-    if (rank.specificBadgeRequirements && rank.specificBadgeRequirements.length > 0) {
-      const specificMet = rank.specificBadgeRequirements.every(
-        name => earnedBadgeNames.includes(name)
-      );
-      if (!specificMet) continue;
-    }
-
-    return rank;
+  loadRankCache();
+  const idx = _rankIndex[user.id];
+  if (idx) {
+    const hit = mockPflxRanks.find(r => (r.id && r.id === idx.id)) || mockPflxRanks.find(r => r.level === idx.level);
+    if (hit) return hit;
   }
-
-  // No rank requirements met — default to level 1
-  return mockPflxRanks[0];
+  const rep = _rankReports[user.id];
+  if (rep && rep.current) {
+    const hit = mockPflxRanks.find(r => (r.id && r.id === rep.current!.id)) || mockPflxRanks.find(r => r.level === rep.current!.level);
+    if (hit) return hit;
+  }
+  const res = RankEngine.resolve(localRankPlayer(user), localRankFacts(user, totalXcoin), mockPflxRanks as RankEngine.EngineRank[], { skipNext: true });
+  return (res.current as PFLXRank) || mockPflxRanks[0];
 }
 
 /** Detailed breakdown of what requirements are met/unmet for a given rank */
@@ -1038,46 +1124,36 @@ export interface RankRequirementStatus {
   allMet: boolean;
 }
 
-/** Get requirement status for a specific rank */
+/** Get requirement status for a specific rank (stacked + alternatives aware) */
 export function getRankRequirements(rank: PFLXRank, user: User): RankRequirementStatus {
-  const checkpointsCurrent = getPlayerCheckpointsCompleted(user.id);
-  const earnedBadgeNames = getPlayerEarnedBadgeNames(user.id);
-
-  const xcMet = user.totalXcoin >= rank.xcoinUnlock;
-  const checkpointsMet = checkpointsCurrent >= rank.checkpointsRequired;
-
-  const badgeTypesDetail = rank.badgeTypeRequirements.map(type => {
-    const map: Record<string, keyof BadgeBreakdown> = { "Primary": "primary", "Premium": "premium", "Executive": "executive", "Signature": "signature" };
-    const key = map[type];
-    const count = key && user.badgeCounts ? (user.badgeCounts[key] ?? 0) : 0;
-    return { type, met: count > 0, count };
-  });
-  const badgeTypesMet = badgeTypesDetail.every(d => d.met);
-
-  const specificBadgesDetail = (rank.specificBadgeRequirements || []).map(name => ({
-    name,
-    met: earnedBadgeNames.includes(name),
-  }));
-  const specificBadgesMet = specificBadgesDetail.every(d => d.met);
-
+  const ev = RankEngine.evaluate(rank as RankEngine.EngineRank, localRankFacts(user), mockPflxRanks as RankEngine.EngineRank[], localRankPlayer(user));
+  const xc = ev.checks.find(c => c.kind === "xc");
+  const cp = ev.checks.find(c => c.kind === "checkpoints");
+  const types = ev.checks.filter(c => c.kind === "type");
+  const specifics = ev.checks.filter(c => c.kind === "badge");
   return {
     rank,
-    xcMet, xcCurrent: user.totalXcoin,
-    checkpointsMet, checkpointsCurrent,
-    badgeTypesMet, badgeTypesDetail,
-    specificBadgesMet, specificBadgesDetail,
-    allMet: xcMet && checkpointsMet && badgeTypesMet && specificBadgesMet,
+    xcMet: !!xc && xc.met, xcCurrent: xc ? xc.have : 0,
+    checkpointsMet: !cp || cp.met || !cp.enforced, checkpointsCurrent: cp ? cp.have : getPlayerCheckpointsCompleted(user.id),
+    badgeTypesMet: types.every(t => t.met || !t.enforced),
+    badgeTypesDetail: types.map(t => ({ type: t.label.replace(/ badge$/, ""), met: t.met, count: t.have })),
+    specificBadgesMet: specifics.every(t => t.met || !t.enforced),
+    specificBadgesDetail: specifics.map(t => ({ name: t.label, met: t.met })),
+    allMet: ev.met,
   };
 }
 
+/** Percent (0-100) progress toward the next rank (share of its enforced requirements met; XC counted fractionally). */
 export function getRankProgress(totalXcoin: number, user?: User): number {
-  const current = getCurrentRank(totalXcoin, user);
-  const nextIdx = mockPflxRanks.findIndex(r => r.level === current.level) + 1;
-  if (nextIdx >= mockPflxRanks.length) return 100;
-  const next = mockPflxRanks[nextIdx];
-  const range = next.xcoinUnlock - current.xcoinUnlock;
-  const progress = totalXcoin - current.xcoinUnlock;
-  return Math.min(100, Math.max(0, (progress / range) * 100));
+  if (!user) {
+    const lad = RankEngine.ladder(mockPflxRanks as RankEngine.EngineRank[]);
+    const current = getCurrentRank(totalXcoin);
+    const i = lad.findIndex(r => r.level === current.level);
+    if (i < 0 || i >= lad.length - 1) return 100;
+    const range = lad[i + 1].xcoinUnlock - current.xcoinUnlock;
+    return Math.min(100, Math.max(0, ((totalXcoin - current.xcoinUnlock) / (range || 1)) * 100));
+  }
+  return Math.round(getPlayerRankReport({ ...user, totalXcoin: Math.max(totalXcoin, user.totalXcoin || 0) } as User).progress * 100);
 }
 
 // Calculate how much XP the target player must pay to buy out a deal

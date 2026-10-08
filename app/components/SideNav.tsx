@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { User, isHostUser, getCurrentRank } from "../lib/data";
 import { playNav, playClick, getSoundSettings, saveSoundSettings, SoundSettings, syncAmbient } from "../lib/sounds";
 import { applyPlayerImages } from "../lib/playerImages";
+import { ProRankWidget } from "./ProRankPanel";
 
 interface NavProps {
   user: User;
@@ -320,6 +321,8 @@ export default function SideNav({ user }: NavProps) {
         }}>
           {isHost ? "HOST PANEL" : "NAVIGATION"}
         </div>
+
+        {!isHost && (<div style={{ margin: "0 0 12px" }}><ProRankWidget user={user} /></div>)}
 
         <div style={{ display: "flex", flexDirection: "column", gap: "2px", flex: 1 }}>
           {links.map((link) => {

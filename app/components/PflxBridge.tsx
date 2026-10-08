@@ -20,6 +20,20 @@ function resolveKey(key: string): string {
   return KEY_ALIAS[key] || key;
 }
 
+// ── Pro Rank: ask the Console (source of truth for badges + checkpoints) for the roster rank index
+//    and this player's requirement checklist. Debounced; the reply is cached in data.ts.
+let _rankReqTimer: ReturnType<typeof setTimeout> | null = null;
+function requestRankReport() {
+  if (typeof window === "undefined" || window.parent === window || _rankReqTimer) return;
+  _rankReqTimer = setTimeout(() => {
+    _rankReqTimer = null;
+    try {
+      const u = JSON.parse(localStorage.getItem("pflx_user") || "null");
+      window.parent.postMessage(JSON.stringify({ type: "pflx_rank_get", playerId: (u && u.id) || undefined, all: true }), "*");
+    } catch { /* ignore */ }
+  }, 1200);
+}
+
 /**
  * PflxBridge — Cross-app message listener.
  * Receives data sync messages from the PFLX Overlay (Mission Control)
@@ -42,6 +56,7 @@ export default function PflxBridge() {
       // Tell the Platform "I'm here, send me the active session"
       try {
         window.parent.postMessage(JSON.stringify({ type: "pflx_identity_request" }), "*");
+      requestRankReport();
       } catch {}
       // ── Pull the full player roster from Console ──
       // X-Coin's leaderboard reads from mockUsers + applyPlayerImages
@@ -152,6 +167,16 @@ export default function PflxBridge() {
         // Replaces any local cache so X-Coin is rendered for the SAME player
         // the Platform shell shows. Custom event lets the rest of the app
         // listen via window.addEventListener('pflx-identity-changed', ...).
+        if (msg.type === "pflx_rank_report") {
+          try {
+            if (msg.index) D.setPflxRankIndex(msg.index);
+            if (msg.playerId && msg.report) D.setPflxRankReport(msg.playerId, msg.report);
+          } catch { /* ignore */ }
+        }
+        if (msg.type === "pflx_player_changed" || msg.type === "pflx_identity_response" || msg.type === "pflx_identity_broadcast"
+            || msg.type === "pflx_player_data" || msg.type === "pflx_award_granted" || msg.type === "pflx_mc_changed") {
+          requestRankReport();
+        }
         if ((msg.type === "pflx_identity_broadcast" || msg.type === "pflx_identity_response") && msg.user) {
           try {
             const u = msg.user;

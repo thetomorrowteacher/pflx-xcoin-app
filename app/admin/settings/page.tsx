@@ -167,6 +167,7 @@ export default function AdminSettings() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const periodFileInputRef = useRef<HTMLInputElement>(null);
   const [editingRank, setEditingRank] = useState<PFLXRank | null>(null);
+  const [altFor, setAltFor] = useState<string | null>(null);
   const [editingPeriod, setEditingPeriod] = useState<GamePeriod | null>(null);
   const [newSeasonTitle, setNewSeasonTitle] = useState("");
 
@@ -522,7 +523,7 @@ export default function AdminSettings() {
                               </div>
                             )}
                             {r.specificBadgeRequirements && r.specificBadgeRequirements.length > 0 && (
-                              <p style={{ margin: "5px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>Req: {r.specificBadgeRequirements.join(", ")}</p>
+                              <p style={{ margin: "5px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>Req: {r.specificBadgeRequirements.map(x => x.split("|").join(" or ")).join(", ")}</p>
                             )}
                           </div>
                         </div>
@@ -591,6 +592,17 @@ export default function AdminSettings() {
               </div>
             </div>
 
+            {/* Requirement enforcement / bypass + stacking */}
+            <div style={{ marginBottom: "16px", padding: "12px 14px", borderRadius: "10px", background: "rgba(245,200,66,0.04)", border: "1px solid rgba(245,200,66,0.15)", display: "flex", flexWrap: "wrap", gap: "18px" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#e0e6ff", cursor: "pointer" }}>
+                <input type="checkbox" checked={editingRank.enforceRequirements !== false} onChange={e => setEditingRank({ ...editingRank, enforceRequirements: e.target.checked })} />
+                Enforce badge &amp; checkpoint requirements <span style={{ color: "rgba(255,255,255,0.35)" }}>(uncheck = XC only, bypass)</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#e0e6ff", cursor: "pointer" }}>
+                <input type="checkbox" checked={editingRank.stackRequirements !== false} onChange={e => setEditingRank({ ...editingRank, stackRequirements: e.target.checked })} />
+                Stack requirements from lower ranks
+              </label>
+            </div>
             {/* Badge Type Requirements */}
             <div style={{ marginBottom: "16px", padding: "14px", borderRadius: "10px", background: "rgba(0,212,255,0.03)", border: "1px solid rgba(0,212,255,0.1)" }}>
               <label style={{ display: "block", marginBottom: "10px", fontSize: "10px", fontWeight: 700, color: "#00d4ff", textTransform: "uppercase", letterSpacing: "0.06em" }}>🏅 Badge Type Requirements</label>
@@ -631,7 +643,8 @@ export default function AdminSettings() {
                       background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)",
                       color: "#22c55e", fontSize: "11px", fontWeight: 700
                     }}>
-                      {badge}
+                      {badge.split("|").join(" or ")}
+                      <span onClick={() => setAltFor(altFor === badge ? null : badge)} title="Add an alternative badge (either one counts)" style={{ cursor: "pointer", fontSize: "10px", padding: "0 5px", borderRadius: "8px", background: altFor === badge ? "rgba(0,212,255,0.4)" : "rgba(0,212,255,0.15)", color: "#67e8f9" }}>+ or</span>
                       <span
                         onClick={() => setEditingRank({ ...editingRank, specificBadgeRequirements: (editingRank.specificBadgeRequirements || []).filter(b => b !== badge) })}
                         style={{ cursor: "pointer", opacity: 0.6, fontSize: "12px", lineHeight: 1, marginLeft: "2px" }}
@@ -649,7 +662,12 @@ export default function AdminSettings() {
                   const val = e.target.value;
                   if (!val) return;
                   const current = editingRank.specificBadgeRequirements || [];
-                  if (!current.includes(val)) {
+                  if (altFor && current.includes(altFor)) {
+                    const parts = altFor.split("|");
+                    if (!parts.includes(val)) parts.push(val);
+                    setEditingRank({ ...editingRank, specificBadgeRequirements: current.map(c => c === altFor ? parts.join("|") : c) });
+                    setAltFor(null);
+                  } else if (!current.includes(val)) {
                     setEditingRank({ ...editingRank, specificBadgeRequirements: [...current, val] });
                   }
                 }}

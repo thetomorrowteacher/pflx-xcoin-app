@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../components/SideNav";
 import SeasonBanner from "../components/SeasonBanner";
+import ProRankPanel from "../components/ProRankPanel";
 import { mergePlayerStats } from "../lib/playerStats";
 import {
   User, mockUsers, mockTransactions, Transaction,
@@ -53,6 +54,12 @@ export default function PlayerHome() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [activeSeason, setActiveSeason] = useState<GamePeriod | null>(null);
   const [currentRank, setCurrentRank] = useState<PFLXRank | null>(null);
+  // Re-resolve the rank when the Console's rank report / roster index arrives.
+  useEffect(() => {
+    const onRank = () => { try { if (user) setCurrentRank(getCurrentRank(user.totalXcoin, user)); } catch { /* ignore */ } };
+    window.addEventListener("pflx-rank-updated", onRank);
+    return () => window.removeEventListener("pflx-rank-updated", onRank);
+  }, [user]);
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [myJobs, setMyJobs] = useState<Job[]>([]);
   const [dailyReport, setDailyReport] = useState<string>("");
@@ -379,32 +386,9 @@ Return ONLY valid JSON with this exact format (no markdown, no code blocks):
           ))}
         </div>
 
-        {/* Pro Rank Progress */}
-        {currentRank && (
-          <div style={{
-            marginBottom: "28px", padding: "20px 24px", borderRadius: "16px",
-            background: "rgba(22,22,31,0.6)", border: "1px solid rgba(0,212,255,0.12)"
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-              <div>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "rgba(0,212,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "3px" }}>Pro Rank Progress</div>
-                <div style={{ fontSize: "16px", fontWeight: 800, color: "#f0f0ff" }}>{currentRank.icon} {currentRank.name}</div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>XC to next rank</div>
-                <div style={{ fontSize: "14px", fontWeight: 800, color: "#00d4ff" }}>{Math.max(0, currentRank.xcoinUnlock + 1000 - user.totalXcoin).toLocaleString()} XC</div>
-              </div>
-            </div>
-            <div style={{ height: "6px", borderRadius: "3px", background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-              <div style={{
-                height: "100%", borderRadius: "3px",
-                width: `${Math.min(xpProgress * 100, 100)}%`,
-                background: "linear-gradient(90deg, #00d4ff, #a78bfa)",
-                transition: "width 0.5s ease"
-              }} />
-            </div>
-          </div>
-        )}
+        {/* Pro Rank — game-style ranked panel (obtained vs needed) */}
+        <ProRankPanel user={user} />
+
 
         {/* ── AI Daily Report & Checklist ── */}
         <div style={{
