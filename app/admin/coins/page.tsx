@@ -275,10 +275,10 @@ export default function ManageCoinsPage() {
                       {coin.image ? <img src={coin.image} style={{ width: "100%", height: "100%", objectFit: "contain" }} alt={coin.name} /> : <span style={{ fontSize: "36px" }}>🪙</span>}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <p style={{ margin: "0 0 4px", fontSize: "14px", fontWeight: 700, color: "#f0f0ff" }}>{coin.name}</p>
+                      <p style={{ margin: "0 0 4px", fontSize: "14px", fontWeight: 700, color: "#f0f0ff" }}>{coin.name}{coin.legacy ? <span title={coin.legacyEra || "Retired badge"} style={{ marginLeft: "8px", fontSize: "9px", fontWeight: 900, letterSpacing: "0.1em", color: "#1a1a1a", background: "#9ca3af", borderRadius: "6px", padding: "1px 6px", verticalAlign: "middle" }}>LEGACY</span> : null}</p>
                       <p style={{ margin: "0 0 12px", fontSize: "12px", color: "rgba(255,255,255,0.4)", lineHeight: 1.4 }}>{coin.description}</p>
                       <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
-                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#4f8ef7", padding: "2px 8px", background: "rgba(79,142,247,0.1)", borderRadius: "6px" }}>{coin.xc} XC REWARD</span>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#4f8ef7", padding: "2px 8px", background: "rgba(79,142,247,0.1)", borderRadius: "6px" }}>{coin.legacy ? "RETIRED · NO XC" : `${coin.xc} XC REWARD`}</span>
                         {coin.sponsorType && coin.sponsorType !== "none" && coin.sponsorName && (
                           <span style={{ fontSize: "11px", fontWeight: 700, color: "#a78bfa", padding: "2px 8px", background: "rgba(167,139,250,0.1)", borderRadius: "6px" }}>
                             {coin.residualPercent || 10}% → {coin.sponsorName}
@@ -291,8 +291,8 @@ export default function ManageCoinsPage() {
                           style={{ flex: 1, padding: "6px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "white", fontSize: "11px", cursor: "pointer" }}
                         >Edit</button>
                         <button 
-                          onClick={() => { setGrantTarget({ playerIds: [], coin, amount: 1 }); setGrantSearch(""); setGrantCohortFilter("all"); }}
-                          style={{ flex: 1, padding: "6px", borderRadius: "8px", border: "none", background: "rgba(79,142,247,0.2)", color: "#4f8ef7", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
+                          disabled={!!coin.legacy} title={coin.legacy ? "Retired (legacy) badge. Switch Legacy off in Edit to award it again." : undefined} onClick={() => { if (coin.legacy) return; setGrantTarget({ playerIds: [], coin, amount: 1 }); setGrantSearch(""); setGrantCohortFilter("all"); }}
+                          style={{ flex: 1, padding: "6px", borderRadius: "8px", border: "none", background: "rgba(79,142,247,0.2)", color: "#4f8ef7", fontSize: "11px", fontWeight: 700, cursor: coin.legacy ? "not-allowed" : "pointer", opacity: coin.legacy ? 0.35 : 1 }}
                         >Grant</button>
                         <button 
                           onClick={() => handleDelete(catIdx, coinIdx)}
@@ -333,12 +333,29 @@ export default function ManageCoinsPage() {
                   <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>XC Reward</label>
                   <input
                     type="number"
+                    disabled={!!editingCoin.coin.legacy}
                     value={editingCoin.coin.xc}
                     onChange={e => setEditingCoin({...editingCoin, coin: {...editingCoin.coin, xc: parseInt(e.target.value)}})}
                     style={{ width: "100%", padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white" }}
                   />
                 </div>
                 
+                {/* Legacy (retired) toggle */}
+                <div style={{ padding: "12px", background: "rgba(156,163,175,0.08)", border: "1px solid rgba(156,163,175,0.25)", borderRadius: "12px" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", color: "#f0f0ff", fontSize: "13px", fontWeight: 700 }}>
+                    <input
+                      type="checkbox"
+                      checked={!!editingCoin.coin.legacy}
+                      onChange={e => {
+                        const c = editingCoin.coin;
+                        if (e.target.checked) setEditingCoin({ ...editingCoin, coin: { ...c, legacy: c.legacy || "retired", xcBeforeLegacy: c.xc || c.xcBeforeLegacy || 0, xc: 0 } });
+                        else setEditingCoin({ ...editingCoin, coin: { ...c, legacy: undefined, legacyEra: undefined, xc: c.xcBeforeLegacy || c.xc || 0 } });
+                      }}
+                    />
+                    Legacy badge (retired)
+                  </label>
+                  <p style={{ margin: "6px 0 0 24px", fontSize: "11px", color: "rgba(255,255,255,0.45)", lineHeight: 1.4 }}>Retired badges stay on player portfolios with a LEGACY tag, carry no XC value and cannot be granted. Turn this off to bring a badge back into use.</p>
+                </div>
                 {/* Image Upload */}
                 <div>
                   <label style={{ display: "block", fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Coin Image</label>

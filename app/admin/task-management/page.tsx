@@ -1188,8 +1188,8 @@ export default function TaskManagement() {
   };
 
   const cohorts = getMockCohorts();
-  const allCoins: RewardCoin[] = COIN_CATEGORIES.flatMap(c => c.coins);
-  const allCoinsFlat = COIN_CATEGORIES.flatMap(cat => cat.coins.map(c => ({ ...c, category: cat.name })));
+  const allCoins: RewardCoin[] = COIN_CATEGORIES.flatMap(c => c.coins.filter(x => !x.legacy));
+  const allCoinsFlat = COIN_CATEGORIES.flatMap(cat => cat.coins.filter(c => !c.legacy).map(c => ({ ...c, category: cat.name })));
 
   // ── Shared styles ─────────────────────────────────────────────────────────
 

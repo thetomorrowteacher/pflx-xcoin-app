@@ -674,6 +674,11 @@ export interface Coin {
   description: string;
   xc: number;  // XC reward value for earning this Digital Badge
   image?: string;
+  // Legacy = RETIRED badge (no longer awarded, no XC value). The host can flip this in Digital Badge Management.
+  id?: string;
+  legacy?: string | boolean;
+  legacyEra?: string;
+  xcBeforeLegacy?: number;
   // Residual income / course sponsorship
   sponsorType?: "player" | "studio" | "none"; // Who sponsors this course/project
   sponsorId?: string;       // Player ID or Studio ID of the sponsor
