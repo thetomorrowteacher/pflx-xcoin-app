@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import SideNav from "../../components/SideNav";
 import { User } from "../../lib/data";
+import BadgePicker, { PickableBadgeCategory } from "../../components/BadgePicker";
 
 // ═══════════════════════════════════════════════════════════════════
 // X-Tracker — rebuilt for v2
@@ -82,6 +83,8 @@ const BADGE_CATEGORIES: { id: BadgeCategory; name: string; color: string; icon: 
   { id: "executive", name: "Executive (Jobs)",          color: "#a78bfa", icon: "🟣" },
   { id: "signature", name: "Signature (Skill Mastery)", color: "#f5c842", icon: "🟡" },
 ];
+// Players pick from the inventory: Primary, Premium and Executive only (never Signature).
+const PICKABLE_BADGE_CATEGORIES = BADGE_CATEGORIES.filter(b => b.id !== "signature");
 
 // ─── Helpers ───────────────────────────────────────────────────────
 function loadRequests(): RewardRequest[] {
@@ -240,6 +243,7 @@ function RequestRewardTab({ user }: { user: User }) {
 
   const submit = useCallback(() => {
     setMsg(null);
+    if (type === "badge" && !badgeName.trim()) { setMsg({ kind: "error", text: "Choose the badge from the inventory." }); return; }
     if (!description.trim()) { setMsg({ kind: "error", text: "A description is required." }); return; }
     if (type === "xc") {
       const n = parseInt(amount, 10);
@@ -316,8 +320,8 @@ function RequestRewardTab({ user }: { user: User }) {
             <div style={{ marginBottom: "16px" }}>
               <label style={labelStyle}>Badge Category</label>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "8px" }}>
-                {BADGE_CATEGORIES.map(b => (
-                  <button key={b.id} onClick={() => setBadgeCat(b.id)} style={{
+                {PICKABLE_BADGE_CATEGORIES.map(b => (
+                  <button key={b.id} onClick={() => { setBadgeCat(b.id); setBadgeName(""); }} style={{
                     padding: "10px 12px", borderRadius: "10px", cursor: "pointer",
                     background: badgeCat === b.id ? `${b.color}22` : "rgba(255,255,255,0.02)",
                     border: badgeCat === b.id ? `1px solid ${b.color}` : "1px solid rgba(255,255,255,0.06)",
@@ -329,9 +333,13 @@ function RequestRewardTab({ user }: { user: User }) {
               </div>
             </div>
             <div style={{ marginBottom: "16px" }}>
-              <label style={labelStyle}>Specific badge name (optional)</label>
-              <input type="text" value={badgeName} onChange={e => setBadgeName(e.target.value)} style={inputStyle}
-                placeholder="e.g. Cipher Victor · Studio Founder · CS Mastery" />
+              <label style={labelStyle}>Choose the badge from the inventory</label>
+              <BadgePicker
+                category={(badgeCat === "signature" ? "primary" : badgeCat) as PickableBadgeCategory}
+                value={badgeName} onChange={setBadgeName}
+                accent={(BADGE_CATEGORIES.find(b => b.id === badgeCat) || BADGE_CATEGORIES[0]).color}
+              />
+              {badgeName && <div style={{ marginTop: "8px", fontSize: "12px", color: "rgba(255,255,255,0.6)" }}>Selected: <b style={{ color: "#fff" }}>{badgeName}</b></div>}
             </div>
           </>
         )}

@@ -1,6 +1,7 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { User, COIN_CATEGORIES } from "../lib/data";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { User } from "../lib/data";
+import BadgePicker, { PickableBadgeCategory } from "./BadgePicker";
 
 // ═══════════════════════════════════════════════════════════════════
 // Quick X-Track — the fast lane of the X-Tracker, inside the player's
@@ -40,8 +41,8 @@ const BADGE_CATEGORIES: { id: BadgeCategory; name: string; color: string; icon: 
   { id: "primary",   name: "Primary",   color: "#22c55e", icon: "🟢" },
   { id: "premium",   name: "Premium",   color: "#3b82f6", icon: "🔵" },
   { id: "executive", name: "Executive", color: "#a78bfa", icon: "🟣" },
-  { id: "signature", name: "Signature", color: "#f5c842", icon: "🟡" },
 ];
+// Signature badges are not requestable here; players choose Primary, Premium or Executive from the inventory.
 
 function loadRequests(): QuickRewardRequest[] {
   try {
@@ -133,18 +134,6 @@ export default function QuickXTracker({ user, onOpenFull }: { user: User; onOpen
     return () => { window.removeEventListener(UPDATED_EVENT, refresh); window.removeEventListener("storage", refresh); };
   }, [refresh]);
 
-  // Suggestions: current (non-legacy) catalog badges of the chosen type.
-  const suggestions = useMemo(() => {
-    const out: string[] = [];
-    try {
-      COIN_CATEGORIES.forEach(cat => {
-        if (!cat.name.toLowerCase().startsWith(badgeCat)) return;
-        (cat.coins || []).forEach(c => { if (c && c.name && !c.legacy) out.push(c.name); });
-      });
-    } catch { /* ignore */ }
-    return out;
-  }, [badgeCat]);
-
   const submit = useCallback(() => {
     if (busy) return;
     setMsg(null);
@@ -152,6 +141,7 @@ export default function QuickXTracker({ user, onOpenFull }: { user: User; onOpen
       const n = parseInt(amount, 10);
       if (!Number.isFinite(n) || n <= 0) { setMsg({ kind: "err", text: "Enter a positive XC amount." }); return; }
     }
+    if (type === "badge" && !badgeName.trim()) { setMsg({ kind: "err", text: "Choose the badge from the inventory." }); return; }
     if (!description.trim()) { setMsg({ kind: "err", text: "Tell your host what you did." }); return; }
     const link = proofLink.trim();
     if (!/^https?:\/\/\S+\.\S+/i.test(link)) { setMsg({ kind: "err", text: "Add a proof link that starts with https:// (Drive, Figma, GitHub…)." }); return; }
@@ -207,9 +197,9 @@ export default function QuickXTracker({ user, onOpenFull }: { user: User; onOpen
         <>
           <div>
             <label style={labelStyle}>Badge type</label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px" }}>
               {BADGE_CATEGORIES.map(b => (
-                <button key={b.id} onClick={() => setBadgeCat(b.id)} style={{
+                <button key={b.id} onClick={() => { setBadgeCat(b.id); setBadgeName(""); }} style={{
                   padding: "7px 8px", borderRadius: "10px", cursor: "pointer", fontSize: "11px", fontWeight: 800, textAlign: "left",
                   background: badgeCat === b.id ? `${b.color}22` : "rgba(255,255,255,0.03)",
                   border: badgeCat === b.id ? `1px solid ${b.color}` : "1px solid rgba(255,255,255,0.08)",
@@ -219,12 +209,13 @@ export default function QuickXTracker({ user, onOpenFull }: { user: User; onOpen
             </div>
           </div>
           <div>
-            <label style={labelStyle}>Which badge? (optional)</label>
-            <input type="text" list="pflx-qxt-badges" value={badgeName} onChange={e => setBadgeName(e.target.value)}
-              style={inputStyle} placeholder="Pick one or type a name" />
-            <datalist id="pflx-qxt-badges">
-              {suggestions.map(n => <option key={n} value={n} />)}
-            </datalist>
+            <label style={labelStyle}>Choose the badge from the inventory</label>
+            <BadgePicker
+              category={badgeCat as PickableBadgeCategory}
+              value={badgeName} onChange={setBadgeName} compact
+              accent={(BADGE_CATEGORIES.find(b => b.id === badgeCat) || BADGE_CATEGORIES[0]).color}
+            />
+            {badgeName && <div style={{ marginTop: "6px", fontSize: "11px", color: "rgba(255,255,255,0.6)" }}>Selected: <b style={{ color: "#fff" }}>{badgeName}</b></div>}
           </div>
         </>
       )}
