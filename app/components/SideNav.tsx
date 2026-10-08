@@ -49,7 +49,28 @@ const CYAN_FAINT = "rgba(0,212,255,0.08)";
 export default function SideNav({ user }: NavProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const isHost = isHostUser(user);
+  const isHostAccount = isHostUser(user);
+  // A host who flips the Console to Player Mode gets the PLAYER sidebar (X-Tracker, Wallet...).
+  // Only honoured when X-Coin is embedded in the Console (standalone ignores the toggle, like RoleGuard).
+  const [viewRole, setViewRole] = useState<"host" | "player" | null>(null);
+  useEffect(() => {
+    let embedded = false;
+    try { embedded = window.self !== window.top; } catch { embedded = true; }
+    if (!embedded) return;
+    try {
+      const r = localStorage.getItem("pflx_active_role");
+      if (r === "host" || r === "player") setViewRole(r);
+    } catch { /* ignore */ }
+    function onMsg(ev: MessageEvent) {
+      try {
+        const m = typeof ev.data === "string" ? JSON.parse(ev.data) : ev.data;
+        if (m && m.type === "pflx_role_changed") setViewRole(m.role === "player" ? "player" : "host");
+      } catch { /* ignore */ }
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+  const isHost = isHostAccount && viewRole !== "player";
   // ── Embed mode: when this app is loaded inside the PFLX Platform Mission
   // Control iframe (?embed=mc), hide the X-Coin sidebar entirely so the
   // parent shell is the only chrome the host sees. This prevents duplicate

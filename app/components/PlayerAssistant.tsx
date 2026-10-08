@@ -7,6 +7,7 @@ import {
   getLevelFromXC, getXCProgress, getCurrentRank, getRankProgress,
   isAssignedToPlayer,
 } from "../lib/data";
+import QuickXTracker, { useXTrackerSync } from "./QuickXTracker";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Message {
@@ -413,6 +414,7 @@ export default function PlayerAssistant() {
   const [thinking, setThinking] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
   const [listening, setListening] = useState(false);
+  const [view, setView] = useState<"chat" | "track">("chat"); // Quick X-Track lives in this panel
   const bottomRef = useRef<HTMLDivElement>(null);
   const recogRef = useRef<SpeechRecognition | null>(null);
 
@@ -423,6 +425,14 @@ export default function PlayerAssistant() {
       try { setPlayer(JSON.parse(stored) as User); } catch { /* ignore */ }
     }
   }, []);
+
+  // Host approved / denied one of this player's X-Tracker requests (kept current on every player page)
+  useXTrackerSync(player?.id, (r) => {
+    const what = r.type === "xc" ? `${r.amount} XC` : (r.badgeName || "badge");
+    addMsg("assistant", r.status === "approved"
+      ? `✅ Your host approved your X-Tracker request (${what}) — it's on your account!`
+      : `❌ Your host denied your X-Tracker request (${what})${r.reviewerNote ? ": " + r.reviewerNote : "."}`);
+  });
 
   // Scroll to bottom
   useEffect(() => {
@@ -456,6 +466,11 @@ export default function PlayerAssistant() {
     const text = (raw ?? input).trim();
     if (!text) return;
     setInput("");
+    // "X-Tracker" / "request a reward" → open the quick tracker right here
+    if (/\bx[-\s]?track(er|ing)?\b|\breward request\b|\brequest (a )?(reward|badge|xc)\b/i.test(text)) {
+      setView("track");
+      return;
+    }
     addMsg("user", text);
     setThinking(true);
 
@@ -539,7 +554,7 @@ export default function PlayerAssistant() {
   const ACCENT = "#a855f7"; // purple
   const GOLD = "#f5c842";
 
-  const quickChips = ["Prioritize", "My tasks", "How to level up", "Deadlines", "Help"];
+  const quickChips = ["⚡ X-Tracker", "Prioritize", "My tasks", "How to level up", "Deadlines", "Help"];
 
   return (
     <>
@@ -630,6 +645,22 @@ export default function PlayerAssistant() {
             </div>
           </div>
 
+          {/* View tabs: Coach chat | Quick X-Track */}
+          <div style={{ display: "flex", gap: "6px", padding: "8px 12px 0" }}>
+            {([["chat", "💬 COACH"], ["track", "⚡ X-TRACK"]] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setView(k)} style={{
+                flex: 1, padding: "7px 6px", borderRadius: "10px", cursor: "pointer", fontSize: "11px", fontWeight: 800, letterSpacing: "0.06em",
+                background: view === k ? `${ACCENT}33` : "rgba(255,255,255,0.04)",
+                border: view === k ? `1px solid ${ACCENT}` : "1px solid rgba(255,255,255,0.08)",
+                color: view === k ? "#f0e8ff" : "rgba(255,255,255,0.5)",
+              }}>{label}</button>
+            ))}
+          </div>
+
+          {view === "track" ? (
+            <QuickXTracker user={player} onOpenFull={() => { setOpen(false); router.push("/player/submit"); }} />
+          ) : (
+          <>
           {/* Messages */}
           <div style={{ flex: 1, overflowY: "auto", padding: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
             {messages.map(msg => (
@@ -716,6 +747,8 @@ export default function PlayerAssistant() {
               ➤
             </button>
           </div>
+          </>
+          )}
         </div>
       )}
     </>
