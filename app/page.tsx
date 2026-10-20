@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { mockUsers, isHostUser } from "./lib/data";
 import { saveUsers } from "./lib/store";
+import { pflxLogin, pflxVerify, getToken, isPflxOrigin } from "./lib/pflxAuth";
 
 type Step = "select" | "pin" | "change-pin" | "claim";
 
@@ -31,20 +32,22 @@ export default function Home() {
 
   // ═══ PFLX SSO AUTO-LOGIN ═══
   // When embedded in the PFLX Platform, URL params bypass the login screen
-  useEffect(() => {
+  useEffect(() => { (async () => {
     const params = new URLSearchParams(window.location.search);
     const sso = params.get("sso");
     const brand = params.get("brand");
-    const ssoPin = params.get("pin");
+    const ssoToken = params.get("token") || "";
     if (sso === "pflx" && brand) {
+      // v295: a Platform link only signs you in if its sign-in pass checks
+      // out on the server; the identity comes from the pass, not the URL.
+      const who = ssoToken ? await pflxVerify(ssoToken) : null;
       const user = mockUsers.find(
-        u => (u.brandName || "").toLowerCase() === brand.toLowerCase()
+        u => who ? (u.id === who.id || (u.brandName || "").toLowerCase() === String(who.brand || "").toLowerCase())
+                 : (u.brandName || "").toLowerCase() === brand.toLowerCase()
       );
       if (user) {
         const autoselect = params.get("autoselect") === "true";
-        // Validate PIN if provided, otherwise trust SSO
-        const correctPin = user.pin ?? (user.role === "admin" ? "0000" : "1234");
-        if (!ssoPin || ssoPin === correctPin) {
+        if (who) {
           // SSO from PFLX Overlay — mark onboarding complete (handled by overlay login)
           // SSO from PFLX Platform — mark onboarding complete (handled by overlay login)
           user.onboardingComplete = true;
@@ -94,6 +97,10 @@ export default function Home() {
       let u: any;
       try { u = JSON.parse(existing); } catch(e) { console.warn("[X-Coin] Corrupt pflx_user in localStorage, clearing"); localStorage.removeItem("pflx_user"); localStorage.removeItem("pflx_keep_signed_in"); setSessionChecked(true); return; }
       if (!u || !u.id) { localStorage.removeItem("pflx_user"); localStorage.removeItem("pflx_keep_signed_in"); setSessionChecked(true); return; }
+      const __who = await pflxVerify(getToken());
+      if (!__who || (__who.id !== u.id && String(__who.brand || "").toLowerCase() !== String(u.brandName || u.brand || "").toLowerCase())) {
+        localStorage.removeItem("pflx_user"); localStorage.removeItem("pflx_keep_signed_in"); setSessionChecked(true); return;
+      }
       // Set role before routing to prevent RoleGuard conflict
       const resumeRole = isHostUser(u) ? "host" : "player";
       localStorage.setItem("pflx_active_role", resumeRole);
@@ -107,6 +114,7 @@ export default function Home() {
     }
     // No SSO and no keep-signed-in — safe to show login screen
     setSessionChecked(true);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -117,14 +125,20 @@ export default function Home() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.parent === window) return; // standalone — local login flow OK
-    function adoptFromPlatform(detailUser?: { brand?: string; brandName?: string; id?: string; role?: string; xc?: number; cohort?: string; image?: string; }) {
+    async function adoptFromPlatform(detailUser?: { brand?: string; brandName?: string; id?: string; role?: string; xc?: number; cohort?: string; image?: string; token?: string; }) {
       try {
+        // v295: trust the Platform's identity only with a valid sign-in pass.
+        const __tok = (detailUser && (detailUser as any).token) || new URLSearchParams(window.location.search).get("token") || getToken();
+        const __who = await pflxVerify(__tok);
+        if (!__who) return false;
         let u = detailUser as any;
         if (!u) {
           const cached = localStorage.getItem("pflx_user");
           if (cached) u = JSON.parse(cached);
         }
         if (!u) return false;
+        if (u.id && u.id !== __who.id) return false;
+        u = { ...u, id: __who.id, brand: __who.brand, brandName: __who.brand, role: __who.role };
         const brand = (u.brand || u.brandName || "").toString();
         if (!brand) return false;
         // Find matching mockUser; if not found, synthesize a minimal one so
@@ -137,7 +151,7 @@ export default function Home() {
             id: u.id || ("platform-" + Date.now()),
             name: u.name || brand,
             brandName: brand,
-            role: (u.role && /admin|host|teacher|instructor|master/i.test(String(u.role))) ? "admin" : "player",
+            role: (__who.role && /admin|host|teacher|instructor|master/i.test(String(__who.role))) ? "admin" : "player",
             avatar: "",
             digitalBadges: u.digitalBadges || 0,
             xcoin: u.xc || u.xcoin || 0,
@@ -146,8 +160,8 @@ export default function Home() {
             cohort: u.cohort || "PlayerPool", pathway: "",
             joinedAt: new Date().toISOString(),
             email: u.email || "", image: u.image || "",
-            pin: u.pin || "", claimed: true,
-            isHost: /admin|host|teacher|instructor|master/i.test(String(u.role || "")),
+            pin: "", claimed: true,
+            isHost: /admin|host|teacher|instructor|master/i.test(String(__who.role || "")),
             studioId: "", badgeCounts: u.badgeCounts || { primary: 0, premium: 0, executive: 0, signature: 0 },
             onboardingComplete: true, pinChanged: true,
           };
@@ -191,11 +205,12 @@ export default function Home() {
     setStep("pin");
   };
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     if (!selectedUser) return;
     setPinError("");
-    const correctPin = selectedUser.pin ?? (selectedUser.role === "admin" ? "0000" : "1234");
-    if (pin === correctPin) {
+    const res = await pflxLogin(selectedUser.id || selectedUser.brandName || "", pin);
+    if (res.error === "too_many_attempts") { setPinError("Too many tries — wait 15 minutes."); setPin(""); return; }
+    if (res.ok) {
       // If player hasn't changed PIN yet (claimed account), go to change-pin step
       if (selectedUser.role === "player" && !selectedUser.isHost && selectedUser.pinChanged === false) {
         setStep("change-pin");
@@ -250,6 +265,9 @@ export default function Home() {
   };
 
   const handleClaimAccount = () => {
+    setClaimError("Claiming an account now happens on the PFLX Platform login page.");
+    return;
+    // eslint-disable-next-line no-unreachable
     setClaimError("");
     if (!claimEmail.trim()) { setClaimError("Email address is required"); return; }
     const match = mockUsers.find(u => u.email?.toLowerCase() === claimEmail.toLowerCase().trim());

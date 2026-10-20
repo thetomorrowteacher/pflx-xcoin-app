@@ -1,4 +1,5 @@
 "use client";
+import { isPflxOrigin } from "../lib/pflxAuth";
 import { useEffect } from "react";
 import { saveData } from "../lib/persistence";
 import { isStoreReady, initStore } from "../lib/store";
@@ -161,6 +162,8 @@ export default function PflxBridge() {
 
     function handleMessage(event: MessageEvent) {
       try {
+        // v295: only the PFLX Platform (or this app itself) may talk to the bridge.
+        if (event.origin !== window.location.origin && !isPflxOrigin(event.origin)) return;
         const msg = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
 
         // ── Identity broadcast from Platform → adopt as the active user ──
@@ -229,7 +232,7 @@ export default function PflxBridge() {
               joinedAt:       p.joinedAt || new Date().toISOString(),
               email:          p.email || "",
               image:          p.image || "",
-              pin:            p.pin || "",
+              pin:            "",
               claimed:        !!p.claimed,
               isHost:         p.role === "admin",
               studioId:       p.studioId || "",
@@ -411,7 +414,7 @@ export default function PflxBridge() {
                   joinedAt:       p.joinedAt || new Date().toISOString(),
                   email:          p.email || "",
                   image:          p.image || "",
-                  pin:            p.pin || "",
+                  pin:            "",
                   claimed:        !!p.claimed,
                   isHost:         p.role === "admin" || !!p.isHost,
                   studioId:       p.studioId || "",
@@ -472,7 +475,7 @@ export default function PflxBridge() {
               joinedAt:       p.joinedAt || new Date().toISOString(),
               email:          p.email || "",
               image:          p.image || "",
-              pin:            p.pin || "",
+              pin:            "",
               claimed:        !!p.claimed,
               isHost:         p.role === "admin",
               studioId:       p.studioId || "",

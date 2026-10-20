@@ -771,7 +771,7 @@ export let mockUsers: User[] = [
     pathway: "Host",
     joinedAt: "2024-01-01",
     email: "host@prototypeflx.com",
-    pin: "0000",
+    pin: "",
     claimed: true,
   },
   {
@@ -790,7 +790,7 @@ export let mockUsers: User[] = [
     pathway: "Host",
     joinedAt: "2024-08-01",
     email: "ennisjohnsonjr@thetomorrowteacher.org",
-    pin: "1111",
+    pin: "",
     claimed: true,
   },
 ];

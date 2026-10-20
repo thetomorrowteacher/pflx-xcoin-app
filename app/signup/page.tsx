@@ -34,6 +34,9 @@ export default function SignupPage() {
   };
 
   const handleClaim = () => {
+    // v295: disabled — claiming by email let anyone reset any account's PIN.
+    if (typeof window !== 'undefined') { window.location.href = 'https://prototypeflx.com'; }
+    return;
     if (!foundUser) return;
     // Generate a temporary PIN for the player
     const pin = generatePin();
